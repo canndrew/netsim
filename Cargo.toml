@@ -2,6 +2,7 @@
 name = "netsim"
 version = "0.1.0"
 authors = ["Andrew Cann <shum@canndrew.org>"]
+description = "Network simulator"
 
 [dependencies]
 libc = "*"
