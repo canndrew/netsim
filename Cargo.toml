@@ -1,0 +1,28 @@
+[package]
+name = "netsim"
+version = "0.1.0"
+authors = ["Andrew Cann <shum@canndrew.org>"]
+
+[dependencies]
+libc = "*"
+unwrap = "1.1"
+get_if_addrs = "0.4"
+tun = "*"
+lazy_static = "*"
+future-utils = "*"
+futures = "*"
+tokio-core = "*"
+tokio-io = "*"
+void = "*"
+net-literals = "*"
+rand = "*"
+ioctl-sys = "*"
+bytes = "*"
+#backtrace-sys = "=0.1.15"
+backtrace = "0.3.3"
+mio = "*"
+quick-error = "*"
+
+[build-dependencies]
+bindgen = "0.30.0"
+
