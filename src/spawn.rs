@@ -1,14 +1,16 @@
-use std::{mem, thread, panic, ptr};
-use std::sync::{Arc, Mutex, Condvar};
-use std::panic::AssertUnwindSafe;
-use libc::{self, c_void, c_int};
+//! contains functions for spawning network environments.
+//!
+//! `new_namespace` is the most fundamental of these functions though there are other, more
+//! higher-level functions which are likely to be more useful for testing.
+
+use priv_prelude::*;
+use libc;
 use std::sync::mpsc;
-use tokio_core::reactor::Handle;
-use tap::{Tap, TapBuilderV4};
 
 const STACK_SIZE: usize = 8 * 1024 * 1024;
 const STACK_ALIGN: usize = 16;
 
+/// A join handle for a thread.
 pub struct JoinHandle<R> {
     inner: Arc<JoinHandleInner<R>>,
     stack_base: *mut u8,
@@ -32,6 +34,9 @@ where
     }
 }
 
+/// Run the function `func` in its own network namespace. This namespace will not have any network
+/// interfaces. You can create virtual interfaces using `Tap`, or use one of the other functions in
+/// this module which do this for you.
 pub fn new_namespace<F, R>(func: F) -> JoinHandle<R>
 where
     F: FnOnce() -> R,
@@ -65,30 +70,52 @@ where
         libc::CLONE_NEWUTS |
         libc::CLONE_NEWUSER;
 
-    type CbData<R> = (Box<FnBox<R>>, Arc<JoinHandleInner<R>>);
-
-    extern "C" fn clone_cb<R>(arg: *mut c_void) -> c_int {
+    //type CbData<R: Send + 'static> = (Box<FnBox<R> + Send>, Arc<JoinHandleInner<R>>);
+    //type CbData = (Box<FnBox<R> + Send>, Arc<JoinHandleInner<R>>);
+    struct CbData<R: Send + 'static> {
+        func: Box<FnBox<R> + Send + 'static>,
+        inner: Arc<JoinHandleInner<R>>,
+    }
+    
+    extern "C" fn clone_cb<R: Send + 'static>(arg: *mut c_void) -> c_int {
         let data: *mut CbData<R> = arg as *mut _;
         let data: Box<CbData<R>> = unsafe { Box::from_raw(data) };
+        //let data: *mut CbData = arg as *mut _;
+        //let data: Box<CbData> = unsafe { Box::from_raw(data) };
         let data = *data;
-        let (func, inner) = data;
+        let CbData { func, inner } = data;
 
-        let func = AssertUnwindSafe(func);
-        let r = panic::catch_unwind(move || {
-            let AssertUnwindSafe(func) = func;
-            func.call_box()
+        // WARNING: HACKERY
+        // 
+        // This should ideally be done without spawning another thread. We're already inside a
+        // thread (spawned by clone), but that thread doesn't respect rust's thread-local storage
+        // for some reason. So we spawn a thread in a thread in order to get our own local storage
+        // keys. There should be a way to do this which doesn't involve spawning two threads and
+        // letting one of them die.
+        //
+        // Additionally, if we do want to spawn a seperate thread then we should be able to use
+        // its JoinHandle rather than crafting our own.
+
+        thread::spawn(move || {
+            let func = AssertUnwindSafe(func);
+            let r = panic::catch_unwind(move || {
+                let AssertUnwindSafe(func) = func;
+                func.call_box()
+            });
+
+            let mut result = unwrap!(inner.result.lock());
+            *result = Some(r);
+            drop(result);
+            inner.condvar.notify_one();
         });
-
-        let mut result = unwrap!(inner.result.lock());
-        *result = Some(r);
-        drop(result);
-        inner.condvar.notify_one();
         0
     }
 
     let stack_head = ((stack_base as usize + STACK_SIZE + STACK_ALIGN) & !(STACK_ALIGN - 1)) as *mut c_void;
     let func = Box::new(func);
-    let arg: Box<CbData<R>> = Box::new((func, inner_cloned));
+    //let arg: Box<CbData<R>> = Box::new((func, inner_cloned));
+    let arg: Box<CbData<R>> = Box::new(CbData { func: func, inner: inner_cloned, });
+    //let arg: Box<CbData> = Box::new((func, inner_cloned));
     let arg = Box::into_raw(arg) as *mut c_void;
     
     let res = unsafe {
@@ -100,6 +127,7 @@ where
 }
 
 impl<R> JoinHandle<R> {
+    /// Join a thread, returning its result.
     pub fn join(mut self) -> thread::Result<R> {
         let mut result = unwrap!(self.inner.result.lock());
         loop {
@@ -130,6 +158,10 @@ impl<R> Drop for JoinHandle<R> {
     }
 }
 
+/// Spawn a function into a new network namespace with a set of network interfaces described by
+/// `ifaces`. Returns a `JoinHandle` which can be used to join the spawned thread, along with a set
+/// of `Tap`s, one for each interface, which can be used to read/write network activity from the
+/// spawned thread.
 pub fn spawn_with_ifaces<F, R>(
     handle: &Handle,
     ifaces: Vec<TapBuilderV4>,
@@ -139,43 +171,88 @@ where
     R: Send + 'static,
     F: FnOnce() -> R + Send + 'static,
 {
-    let remote = handle.remote().clone();
     let (tx, rx) = mpsc::channel();
     let join_handle = new_namespace(move || {
-        let handle = unwrap!(remote.handle(), "no core is currently running!");
         let mut taps = Vec::with_capacity(ifaces.len());
         for tap_builder in ifaces {
-            taps.push(unwrap!(tap_builder.build(&handle)));
+            taps.push(unwrap!(tap_builder.build_unbound()));
         }
         unwrap!(tx.send(taps));
         func()
     });
 
-    let taps = unwrap!(rx.recv());
+    let taps_unbound = unwrap!(rx.recv());
+    let mut taps = Vec::with_capacity(taps_unbound.len());
+    for tap_unbound in taps_unbound {
+        taps.push(tap_unbound.bind(handle));
+    }
     (join_handle, taps)
+}
+
+/// Spawn a function into a new network namespace with a single network interface behind a virtual
+/// NAT. The returned `Gateway` can be used to read/write network activity from the public side of
+/// the NAT.
+pub fn spawn_behind_gateway<F, R>(
+    handle: &Handle,
+    func: F,
+) -> (JoinHandle<R>, Gateway)
+where
+    R: Send + 'static,
+    F: FnOnce() -> R + Send + 'static,
+{
+    let subnet = SubnetV4::random_local();
+    let addr = subnet.random_client_addr();
+    //let subnet = SubnetV4::local_10();
+    //let addr = ipv4!("10.0.0.2");
+    let mut tap_builder = TapBuilderV4::new();
+    tap_builder.address(IfaceAddrV4 {
+        address: addr,
+        netmask: subnet.netmask(),
+    });
+    tap_builder.route(RouteV4::new(SubnetV4::global(), Some(subnet.gateway_addr())));
+
+    let (join_handle, taps) = spawn_with_ifaces(handle, vec![tap_builder], func);
+    let tap = unwrap!(taps.into_iter().next());
+    let gateway = {
+        GatewayBuilder::new(subnet)
+        .build(Box::new(tap))
+    };
+
+    (join_handle, gateway)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use futures::{future, Future, Stream};
-    use tokio_core::reactor::Core;
     use get_if_addrs;
-    use void::ResultVoidExt;
-    use tap::IfaceAddrV4;
     use std;
-    use route::{SubnetV4, RouteV4};
-    use ethernet::{EtherPayload};
-    use ip::Ipv4Payload;
-    use std::net::{SocketAddr, SocketAddrV4};
     use rand;
-    use future_utils::StreamExt;
+    use std::cell::Cell;
+    use env_logger;
+
+    #[test]
+    fn respects_thread_local_storage() {
+        thread_local! {
+            static TEST: Cell<u32> = Cell::new(0);
+        };
+
+        TEST.with(|v| v.set(123));
+        let join_handle = new_namespace(|| {
+            TEST.with(|v| {
+                assert_eq!(v.get(), 0);
+                v.set(456);
+            });
+        });
+        unwrap!(join_handle.join());
+        TEST.with(|v| assert_eq!(v.get(), 123));
+    }
 
     #[test]
     fn test_no_network() {
         let mut core = unwrap!(Core::new());
         let handle = core.handle();
         let res = core.run(future::lazy(|| {
+            let handle = handle.remote().handle().unwrap();
             let (join_handle, taps) = spawn_with_ifaces(&handle, vec![], || {
                 unwrap!(get_if_addrs::get_if_addrs())
             });
@@ -189,28 +266,63 @@ mod test {
 
     #[test]
     fn test_one_interface_send_udp() {
+        let _ = env_logger::init();
         let mut core = unwrap!(Core::new());
         let handle = core.handle();
         let res = core.run(future::lazy(|| {
+            trace!("starting");
+            let subnet = SubnetV4::random_local();
             let mut tap_builder = TapBuilderV4::new();
-            tap_builder.address(IfaceAddrV4::default());
+            tap_builder.address(IfaceAddrV4 {
+                address: subnet.random_client_addr(),
+                netmask: subnet.netmask(),
+            });
             tap_builder.route(RouteV4 {
                 destination: SubnetV4::new(ipv4!("0.0.0.0"), 0),
-                gateway: ipv4!("0.0.0.0"),
+                gateway: subnet.gateway_addr(),
+                use_gateway: true,
             });
 
             let payload: [u8; 8] = rand::random();
             let addr = addrv4!("1.2.3.4:56");
+            trace!("spawning thread");
             let (join_handle, mut taps) = spawn_with_ifaces(&handle, vec![tap_builder], move || {
                 let socket = unwrap!(std::net::UdpSocket::bind(addr!("0.0.0.0:0")));
                 unwrap!(socket.send_to(&payload[..], SocketAddr::V4(addr)));
+                trace!("sent udp packet");
             });
             let tap = unwrap!(taps.pop());
 
-            tap
+            let mac_addr = rand::random();
+            let (tap_tx, tap_rx) = tap.split();
+            tap_rx
             .map_err(|e| panic!("error reading tap: {}", e))
-            .filter_map(move |ether_frame| {
-                match ether_frame.payload() {
+            .into_future()
+            .map_err(|(v, _)| v)
+            .and_then(move |(frame_opt, tap_rx)| {
+                let mut frame = unwrap!(frame_opt);
+                match frame.payload() {
+                    EtherPayload::Arp(arp) => {
+                        let src_mac = frame.source();
+                        frame.set_destination(src_mac);
+                        frame.set_source(mac_addr);
+                        frame.set_payload(EtherPayload::Arp(arp.response(mac_addr)));
+
+                        tap_tx
+                        .send(frame)
+                        .map_err(|e| panic!("error sending arp reply: {}", e))
+                        .and_then(|_tap_tx| {
+                            tap_rx
+                            .into_future()
+                            .map_err(|(v, _)| v)
+                        })
+                    },
+                    _ => panic!("unexpected frame {:?}", frame),
+                }
+            })
+            .map(move |(frame_opt, _tap_rx)| {
+                let frame = unwrap!(frame_opt);
+                match frame.payload() {
                     EtherPayload::Ipv4(ipv4_packet) => {
                         let dest_ip = ipv4_packet.destination();
                         let udp_packet = match ipv4_packet.payload() {
@@ -221,13 +333,11 @@ mod test {
                         let dest = SocketAddrV4::new(dest_ip, dest_port);
                         assert_eq!(dest, addr);
                         assert_eq!(udp_packet.payload(), &payload[..]);
-                        Some(())
-                    },
-                    _ => None,
+                    }
+                    _ => panic!("unexpected frame {:?}", frame),
                 }
             })
-            .first_ok()
-            .map_err(|_v| panic!("did not receive expected udp packet!"))
+            .map(move |()| unwrap!(join_handle.join()))
         }));
         res.void_unwrap()
     }

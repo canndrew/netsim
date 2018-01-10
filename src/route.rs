@@ -1,9 +1,9 @@
-use std::{io, mem};
-use std::net::Ipv4Addr;
-use std::ffi::CString;
+use priv_prelude::*;
 use sys;
 
 quick_error! {
+    /// Errors returned by `add_route` and `Route::add`
+    #[allow(missing_docs)]
     #[derive(Debug)]
     pub enum AddRouteError {
         CreateControlSocket(e: io::Error) {
@@ -22,35 +22,25 @@ quick_error! {
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct SubnetV4 {
-    addr: Ipv4Addr,
-    bits: u8,
-}
-
-impl SubnetV4 {
-    pub fn new(addr: Ipv4Addr, bits: u8) -> SubnetV4 {
-        SubnetV4 {
-            addr: Ipv4Addr::from(u32::from(addr) & !(0xffffffff >> bits)),
-            bits: bits,
-        }
-    }
-}
-
+/// Represents an IPv4 route.
 #[derive(Clone, Copy)]
 pub struct RouteV4 {
+    /// The destination subnet of the route. All packets to this subnet will use this route.
     pub destination: SubnetV4,
-    pub gateway: Ipv4Addr,
+    /// The gateway to route packets through (if any).
+    pub gateway: Option<Ipv4Addr>,
 }
 
 impl RouteV4 {
-    pub fn new(destination: SubnetV4, gateway: Ipv4Addr) -> RouteV4 {
+    /// Create a new route with the given destination and gateway
+    pub fn new(destination: SubnetV4, gateway: Option<Ipv4Addr>) -> RouteV4 {
         RouteV4 {
             destination,
             gateway,
         }
     }
 
+    /// Add the route to the routing table of the current network namespace.
     pub fn add(self, iface_name: &str) -> Result<(), AddRouteError> {
         add_route(self.destination, self.gateway, iface_name)
     }
@@ -58,7 +48,7 @@ impl RouteV4 {
 
 pub fn add_route(
     destination: SubnetV4,
-    gateway: Ipv4Addr,
+    gateway: Option<Ipv4Addr>,
     iface_name: &str,
 ) -> Result<(), AddRouteError> {
     let fd = unsafe {
@@ -77,24 +67,27 @@ pub fn add_route(
     };
 
     unsafe {
-        let route_gateway = &mut route.rt_gateway as *mut _ as *mut sys::sockaddr_in;
-        (*route_gateway).sin_family = sys::AF_INET as u16;
-        (*route_gateway).sin_addr = sys::in_addr { s_addr: gateway.into() };
-    };
-    
-    unsafe {
         let route_destination = &mut route.rt_dst as *mut _ as *mut sys::sockaddr_in;
         (*route_destination).sin_family = sys::AF_INET as u16;
-        (*route_destination).sin_addr = sys::in_addr { s_addr: destination.addr.into() };
+        (*route_destination).sin_addr = sys::in_addr { s_addr: u32::from(destination.base_addr()).to_be() };
     };
 
     unsafe {
         let route_genmask = &mut route.rt_genmask as *mut _ as *mut sys::sockaddr_in;
         (*route_genmask).sin_family = sys::AF_INET as u16;
-        (*route_genmask).sin_addr = sys::in_addr { s_addr: !(0xffffffffu32 >> destination.bits) };
+        (*route_genmask).sin_addr = sys::in_addr { s_addr: u32::from(destination.netmask()).to_be() };
     };
 
     route.rt_flags = sys::RTF_UP as u16;
+    if let Some(gateway_addr) = gateway {
+        unsafe {
+            let route_gateway = &mut route.rt_gateway as *mut _ as *mut sys::sockaddr_in;
+            (*route_gateway).sin_family = sys::AF_INET as u16;
+            (*route_gateway).sin_addr = sys::in_addr { s_addr: u32::from(gateway_addr).to_be() };
+        };
+    
+        route.rt_flags |= sys::RTF_GATEWAY as u16;
+    }
 
     let name = match CString::new(iface_name) {
         Ok(name) => name,

@@ -1,19 +1,12 @@
-use std::{io, mem, ptr, slice};
-use std::io::{Read, Write};
-use std::ffi::CString;
-use std::os::unix::io::AsRawFd;
-use std::net::Ipv4Addr;
-use libc::{self, c_int};
+//! Contains utilites for working with virtual (TAP) network interfaces.
+
+use priv_prelude::*;
+use libc;
 use sys;
-use bytes::{Bytes, BytesMut};
-use futures::{Async, AsyncSink, Stream, Sink};
-use tokio_core::reactor::{Handle, PollEvented};
-use fd::AsyncFd;
-use route::{RouteV4, AddRouteError};
-use std::str;
-use ethernet::EtherFrame;
 
 quick_error! {
+    /// Error returned by `TapBuilderV4::build`
+    #[allow(missing_docs)]
     #[derive(Debug)]
     pub enum TapBuildError {
         NameContainsNul {
@@ -47,6 +40,16 @@ quick_error! {
             display("failed to create dummy socket: {}", e)
             cause(e)
         }
+        SetInterfaceAddress(e: io::Error) {
+            description("failed to set interface address")
+            display("failed to set interface address: {}", e)
+            cause(e)
+        }
+        SetInterfaceNetmask(e: io::Error) {
+            description("failed to set interface netmask")
+            display("failed to set interface netmask: {}", e)
+            cause(e)
+        }
         GetInterfaceFlags(e: io::Error) {
             description("failed to get newly created interface's flags")
             display("failed to get newly created interface's flags: {}", e)
@@ -60,14 +63,20 @@ quick_error! {
     }
 }
 
+/// This object can be used to set the configuration options for a `Tap` before creating the `Tap`
+/// using `build`.
 pub struct TapBuilderV4 {
-    pub name: String,
-    pub address: Option<IfaceAddrV4>,
-    pub routes: Vec<RouteV4>,
+    name: String,
+    address: Option<IfaceAddrV4>,
+    routes: Vec<RouteV4>,
 }
 
+// TODO: don't really need this type.
+/// Contains interface ipv4 address parameters.
 pub struct IfaceAddrV4 {
+    /// The interface's address
     pub address: Ipv4Addr,
+    /// The interface's netmask
     pub netmask: Ipv4Addr,
 }
 
@@ -81,39 +90,47 @@ impl Default for TapBuilderV4 {
     }
 }
 
-impl Default for IfaceAddrV4 {
-    fn default() -> IfaceAddrV4 {
-        IfaceAddrV4 {
-            address: ipv4!("192.168.0.2"),
-            netmask: ipv4!("255.255.255.0"),
-        }
-    }
+mod ioctl {
+    use priv_prelude::*;
+    use sys;
+
+    ioctl!(bad read siocgifflags with 0x8913; sys::ifreq);
+    ioctl!(bad write siocsifflags with 0x8914; sys::ifreq);
+    ioctl!(bad write siocsifaddr with 0x8916; sys::ifreq);
+    //ioctl!(bad read siocgifnetmask with 0x891b; sys::ifreq);
+    ioctl!(bad write siocsifnetmask with 0x891c; sys::ifreq);
+    ioctl!(write tunsetiff with b'T', 202; c_int);
 }
 
-ioctl!(bad read siocgifflags with 0x8913; sys::ifreq);
-ioctl!(bad write siocsifflags with 0x8914; sys::ifreq);
-
 impl TapBuilderV4 {
+    /// Start building a new `Tap` with the default configuration options.
     pub fn new() -> TapBuilderV4 {
         Default::default()
     }
 
+    /// Set the interface name.
     pub fn name<S: Into<String>>(&mut self, name: S) -> &mut Self {
         self.name = name.into();
         self
     }
 
+    /// Set the interface address and netmask.
     pub fn address(&mut self, address: IfaceAddrV4) -> &mut Self {
         self.address = Some(address);
         self
     }
 
+    /// Add a route to the set of routes that will be created and directed through this interface.
     pub fn route(&mut self, route: RouteV4) -> &mut Self {
         self.routes.push(route);
         self
     }
 
-    pub fn build(self, handle: &Handle) -> Result<Tap, TapBuildError> {
+    /// Consume this `TapBuilderV4` and build a `PreTap`. This creates the TAP device but does not
+    /// bind it to a tokio event loop. This is useful if the event loop lives in a different thread
+    /// to where you need to create the device. You can send a `PreTap` to another thread then
+    /// `bind` it to create your `Tap`.
+    pub fn build_unbound(self) -> Result<PreTap, TapBuildError> {
         let name = match CString::new(self.name) {
             Ok(name) => name,
             Err(..) => {
@@ -145,7 +162,7 @@ impl TapBuilderV4 {
         };
 
         let res = unsafe {
-            tunsetiff(fd.as_raw_fd(), &mut req as *mut _ as *mut _)
+            ioctl::tunsetiff(fd.as_raw_fd(), &mut req as *mut _ as *mut _)
         };
         if res < 0 {
             return Err(TapBuildError::CreateTun(io::Error::last_os_error()));
@@ -171,13 +188,45 @@ impl TapBuilderV4 {
             if fd < 0 {
                 return Err(TapBuildError::CreateDummySocket(io::Error::last_os_error()));
             }
-			if siocgifflags(fd, &mut req) < 0 {
+
+            if let Some(address) = self.address {
+                {
+                    let addr = &mut req.ifr_ifru.ifru_addr;
+                    let addr = addr as *mut sys::sockaddr;
+                    let addr = addr as *mut sys::sockaddr_in;
+                    let addr = &mut *addr;
+                    addr.sin_family = sys::AF_INET as sys::sa_family_t;
+                    addr.sin_port = 0;
+                    addr.sin_addr.s_addr = u32::from(address.address).to_be();
+                }
+
+                if ioctl::siocsifaddr(fd, &req) < 0 {
+                    return Err(TapBuildError::SetInterfaceAddress(io::Error::last_os_error()));
+                }
+
+
+                {
+                    let addr = &mut req.ifr_ifru.ifru_addr;
+                    let addr = addr as *mut sys::sockaddr;
+                    let addr = addr as *mut sys::sockaddr_in;
+                    let addr = &mut *addr;
+                    addr.sin_family = sys::AF_INET as sys::sa_family_t;
+                    addr.sin_port = 0;
+                    addr.sin_addr.s_addr = u32::from(address.netmask).to_be();
+                }
+
+                if ioctl::siocsifnetmask(fd, &req) < 0 {
+                    return Err(TapBuildError::SetInterfaceNetmask(io::Error::last_os_error()));
+                }
+            }
+
+			if ioctl::siocgifflags(fd, &mut req) < 0 {
 				return Err(TapBuildError::GetInterfaceFlags(io::Error::last_os_error()));
 			}
 
 			req.ifr_ifru.ifru_flags |= (sys::IFF_UP as u32 | sys::IFF_RUNNING as u32) as i16;
 
-			if siocsifflags(fd, &mut req) < 0 {
+			if ioctl::siocsifflags(fd, &mut req) < 0 {
 				return Err(TapBuildError::SetInterfaceFlags(io::Error::last_os_error()));
 			}
 		}
@@ -186,17 +235,38 @@ impl TapBuilderV4 {
             route.add(&real_name).map_err(TapBuildError::CreateRoute)?;
         }
 
-        let fd = unwrap!(PollEvented::new(fd, handle));
 
-        Ok(Tap { fd })
+        Ok(PreTap { fd })
+    }
+
+    /// Consume this `TapBuilderV4` and build the TAP interface. The returned `Tap` object can be
+    /// used to read/write ethernet frames from this interface. `handle` is a handle to a tokio
+    /// event loop which will be used for reading/writing.
+    pub fn build(self, handle: &Handle) -> Result<Tap, TapBuildError> {
+        Ok(self.build_unbound()?.bind(handle))
     }
 }
 
+/// Represents a TAP device which has been built but not bound to a tokio event loop.
+pub struct PreTap {
+    fd: AsyncFd,
+}
+
+impl PreTap {
+    /// Bind the tap device to the event loop, creating a `Tap` which you can read/write ethernet
+    /// frames with.
+    pub fn bind(self, handle: &Handle) -> Tap {
+        let PreTap { fd } = self;
+        let fd = unwrap!(PollEvented::new(fd, handle));
+        Tap { fd }
+    }
+}
+
+/// A handle to a virtual (TAP) network interface. Can be used to read/write ethernet frames
+/// directly to the device.
 pub struct Tap {
     fd: PollEvented<AsyncFd>,
 }
-
-ioctl!(write tunsetiff with b'T', 202; c_int);
 
 impl Stream for Tap {
     type Item = EtherFrame;
@@ -214,6 +284,7 @@ impl Stream for Tap {
             Ok(0) => Ok(Async::Ready(None)),
             Ok(n) => {
 
+                /*
                 'out: for i in 0.. {
                     println!("");
                     for j in 0..4 {
@@ -226,9 +297,11 @@ impl Stream for Tap {
                     }
                 }
                 println!("");
+                */
 
                 let bytes = Bytes::from(&buffer[..n]);
                 let frame = EtherFrame::from_bytes(bytes);
+                trace!("reading frame: {:?}", frame);
                 Ok(Async::Ready(Some(frame)))
             },
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -245,18 +318,20 @@ impl Sink for Tap {
     type SinkError = io::Error;
     
     fn start_send(&mut self, item: EtherFrame) -> io::Result<AsyncSink<EtherFrame>> {
+        trace!("sending frame to TAP device");
         if let Async::NotReady = self.fd.poll_write() {
             return Ok(AsyncSink::NotReady(item));
         }
 
-        match self.fd.write(&item.data()[..]) {
-            Ok(n) => assert_eq!(n, item.data().len()),
+        match self.fd.write(&item.as_bytes()[..]) {
+            Ok(n) => assert_eq!(n, item.as_bytes().len()),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 self.fd.need_write();
                 return Ok(AsyncSink::NotReady(item));
             }
             Err(e) => return Err(e),
         }
+        trace!("sent: {:?}", item);
         Ok(AsyncSink::Ready)
     }
 

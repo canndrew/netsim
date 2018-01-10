@@ -16,13 +16,18 @@ tokio-core = "*"
 tokio-io = "*"
 void = "*"
 net-literals = "*"
-rand = "*"
+rand = "0.4"
+rand_derive = "*"
+#rand = { path = "../rand" }
+#rand_derive = { path = "../rand/rand-derive" }
 ioctl-sys = "*"
 bytes = "*"
 #backtrace-sys = "=0.1.15"
 backtrace = "0.3.3"
 mio = "*"
 quick-error = "*"
+log = "*"
+env_logger = "*"
 
 [build-dependencies]
 bindgen = "0.30.0"

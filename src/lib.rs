@@ -78,6 +78,8 @@
 //! TODO
 //!
 
+//#![deny(missing_docs)]
+
 extern crate libc;
 #[macro_use]
 extern crate unwrap;
@@ -95,11 +97,16 @@ extern crate void;
 extern crate net_literals;
 extern crate rand;
 #[macro_use]
+extern crate rand_derive;
+#[macro_use]
 extern crate ioctl_sys;
 extern crate bytes;
 extern crate mio;
 #[macro_use]
 extern crate quick_error;
+#[macro_use]
+extern crate log;
+extern crate env_logger;
 
 //mod machine;
 //pub mod plug;
@@ -109,10 +116,20 @@ mod fd;
 mod sys;
 mod route;
 mod ethernet;
-mod ip;
+mod ipv4;
+mod ipv6;
 mod udp;
+//mod frame_buffer;
+mod gateway;
+mod link;
+mod util;
+mod time;
+mod subnet;
+mod arp;
+mod icmpv6;
 
-pub use spawn::JoinHandle;
-pub use tap::{Tap, TapBuilderV4, IfaceAddrV4};
-//pub use machine::spawn_with_ifaces;
+mod prelude;
+mod priv_prelude;
+
+pub use prelude::*;
 
