@@ -6,29 +6,27 @@ quick_error! {
     #[allow(missing_docs)]
     #[derive(Debug)]
     pub enum AddRouteError {
-        CreateControlSocket(e: io::Error) {
-            description("failed to create control socket")
-            display("failed to create control socket: {}", e)
+        ProcessFileDescriptorLimit(e: io::Error) {
+            description("process file descriptor limit hit")
+            display("process file descriptor limit hit ({})", e)
+            cause(e)
+        }
+        SystemFileDescriptorLimit(e: io::Error) {
+            description("system file descriptor limit hit")
+            display("system file descriptor limit hit ({})", e)
             cause(e)
         }
         NameContainsNul {
             description("interface name contains interior NUL byte")
         }
-        AddRoute(e: io::Error) {
-            description("call to SIOCADDRT ioctl to add route failed")
-            display("call to SIOCADDRT ioctl to add route failed: {}", e)
-            cause(e)
-        }
     }
 }
 
 /// Represents an IPv4 route.
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct RouteV4 {
-    /// The destination subnet of the route. All packets to this subnet will use this route.
-    pub destination: SubnetV4,
-    /// The gateway to route packets through (if any).
-    pub gateway: Option<Ipv4Addr>,
+    destination: SubnetV4,
+    gateway: Option<Ipv4Addr>,
 }
 
 impl RouteV4 {
@@ -38,6 +36,14 @@ impl RouteV4 {
             destination,
             gateway,
         }
+    }
+
+    pub fn destination(&self) -> SubnetV4 {
+        self.destination
+    }
+
+    pub fn gateway(&self) -> Option<Ipv4Addr> {
+        self.gateway
     }
 
     /// Add the route to the routing table of the current network namespace.
@@ -59,7 +65,14 @@ pub fn add_route(
         )
     };
     if fd < 0 {
-        return Err(AddRouteError::CreateControlSocket(io::Error::last_os_error()));
+        let os_err = io::Error::last_os_error();
+        match (-fd) as u32 {
+            sys::EMFILE => return Err(AddRouteError::ProcessFileDescriptorLimit(os_err)),
+            sys::ENFILE => return Err(AddRouteError::SystemFileDescriptorLimit(os_err)),
+            _ => {
+                panic!("unexpected error creating socket: {}", os_err);
+            },
+        }
     }
 
     let mut route: sys::rtentry = unsafe {
@@ -103,7 +116,9 @@ pub fn add_route(
         sys::ioctl(fd, sys::SIOCADDRT as u64, &route)
     };
     if res != 0 {
-        return Err(AddRouteError::AddRoute(io::Error::last_os_error()));
+        let os_err = io::Error::last_os_error();
+        // TODO: there are definitely some errors that should be caught here.
+        panic!("unexpected error from SIOCADDRT ioctl: {}", os_err);
     }
 
     Ok(())

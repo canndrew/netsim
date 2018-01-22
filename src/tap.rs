@@ -3,6 +3,7 @@
 use priv_prelude::*;
 use libc;
 use sys;
+use get_if_addrs;
 
 quick_error! {
     /// Error returned by `TapBuilderV4::build`
@@ -15,37 +16,48 @@ quick_error! {
         NameTooLong {
             description("interface name too long")
         }
-        OpenTunController(e: io::Error) {
-            description("failed to open /dev/net/tun")
-            display("failed to open /dev/net/tun: {}", e)
+        TunPermissionDenied(e: io::Error) {
+            description("permission denied to open /dev/net/tun")
+            display("permission denied to open /dev/net/tun ({})", e)
             cause(e)
         }
-        SetControllerAsync(e: io::Error) {
-            description("failed to make controller file descriptor non-blocking")
-            display("failed to make controller file descriptor non-blocking: {}", e)
+        TunSymbolicLinks(e: io::Error) {
+            description("too many symbolic links when resolving path /dev/net/tun")
+            display("too many symbolic links when resolving path /dev/net/tun ({})", e)
             cause(e)
         }
-        CreateTun(e: io::Error) {
-            description("TUNSETIFF ioctl to create tun interface failed")
-            display("TUNSETIFF ioctl to create tun interface failed: {}", e)
+        ProcessFileDescriptorLimit(e: io::Error) {
+            description("process file descriptor limit hit")
+            display("process file descriptor limit hit ({})", e)
             cause(e)
         }
-        CreateRoute(e: AddRouteError) {
-            description("failed to create route")
-            display("failed to create route: {}", e)
+        SystemFileDescriptorLimit(e: io::Error) {
+            description("system file descriptor limit hit")
+            display("system file descriptor limit hit ({})", e)
             cause(e)
         }
-        CreateDummySocket(e: io::Error) {
-            description("failed to create dummy socket")
-            display("failed to create dummy socket: {}", e)
+        TunDoesntExist(e: io::Error) {
+            description("/dev/net/tun doesn't exist")
+            display("/dev/net/tun doesn't exist ({})", e)
             cause(e)
         }
-        SetInterfaceAddress(e: io::Error) {
+        TunDeviceNotLoaded(e: io::Error) {
+            description("driver for /dev/net/tun not loaded")
+            display("driver for /dev/net/tun not loaded ({})", e)
+            cause(e)
+        }
+        CreateTapPermissionDenied {
+            description("TUNSETIFF ioctl to create tun interface failed with permission denied")
+        }
+        InterfaceAlreadyExists {
+            description("an interface with the given name already exists")
+        }
+        SetInterfaceAddress(ip: Ipv4Addr, e: io::Error) {
             description("failed to set interface address")
             display("failed to set interface address: {}", e)
             cause(e)
         }
-        SetInterfaceNetmask(e: io::Error) {
+        SetInterfaceNetmask(netmask: Ipv4Addr, e: io::Error) {
             description("failed to set interface netmask")
             display("failed to set interface netmask: {}", e)
             cause(e)
@@ -65,13 +77,16 @@ quick_error! {
 
 /// This object can be used to set the configuration options for a `Tap` before creating the `Tap`
 /// using `build`.
+#[derive(Debug)]
 pub struct TapBuilderV4 {
     name: String,
-    address: Option<IfaceAddrV4>,
+    //address: Option<IfaceAddrV4>,
+    address: Ipv4Addr,
+    netmask: Ipv4Addr,
     routes: Vec<RouteV4>,
 }
 
-// TODO: don't really need this type.
+/*
 /// Contains interface ipv4 address parameters.
 pub struct IfaceAddrV4 {
     /// The interface's address
@@ -79,12 +94,14 @@ pub struct IfaceAddrV4 {
     /// The interface's netmask
     pub netmask: Ipv4Addr,
 }
+*/
 
 impl Default for TapBuilderV4 {
     fn default() -> TapBuilderV4 {
         TapBuilderV4 {
             name: String::from("netsim"),
-            address: None,
+            address: ipv4!("0.0.0.0"),
+            netmask: ipv4!("0.0.0.0"),
             routes: Vec::new(),
         }
     }
@@ -115,8 +132,13 @@ impl TapBuilderV4 {
     }
 
     /// Set the interface address and netmask.
-    pub fn address(&mut self, address: IfaceAddrV4) -> &mut Self {
-        self.address = Some(address);
+    pub fn address(&mut self, address: Ipv4Addr) -> &mut Self {
+        self.address = address;
+        self
+    }
+
+    pub fn netmask(&mut self, netmask: Ipv4Addr) -> &mut Self {
+        self.netmask = netmask;
         self
     }
 
@@ -131,7 +153,7 @@ impl TapBuilderV4 {
     /// to where you need to create the device. You can send a `PreTap` to another thread then
     /// `bind` it to create your `Tap`.
     pub fn build_unbound(self) -> Result<PreTap, TapBuildError> {
-        let name = match CString::new(self.name) {
+        let name = match CString::new(self.name.clone()) {
             Ok(name) => name,
             Err(..) => {
                 return Err(TapBuildError::NameContainsNul);
@@ -141,13 +163,27 @@ impl TapBuilderV4 {
             return Err(TapBuildError::NameTooLong);
         }
 
-        let raw_fd = unsafe {
-            libc::open(b"/dev/net/tun\0".as_ptr() as *const _, libc::O_RDWR)
+        let fd = loop {
+            let raw_fd = unsafe {
+                libc::open(b"/dev/net/tun\0".as_ptr() as *const _, libc::O_RDWR)
+            };
+            if raw_fd < 0 {
+                let os_err = io::Error::last_os_error();
+                match (-raw_fd) as u32 {
+                    sys::EACCES => return Err(TapBuildError::TunPermissionDenied(os_err)),
+                    sys::EINTR => continue,
+                    sys::ELOOP => return Err(TapBuildError::TunSymbolicLinks(os_err)),
+                    sys::EMFILE => return Err(TapBuildError::ProcessFileDescriptorLimit(os_err)),
+                    sys::ENFILE => return Err(TapBuildError::SystemFileDescriptorLimit(os_err)),
+                    sys::ENOENT => return Err(TapBuildError::TunDoesntExist(os_err)),
+                    sys::ENXIO => return Err(TapBuildError::TunDeviceNotLoaded(os_err)),
+                    _ => {
+                        panic!("unexpected error from open(\"/dev/net/tun\"). {}", os_err);
+                    },
+                }
+            }
+            break unwrap!(AsyncFd::new(raw_fd));
         };
-        if raw_fd < 0 {
-            return Err(TapBuildError::OpenTunController(io::Error::last_os_error()));
-        }
-		let fd = AsyncFd::new(raw_fd).map_err(TapBuildError::SetControllerAsync)?;
 
         let mut req = unsafe {
             let mut req: sys::ifreq = mem::zeroed();
@@ -165,7 +201,25 @@ impl TapBuilderV4 {
             ioctl::tunsetiff(fd.as_raw_fd(), &mut req as *mut _ as *mut _)
         };
         if res < 0 {
-            return Err(TapBuildError::CreateTun(io::Error::last_os_error()));
+            let os_err = sys::errno();
+            match os_err as u32 {
+                sys::EPERM => return Err(TapBuildError::CreateTapPermissionDenied),
+                sys::EBUSY => {
+                    println!("our name == {}", self.name);
+                    for iface in unwrap!(get_if_addrs::get_if_addrs()) {
+                        println!("{:?}", iface);
+                        if iface.name == self.name {
+                            return Err(TapBuildError::InterfaceAlreadyExists);
+                        }
+                    }
+                    panic!("unexpected EBUSY error when creating TAP device");
+                },
+                // TODO: what error do we get if we try to create two interfaces with the same
+                // name?
+                _ => {
+                    panic!("unexpected error creating TAP device: {}", io::Error::from_raw_os_error(os_err));
+                },
+            }
         }
 
         let real_name = {
@@ -186,55 +240,81 @@ impl TapBuilderV4 {
 		unsafe {
             let fd = sys::socket(sys::AF_INET as i32, sys::__socket_type::SOCK_DGRAM as i32, 0);
             if fd < 0 {
-                return Err(TapBuildError::CreateDummySocket(io::Error::last_os_error()));
+                let os_err = io::Error::last_os_error();
+                match (-fd) as u32 {
+                    sys::EMFILE => return Err(TapBuildError::ProcessFileDescriptorLimit(os_err)),
+                    sys::ENFILE => return Err(TapBuildError::SystemFileDescriptorLimit(os_err)),
+                    _ => {
+                        panic!("unexpected error when creating dummy socket: {}", os_err);
+                    },
+                }
             }
 
-            if let Some(address) = self.address {
-                {
-                    let addr = &mut req.ifr_ifru.ifru_addr;
-                    let addr = addr as *mut sys::sockaddr;
-                    let addr = addr as *mut sys::sockaddr_in;
-                    let addr = &mut *addr;
-                    addr.sin_family = sys::AF_INET as sys::sa_family_t;
-                    addr.sin_port = 0;
-                    addr.sin_addr.s_addr = u32::from(address.address).to_be();
-                }
+            {
+                let addr = &mut req.ifr_ifru.ifru_addr;
+                let addr = addr as *mut sys::sockaddr;
+                let addr = addr as *mut sys::sockaddr_in;
+                let addr = &mut *addr;
+                addr.sin_family = sys::AF_INET as sys::sa_family_t;
+                addr.sin_port = 0;
+                addr.sin_addr.s_addr = u32::from(self.address).to_be();
+            }
 
-                if ioctl::siocsifaddr(fd, &req) < 0 {
-                    return Err(TapBuildError::SetInterfaceAddress(io::Error::last_os_error()));
-                }
+            if ioctl::siocsifaddr(fd, &req) < 0 {
+                let _ = sys::close(fd);
+                // TODO: what errors occur if we
+                //  (a) pick an invalid IP.
+                //  (b) pick an IP already in use
+                panic!("unexpected error from SIOCSIFADDR ioctl: {}", io::Error::last_os_error());
+            }
 
 
-                {
-                    let addr = &mut req.ifr_ifru.ifru_addr;
-                    let addr = addr as *mut sys::sockaddr;
-                    let addr = addr as *mut sys::sockaddr_in;
-                    let addr = &mut *addr;
-                    addr.sin_family = sys::AF_INET as sys::sa_family_t;
-                    addr.sin_port = 0;
-                    addr.sin_addr.s_addr = u32::from(address.netmask).to_be();
-                }
+            {
+                let addr = &mut req.ifr_ifru.ifru_addr;
+                let addr = addr as *mut sys::sockaddr;
+                let addr = addr as *mut sys::sockaddr_in;
+                let addr = &mut *addr;
+                addr.sin_family = sys::AF_INET as sys::sa_family_t;
+                addr.sin_port = 0;
+                addr.sin_addr.s_addr = u32::from(self.netmask).to_be();
+            }
 
-                if ioctl::siocsifnetmask(fd, &req) < 0 {
-                    return Err(TapBuildError::SetInterfaceNetmask(io::Error::last_os_error()));
-                }
+            if ioctl::siocsifnetmask(fd, &req) < 0 {
+                let _ = sys::close(fd);
+                // TODO: what error occurs if we try to use an invalid netmask?
+                panic!("unexpected error from SIOCSIFNETMASK ioctl: {}", io::Error::last_os_error());
             }
 
 			if ioctl::siocgifflags(fd, &mut req) < 0 {
-				return Err(TapBuildError::GetInterfaceFlags(io::Error::last_os_error()));
+                let _ = sys::close(fd);
+                panic!("unexpected error from SIOCGIFFLAGS ioctl: {}", io::Error::last_os_error());
 			}
 
 			req.ifr_ifru.ifru_flags |= (sys::IFF_UP as u32 | sys::IFF_RUNNING as u32) as i16;
 
 			if ioctl::siocsifflags(fd, &mut req) < 0 {
-				return Err(TapBuildError::SetInterfaceFlags(io::Error::last_os_error()));
+                let _ = sys::close(fd);
+                panic!("unexpected error from SIOCSIFFLAGS ioctl: {}", io::Error::last_os_error());
 			}
+            let _ = sys::close(fd);
 		}
 
         for route in self.routes {
-            route.add(&real_name).map_err(TapBuildError::CreateRoute)?;
+            trace!("adding route {:?} to {}", route, real_name);
+            match route.add(&real_name) {
+                Ok(()) => (),
+                Err(AddRouteError::ProcessFileDescriptorLimit(e)) => {
+                    return Err(TapBuildError::ProcessFileDescriptorLimit(e));
+                },
+                Err(AddRouteError::SystemFileDescriptorLimit(e)) => {
+                    return Err(TapBuildError::SystemFileDescriptorLimit(e));
+                },
+                Err(AddRouteError::NameContainsNul) => unreachable!(),
+            }
         }
 
+        trace!("creating TAP");
+        ::std::process::Command::new("ifconfig").status().unwrap();
 
         Ok(PreTap { fd })
     }
@@ -248,6 +328,7 @@ impl TapBuilderV4 {
 }
 
 /// Represents a TAP device which has been built but not bound to a tokio event loop.
+#[derive(Debug)]
 pub struct PreTap {
     fd: AsyncFd,
 }
@@ -301,7 +382,6 @@ impl Stream for Tap {
 
                 let bytes = Bytes::from(&buffer[..n]);
                 let frame = EtherFrame::from_bytes(bytes);
-                trace!("reading frame: {:?}", frame);
                 Ok(Async::Ready(Some(frame)))
             },
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -337,6 +417,58 @@ impl Sink for Tap {
 
     fn poll_complete(&mut self) -> io::Result<Async<()>> {
         Ok(Async::Ready(()))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use priv_prelude::*;
+    use spawn;
+    use capabilities;
+
+    #[test]
+    fn build_tap_name_contains_nul() {
+        let mut tap_builder = TapBuilderV4::new();
+        tap_builder.address(Ipv4Addr::random_global());
+        tap_builder.name("hello\0");
+        let res = tap_builder.build_unbound();
+        match res {
+            Err(TapBuildError::NameContainsNul) => (),
+            x => panic!("unexpected result: {:?}", x),
+        }
+    }
+
+    #[test]
+    fn build_tap_duplicate_name() {
+        let join_handle = spawn::new_namespace(|| {
+            let mut tap_builder = TapBuilderV4::new();
+            tap_builder.address(Ipv4Addr::random_global());
+            tap_builder.name("hello");
+            let _tap = unwrap!(tap_builder.build_unbound());
+            
+            let mut tap_builder = TapBuilderV4::new();
+            tap_builder.address(Ipv4Addr::random_global());
+            tap_builder.name("hello");
+            match tap_builder.build_unbound() {
+                Err(TapBuildError::InterfaceAlreadyExists) => (),
+                res => panic!("unexpected result: {:?}", res),
+            }
+        });
+        unwrap!(join_handle.join());
+    }
+
+    #[test]
+    fn build_tap_permission_denied() {
+        let join_handle = spawn::new_namespace(|| {
+            unwrap!(unwrap!(capabilities::Capabilities::new()).apply());
+
+            let mut tap_builder = TapBuilderV4::new();
+            match tap_builder.build_unbound() {
+                Err(TapBuildError::CreateTapPermissionDenied) => (),
+                res => panic!("unexpected result: {:?}", res),
+            }
+        });
+        unwrap!(join_handle.join());
     }
 }
 

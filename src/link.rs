@@ -1,3 +1,17 @@
+
+
+
+
+// TODO: figure out how to do rate-limiting.
+// seems like the kernel will allow userspace to just keep sending data out a TAP interface even if
+// the frames aren't being read quickly enough on the otherside. Data seems to just get dropped.
+// *haven't confirmed this though* - could label the packets and see.
+//
+// Otherwise, I could make the sender thread rate-limit itself. Which may be good for some purposes
+// but isn't really a complete solution.
+
+
+
 use priv_prelude::*;
 use util;
 
@@ -8,7 +22,7 @@ pub struct LinkBuilder {
     mean_additional_latency: Duration,
     loss_burst: Duration,
     loss_rate: f32,
-    ttl: u8,
+    //ttl: u8,
     bandwidth_rx: f32,
     bandwidth_tx: f32,
 }
@@ -20,7 +34,7 @@ impl Default for LinkBuilder {
             mean_additional_latency: Duration::new(0, 0),
             loss_rate: 0.0,
             loss_burst: Duration::from_millis(10),
-            ttl: 0,
+            //ttl: 0,
             bandwidth_rx: 12.5e6,   // 100 megabit
             bandwidth_tx: 12.5e6,
         }
@@ -98,6 +112,7 @@ impl LinkBuilder {
             next_loss_state_toggle: Instant::now(),
             sending: None,
             unplugged: false,
+            debug_frames_read: 0,
         }
     }
 
@@ -106,19 +121,21 @@ impl LinkBuilder {
         mut frame: EtherFrame,
         buffer: &mut BTreeMap<Instant, EtherFrame>,
     ) {
-        let mut ipv4 = match frame.payload() {
+        /*
+        let ipv4 = match frame.payload() {
             EtherPayload::Ipv4(ipv4) => ipv4,
             _ => return,
         };
-        let ttl = ipv4.ttl().saturating_sub(self.ttl);
-        if ttl > 0 {
-            ipv4.set_ttl(ttl);
+        */
+        //let ttl = ipv4.ttl().saturating_sub(self.ttl);
+        //if ttl > 0 {
+            //ipv4.set_ttl(ttl);
             let latency = self.min_latency
                         + self.mean_additional_latency.mul_f32(util::expovariant_rand());
             let arrival = Instant::now() + latency;
-            frame.set_payload(EtherPayload::Ipv4(ipv4));
+            //frame.set_payload(EtherPayload::Ipv4(ipv4));
             buffer.insert(arrival, frame);
-        }
+        //}
     }
 }
 
@@ -137,6 +154,7 @@ pub struct Link {
     next_loss_state_toggle: Instant,
     sending: Option<EtherFrame>,
     unplugged: bool,
+    debug_frames_read: usize,
 }
 
 impl Link {
@@ -165,13 +183,20 @@ impl Stream for Link {
         self.update_loss_state();
 
         loop {
+            trace!("in link stream wow, frames_read == {}, frames_in_trasit == {}", self.debug_frames_read, self.in_transit_rx.len());
             match self.timeout_rx_read.poll().void_unwrap() {
-                Async::NotReady => break,
+                Async::NotReady => {
+                    trace!("timeout not ready");
+                    break;
+                },
                 Async::Ready(()) => {
+                    trace!("polling channel");
                     match self.channel.poll()? {
                         Async::Ready(Some(frame)) => {
+                            self.debug_frames_read += 1;
                             let len = frame.len() as f32;
-                            let read_delay = Duration::from_secs(1).mul_f32(len / self.cfg.bandwidth_rx);
+                            //let read_delay = Duration::from_secs(1).mul_f32(len / self.cfg.bandwidth_rx);
+                            let read_delay = Duration::new(0, 0);
                             self.timeout_rx_read.reset(Instant::now() + read_delay);
                             if !self.loss_state {
                                 self.cfg.buffer_frame(frame, &mut self.in_transit_rx);
@@ -185,6 +210,7 @@ impl Stream for Link {
         }
 
         while let Some(instant) = self.in_transit_rx.keys().next().cloned() {
+            trace!("in link stream yo");
             self.timeout_rx_write.reset(instant);
             match self.timeout_rx_write.poll().void_unwrap() {
                 Async::NotReady => break,
@@ -216,7 +242,8 @@ impl Sink for Link {
         };
 
         let len = frame.len() as f32;
-        let read_delay = Duration::from_secs(1).mul_f32(len / self.cfg.bandwidth_tx);
+        //let read_delay = Duration::from_secs(1).mul_f32(len / self.cfg.bandwidth_tx);
+        let read_delay = Duration::new(0, 0);
         self.timeout_tx_read.reset(Instant::now() + read_delay);
         let _ = self.timeout_tx_read.poll().void_unwrap();
 
@@ -230,6 +257,7 @@ impl Sink for Link {
     fn poll_complete(&mut self) -> io::Result<Async<()>> {
         loop {
             if let Some(frame) = self.sending.take() {
+                trace!("trying to send frame");
                 match self.channel.start_send(frame)? {
                     AsyncSink::Ready => (),
                     AsyncSink::NotReady(frame) => {
@@ -241,16 +269,156 @@ impl Sink for Link {
             if let Some(instant) = self.in_transit_tx.keys().next().cloned() {
                 self.timeout_tx_write.reset(instant);
                 match self.timeout_tx_write.poll().void_unwrap() {
-                    Async::NotReady => break,
+                    Async::NotReady => return Ok(Async::NotReady),
                     Async::Ready(()) => {
                         let frame = unwrap!(self.in_transit_tx.remove(&instant));
+                        trace!("dropping frame!");
                         self.sending = Some(frame); // may drop the currently sending frame,
                     },
                 }
+            } else {
+                break;
             }
         }
 
         Ok(Async::Ready(()))
     }
 }
+
+#[cfg(test)]
+mod test {
+    use priv_prelude::*;
+    use spawn;
+    use std;
+    use env_logger;
+    use util;
+    use bincode;
+    use future_utils;
+
+    #[test]
+    fn correct_stats() {
+        let _ = env_logger::init();
+        let mut core = unwrap!(Core::new());
+        let handle = core.handle();
+        let res = core.run(future::lazy(|| {
+            const NUM_PACKETS: usize = 10_000;
+            const ENCODED_LIMIT: usize = 64;
+
+            let ip_0 = Ipv4Addr::random_global();
+            let ip_1 = Ipv4Addr::random_global();
+            let addr_0 = SocketAddr::V4(SocketAddrV4::new(ip_0, 123));
+            let addr_1 = SocketAddr::V4(SocketAddrV4::new(ip_1, 123));
+            let mut tap_builder_0 = TapBuilderV4::new();
+            tap_builder_0.name("netsim0");
+            tap_builder_0.address(ip_0);
+            tap_builder_0.route(RouteV4 {
+                destination: SubnetV4::new(ip_1, 32),
+                gateway: None,
+            });
+            let mut tap_builder_1 = TapBuilderV4::new();
+            tap_builder_1.name("netsim1");
+            tap_builder_1.address(ip_1);
+            tap_builder_1.route(RouteV4 {
+                destination: SubnetV4::new(ip_0, 32),
+                gateway: None,
+            });
+
+            let min_latency = 20.0 + 20.0 * util::expovariant_rand();
+            let min_latency = Duration::from_millis(1).mul_f32(min_latency);
+            let mean_additional_latency = 10.0 + 10.0 * util::expovariant_rand();
+            let mean_additional_latency = Duration::from_millis(1).mul_f32(mean_additional_latency);
+            let start_time = Instant::now();
+
+            let (join_handle_0, mut taps) = spawn::spawn_with_ifaces(
+                &handle,
+                vec![tap_builder_0],
+                move || {
+                    let sock_0 = unwrap!(std::net::UdpSocket::bind(addr_0));
+                    for i in 0..NUM_PACKETS {
+                        let now = Instant::now() - start_time;
+                        let data = (now.as_secs(), now.subsec_nanos());
+                        let encoded = unwrap!(bincode::serialize(&data, bincode::Bounded(ENCODED_LIMIT as u64)));
+                        unwrap!(sock_0.send_to(&encoded[..], addr_1));
+                        trace!("packets actually sent: {}", i);
+                    }
+                },
+            );
+            let tap_0 = unwrap!(taps.pop());
+
+            let (drop_tx, drop_rx) = future_utils::drop_notify();
+            let (join_handle_1, mut taps) = spawn::spawn_with_ifaces(
+                &handle,
+                vec![tap_builder_1],
+                move || {
+                    println!("address is {}", addr_1);
+                    ::std::process::Command::new("ifconfig").status().unwrap();
+                    let sock_1 = unwrap!(std::net::UdpSocket::bind(addr_1));
+                    sock_1.set_read_timeout(Some(min_latency + mean_additional_latency * 100));
+                    let mut total_latency = Duration::new(0, 0);
+                    let mut num_received = 0;
+                    let mut actual_min_latency = None;
+                    loop {
+                        let mut buffer = [0u8; ENCODED_LIMIT];
+                        match sock_1.recv_from(&mut buffer) {
+                            Ok((n, addr)) => {
+                                let data  = unwrap!(bincode::deserialize(&buffer[..n]));
+                                let (secs, subsec_nanos) = data;
+                                let latency = Instant::now() - (start_time + Duration::new(secs, subsec_nanos));
+                                num_received += 1;
+                                total_latency += latency;
+                                actual_min_latency = Some(match actual_min_latency {
+                                    Some(actual_min_latency) => cmp::min(actual_min_latency, latency),
+                                    None => latency,
+                                });
+                            },
+                            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock || 
+                                          e.kind() == io::ErrorKind::TimedOut => break,
+                            Err(e) => panic!("read error: {}", e),
+                        };
+                    }
+                    let actual_min_latency = unwrap!(actual_min_latency);
+                    if actual_min_latency > min_latency.mul_f32(1.1) {
+                        panic!("actual_min_latency is suspiciously large. actual_min_latency == {:?}, min_latency == {:?}, num_received == {}", actual_min_latency, min_latency, num_received);
+                    }
+
+                    let actual_mean_latency = total_latency.mul_f32(1.0 / (num_received as f32));
+                    let actual_mean_additional_latency = actual_mean_latency - min_latency;
+
+                    // Were the stats rougly correct? Note that this could (very rarely) fail just
+                    // due to randomness.
+                    assert!(actual_mean_additional_latency > mean_additional_latency.mul_f32(0.9));
+                    assert!(actual_mean_additional_latency < mean_additional_latency.mul_f32(1.1));
+                    drop(drop_tx);
+                },
+            );
+            let tap_1 = unwrap!(taps.pop());
+
+            let mut link_builder = LinkBuilder::new();
+            link_builder.min_latency(min_latency);
+            let link = link_builder.build(Box::new(tap_0), &handle);
+
+            let pump_frames_around = {
+                let (link_tx, link_rx) = link.split();
+                let (tap_tx, tap_rx) = tap_1.split();
+                let f0 = link_tx.send_all(tap_rx);
+                let f1 = tap_tx.send_all(link_rx);
+
+                f0
+                .join(f1)
+                .map(|((_link_tx, _tap_rx), (_tap_tx, _link_rx))| ())
+                .map_err(|e| panic!("io error: {}", e))
+            };
+
+            drop_rx
+            .while_driving(pump_frames_around)
+            .map(|((), _pump_frames_around)| {
+                unwrap!(join_handle_0.join());
+                unwrap!(join_handle_1.join());
+            })
+            .map_err(|(v, _pump_frames_around)| v)
+        }));
+        res.void_unwrap()
+    }
+}
+
 

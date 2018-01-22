@@ -3,6 +3,7 @@ use mio::{Evented, Poll, Token, PollOpt, Ready};
 use mio::unix::EventedFd;
 use libc;
 
+#[derive(Debug)]
 pub struct AsyncFd(RawFd);
 
 impl AsyncFd {

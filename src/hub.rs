@@ -1,21 +1,26 @@
-pub struct Hub {
-    taps: Vec<Tap>,
-    state: HubState,
+use priv_prelude::*;
+
+struct Client {
+    channel: EtherBox,
+    outgoing: VecDeque<EtherFrame>,
 }
 
-enum HubState {
-    Reading {
-        index: usize,
-    },
-    Writing {
-        index: usize,
-        frame: EtherFrame,
-    },
-    Finished,
+pub struct Hub {
+    clients: Vec<Client>,
 }
 
 impl Hub {
-    pub fn new(handle: &Handle) -> Hub {
+    pub fn new() -> Hub {
+        Hub {
+            clients: Vec::new(),
+        }
+    }
+
+    pub fn add_client<E: EtherChannel + 'static>(&mut self, client: E) {
+        self.clients.push(Client {
+            channel: Box::new(client),
+            outgoing: VecDeque::new(),
+        });
     }
 }
 
@@ -23,39 +28,48 @@ impl Future for Hub {
     type Item = ();
     type Error = io::Error;
 
-    fn poll(&mut self) -> Result<Async<()>, Void> {
-        /*
-        loop {
-            match self.rx.poll().void_unwrap() {
-                Async::Ready(Some(tap)) => self.taps.push(tap),
-                Async::Ready(None) => return Ok(Async::Ready(())),
-                Async::NotReady => break,
-            }
-        }
-        */
-
-        let state = mem::swap(&mut self.state, HubState::Finished);
-        match state {
-
-        }
-
-        loop {
-            if let Some(frame) = self.frame.take() {
-                for tap in &mut self.taps {
-
-                }
-            }
-        }
-
+    fn poll(&mut self) -> io::Result<Async<()>> {
+        println!("polling hub");
         let mut i = 0;
-        while i < self.taps.len() {
-            match self.taps[i].poll()? {
+        while i < self.clients.len() {
+            match self.clients[i].channel.poll()? {
                 Async::Ready(Some(frame)) => {
-                    for tap in &mut self.taps {
-                        tap.send(
+                    println!("hub received frame: {:?}", frame);
+                    for client in &mut self.clients {
+                        client.outgoing.push_back(frame.clone());
                     }
                 },
+                Async::Ready(None) => {
+                    println!("hub removing device #{}", i);
+                    self.clients.swap_remove(i);
+                },
+                Async::NotReady => {
+                    i += 1;
+                },
             }
+        }
+
+        for client in &mut self.clients {
+            loop {
+                let frame = match client.outgoing.pop_front() {
+                    Some(frame) => frame,
+                    None => break,
+                };
+                match client.channel.start_send(frame)? {
+                    AsyncSink::Ready => (),
+                    AsyncSink::NotReady(frame) => {
+                        client.outgoing.push_front(frame);
+                        break;
+                    },
+                }
+            }
+            let _ = client.channel.poll_complete()?;
+        }
+
+        if self.clients.is_empty() {
+            Ok(Async::Ready(()))
+        } else {
+            Ok(Async::NotReady)
         }
     }
 }

@@ -5,3 +5,9 @@
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
+pub fn errno() -> ::std::os::raw::c_int {
+    unsafe {
+        *__errno_location()
+    }
+}
+

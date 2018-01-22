@@ -60,6 +60,18 @@ impl ArpPacket {
         Ipv4Addr::new(self.data[24], self.data[25], self.data[26], self.data[27])
     }
 
+    pub fn request(source_mac: MacAddr, source_ip: Ipv4Addr, destination_ip: Ipv4Addr) -> ArpPacket {
+        let mut data = BytesMut::with_capacity(28);
+        data.extend_from_slice(&[0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01]);
+        data.extend_from_slice(&source_mac.as_bytes());
+        data.extend_from_slice(&source_ip.octets());
+        data.extend_from_slice(&MacAddr::broadcast().as_bytes());
+        data.extend_from_slice(&destination_ip.octets());
+        ArpPacket {
+            data: Bytes::from(data),
+        }
+    }
+
     pub fn response(self, mac: MacAddr) -> ArpPacket {
         let source_ip = self.destination_ip();
         let destination_ip = self.source_ip();
@@ -68,6 +80,8 @@ impl ArpPacket {
         let ArpPacket { data: bytes } = self;
         let mut bytes_mut = BytesMut::from(bytes);
 
+        bytes_mut[6] = 0;
+        bytes_mut[7] = 2;
         bytes_mut[8..14].clone_from_slice(&mac.as_bytes()[..]);
         bytes_mut[14..18].clone_from_slice(&source_ip.octets()[..]);
         bytes_mut[18..24].clone_from_slice(&destination_mac.as_bytes()[..]);

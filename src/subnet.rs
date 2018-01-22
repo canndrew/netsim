@@ -4,7 +4,7 @@ use std::net::AddrParseError;
 use std::num::ParseIntError;
 
 /// An Ipv4 subnet
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct SubnetV4 {
     addr: Ipv4Addr,
     bits: u8,
@@ -18,7 +18,7 @@ impl SubnetV4 {
     /// Create the subnet 192.168.0.0/24 with `SubnetV4::new(ipv4!("192.168.0.0"), 24)`
     pub fn new(addr: Ipv4Addr, bits: u8) -> SubnetV4 {
         SubnetV4 {
-            addr: Ipv4Addr::from(u32::from(addr) & !(0xffffffff >> bits)),
+            addr: Ipv4Addr::from(u32::from(addr) & !(0xffffffffu32.checked_shr(bits as u32).unwrap_or(0))),
             bits: bits,
         }
     }
@@ -79,7 +79,7 @@ impl SubnetV4 {
 
     /// Get the netmask as an IP address
     pub fn netmask(&self) -> Ipv4Addr {
-        Ipv4Addr::from(!(0xffffffff >> self.bits))
+        Ipv4Addr::from(!(0xffffffffu32.checked_shr(self.bits as u32).unwrap_or(0)))
     }
 
     /// Get the base address of the subnet, ie. the lowest IP address which is part of the subnet.
@@ -89,7 +89,7 @@ impl SubnetV4 {
 
     /// Get a default IP address for the subnet's gateway. This is one higher than the base address
     /// of the subnet. eg. for 10.0.0.0/8, the default address for the gateway will be 10.0.0.1
-    pub fn gateway_addr(&self) -> Ipv4Addr {
+    pub fn gateway_ip(&self) -> Ipv4Addr {
         Ipv4Addr::from(u32::from(self.addr) | 1)
     }
 
@@ -107,6 +107,13 @@ impl SubnetV4 {
         };
         let addr = u32::from(self.addr) | (addr & mask);
         Ipv4Addr::from(addr)
+    }
+
+    /// Check whether this subnet contains the given IP address
+    pub fn contains(&self, ip: Ipv4Addr) -> bool {
+        let base_addr = u32::from(self.addr);
+        let test_addr = u32::from(ip);
+        (base_addr ^ test_addr).leading_zeros() >= self.bits as u32
     }
 }
 

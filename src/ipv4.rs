@@ -116,6 +116,7 @@ impl Ipv4Packet {
 pub trait Ipv4AddrExt {
     fn random_global() -> Ipv4Addr;
     fn is_global(&self) -> bool;
+    fn is_reserved(&self) -> bool;
 }
 
 impl Ipv4AddrExt for Ipv4Addr {
@@ -136,7 +137,12 @@ impl Ipv4AddrExt for Ipv4Addr {
         ||  self.is_multicast()
         ||  self.is_broadcast()
         ||  self.is_documentation()
+        ||  self.is_reserved()
         )
+    }
+
+    fn is_reserved(&self) -> bool {
+        u32::from(*self) & 0xf0000000 == 0xf0000000
     }
 }
 

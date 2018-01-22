@@ -1,7 +1,11 @@
+#[cfg(test)]
 use priv_prelude::*;
+#[cfg(test)]
 use rand;
+#[cfg(test)]
 use rand::distributions::range::Range;
 
+#[cfg(test)]
 pub fn expovariant_rand() -> f32 {
     let range = Range::new(0.0, 1.0);
     let mut rng = rand::thread_rng();

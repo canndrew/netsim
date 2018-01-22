@@ -4,6 +4,7 @@ with import <nixpkgs> {}; {
     buildInputs = [
       stdenv
       llvmPackages.clang-unwrapped
+      libcap
     ];
 
     LIBCLANG_PATH = "${llvmPackages.clang-unwrapped}/lib";

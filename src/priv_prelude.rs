@@ -1,5 +1,5 @@
 pub use prelude::*;
-pub use std::{io, mem, fmt, thread, panic, ptr, slice, str, u16, f32};
+pub use std::{io, mem, fmt, thread, panic, ptr, slice, str, u16, f32, cmp};
 pub use std::io::{Read, Write};
 pub use std::os::unix::io::{RawFd, AsRawFd, FromRawFd};
 pub use std::collections::{HashMap, BTreeMap, VecDeque};
@@ -14,13 +14,15 @@ pub use futures::{Async, AsyncSink, Future, Stream, Sink, future, stream};
 pub use libc::{c_void, c_int};
 pub use tokio_core::reactor::{Core, Handle, PollEvented};
 pub use tokio_io::{AsyncWrite, AsyncRead};
-pub use future_utils::{Timeout, FutureExt, StreamExt};
+pub use future_utils::{Timeout, FutureExt, StreamExt, DropNotify, DropNotice};
 pub use void::{Void, ResultVoidExt};
 pub use rand::Rng;
 pub use rand::distributions::IndependentSample;
+pub use future_utils::mpsc::{UnboundedSender, UnboundedReceiver};
 pub use std::str::FromStr;
 
 pub use fd::AsyncFd;
 pub use ipv4::Ipv4AddrExt;
 pub use time::DurationExt;
+pub use with_disconnect::WithDisconnect;
 

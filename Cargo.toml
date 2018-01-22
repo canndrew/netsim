@@ -8,9 +8,8 @@ description = "Network simulator"
 libc = "*"
 unwrap = "1.1"
 get_if_addrs = "0.4"
-tun = "*"
 lazy_static = "*"
-future-utils = "*"
+future-utils = { path = "../../rust/future-utils" }
 futures = "*"
 tokio-core = "*"
 tokio-io = "*"
@@ -28,7 +27,11 @@ mio = "*"
 quick-error = "*"
 log = "*"
 env_logger = "*"
+capabilities = "*"
 
 [build-dependencies]
 bindgen = "0.30.0"
+
+[dev-dependencies]
+bincode = "*"
 

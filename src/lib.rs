@@ -78,13 +78,12 @@
 //! TODO
 //!
 
+#![recursion_limit="128"]
 //#![deny(missing_docs)]
 
 extern crate libc;
 #[macro_use]
 extern crate unwrap;
-extern crate tun;
-//#[cfg(test)]
 extern crate get_if_addrs;
 //#[macro_use]
 //extern crate lazy_static;
@@ -107,6 +106,11 @@ extern crate quick_error;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+#[cfg(test)]
+extern crate bincode;
+#[cfg(test)]
+extern crate capabilities;
+
 
 //mod machine;
 //pub mod plug;
@@ -121,12 +125,18 @@ mod ipv6;
 mod udp;
 //mod frame_buffer;
 mod gateway;
-mod link;
+//mod link;
 mod util;
 mod time;
 mod subnet;
 mod arp;
 mod icmpv6;
+mod hub;
+mod veth;
+mod veth_adaptor;
+mod mac;
+mod flush;
+mod with_disconnect;
 
 mod prelude;
 mod priv_prelude;

@@ -6,6 +6,7 @@
 use priv_prelude::*;
 use libc;
 use std::sync::mpsc;
+use future_utils;
 
 const STACK_SIZE: usize = 8 * 1024 * 1024;
 const STACK_ALIGN: usize = 16;
@@ -166,7 +167,7 @@ pub fn spawn_with_ifaces<F, R>(
     handle: &Handle,
     ifaces: Vec<TapBuilderV4>,
     func: F,
-) -> (JoinHandle<R>, Vec<Tap>)
+) -> (JoinHandle<R>, Vec<EtherBox>)
 where
     R: Send + 'static,
     F: FnOnce() -> R + Send + 'static,
@@ -174,19 +175,75 @@ where
     let (tx, rx) = mpsc::channel();
     let join_handle = new_namespace(move || {
         let mut taps = Vec::with_capacity(ifaces.len());
+        let mut drop_txs = Vec::with_capacity(ifaces.len());
         for tap_builder in ifaces {
-            taps.push(unwrap!(tap_builder.build_unbound()));
+            trace!("building tap {:?}", tap_builder);
+            let (drop_tx, drop_rx) = future_utils::drop_notify();
+            let tap_unbound = unwrap!(tap_builder.build_unbound());
+            taps.push((tap_unbound, drop_rx));
+            drop_txs.push(drop_tx);
         }
         unwrap!(tx.send(taps));
-        func()
+        let ret = func();
+        drop(drop_txs);
+        ret
     });
 
     let taps_unbound = unwrap!(rx.recv());
     let mut taps = Vec::with_capacity(taps_unbound.len());
-    for tap_unbound in taps_unbound {
-        taps.push(tap_unbound.bind(handle));
+    for (tap_unbound, drop_rx) in taps_unbound {
+        let tap = tap_unbound.bind(handle);
+        let tap = WithDisconnect::new(tap, drop_rx);
+        let tap = Box::new(tap);
+        let tap = tap as EtherBox;
+        taps.push(tap);
     }
+    
     (join_handle, taps)
+}
+
+pub fn spawn_on_internet<F, R>(
+    handle: &Handle,
+    func: F,
+) -> (JoinHandle<R>, EtherBox)
+where
+    R: Send + 'static,
+    F: FnOnce(Ipv4Addr) -> R + Send + 'static,
+{
+    let mut tap_builder = TapBuilderV4::new();
+    let ip = Ipv4Addr::random_global();
+    tap_builder.address(ip);
+    trace!("ip == {}", ip);
+    let route = RouteV4::new(SubnetV4::new(ip, 0), None);
+    trace!("tap_builder has route {:?}", route);
+    //tap_builder.route(RouteV4::new(SubnetV4::new(ipv4!("0.0.0.0"), 0), None));
+    tap_builder.route(route);
+
+    let (join_handle, taps) = spawn_with_ifaces(handle, vec![tap_builder], move || func(ip));
+    let tap = unwrap!(taps.into_iter().next());
+
+    (join_handle, tap)
+}
+
+pub fn spawn_on_subnet<F, R>(
+    handle: &Handle,
+    subnet: SubnetV4,
+    func: F,
+) -> (JoinHandle<R>, EtherBox)
+where
+    R: Send + 'static,
+    F: FnOnce(Ipv4Addr) -> R + Send + 'static
+{
+    let mut tap_builder = TapBuilderV4::new();
+    let ip = subnet.random_client_addr();
+    tap_builder.address(ip);
+    tap_builder.netmask(subnet.netmask());
+    tap_builder.route(RouteV4::new(subnet, None));
+
+    let (join_handle, taps) = spawn_with_ifaces(handle, vec![tap_builder], move || func(ip));
+    let tap = unwrap!(taps.into_iter().next());
+
+    (join_handle, tap)
 }
 
 /// Spawn a function into a new network namespace with a single network interface behind a virtual
@@ -195,21 +252,16 @@ where
 pub fn spawn_behind_gateway<F, R>(
     handle: &Handle,
     func: F,
-) -> (JoinHandle<R>, Gateway)
+) -> (JoinHandle<R>, EtherBox)
 where
     R: Send + 'static,
     F: FnOnce() -> R + Send + 'static,
 {
     let subnet = SubnetV4::random_local();
-    let addr = subnet.random_client_addr();
-    //let subnet = SubnetV4::local_10();
-    //let addr = ipv4!("10.0.0.2");
     let mut tap_builder = TapBuilderV4::new();
-    tap_builder.address(IfaceAddrV4 {
-        address: addr,
-        netmask: subnet.netmask(),
-    });
-    tap_builder.route(RouteV4::new(SubnetV4::global(), Some(subnet.gateway_addr())));
+    tap_builder.address(subnet.random_client_addr());
+    tap_builder.netmask(subnet.netmask());
+    tap_builder.route(RouteV4::new(SubnetV4::global(), Some(subnet.gateway_ip())));
 
     let (join_handle, taps) = spawn_with_ifaces(handle, vec![tap_builder], func);
     let tap = unwrap!(taps.into_iter().next());
@@ -218,7 +270,7 @@ where
         .build(Box::new(tap))
     };
 
-    (join_handle, gateway)
+    (join_handle, Box::new(gateway))
 }
 
 #[cfg(test)]
@@ -273,15 +325,12 @@ mod test {
             trace!("starting");
             let subnet = SubnetV4::random_local();
             let mut tap_builder = TapBuilderV4::new();
-            tap_builder.address(IfaceAddrV4 {
-                address: subnet.random_client_addr(),
-                netmask: subnet.netmask(),
-            });
-            tap_builder.route(RouteV4 {
-                destination: SubnetV4::new(ipv4!("0.0.0.0"), 0),
-                gateway: subnet.gateway_addr(),
-                use_gateway: true,
-            });
+            tap_builder.address(subnet.random_client_addr());
+            tap_builder.netmask(subnet.netmask());
+            tap_builder.route(RouteV4::new(
+                SubnetV4::new(ipv4!("0.0.0.0"), 0),
+                Some(subnet.gateway_ip()),
+            ));
 
             let payload: [u8; 8] = rand::random();
             let addr = addrv4!("1.2.3.4:56");
@@ -338,6 +387,56 @@ mod test {
                 }
             })
             .map(move |()| unwrap!(join_handle.join()))
+        }));
+        res.void_unwrap()
+    }
+
+    #[test]
+    fn can_talk_to_self_on_internet() {
+        use tokio_core::net::UdpSocket;
+
+        let _ = env_logger::init();
+        let mut core = unwrap!(Core::new());
+        let handle = core.handle();
+        let res = core.run(future::lazy(move || {
+            let (join_handle, tap) = spawn_on_internet(&handle, move || {
+                trace!("our pid is {:?}", unsafe { ::sys::getpid() });
+                thread::sleep(Duration::from_secs(10));
+
+                ::std::process::Command::new("route").status().unwrap();
+                //panic!("ass balls");
+
+                let mut core = unwrap!(Core::new());
+                let handle = core.handle();
+
+                let if_addrs = unwrap!(get_if_addrs::get_if_addrs());
+                let ip = if_addrs.into_iter().filter_map(|if_addr| {
+                    match if_addr.addr {
+                        get_if_addrs::IfAddr::V4(ifv4_addr) => Some(ifv4_addr.ip),
+                        _ => None,
+                    }
+                }).next().unwrap();
+
+                let addr0 = SocketAddr::V4(SocketAddrV4::new(ip, 45666));
+                let socket0 = unwrap!(UdpSocket::bind(&addr0, &handle));
+                let addr1 = SocketAddr::V4(SocketAddrV4::new(ip, 45667));
+                let socket1 = unwrap!(UdpSocket::bind(&addr1, &handle));
+
+                trace!("addr0 == {}", addr0);
+                let res = core.run({
+                    socket1
+                    .send_dgram([123], addr0)
+                    .and_then(|_| {
+                        trace!("sent packet");
+                        socket0.recv_dgram([0; 32])
+                    })
+                    .map(|_| trace!("got data"))
+                    .map_err(|e| panic!(e))
+                });
+                res.void_unwrap()
+            });
+            join_handle.join();
+            Ok(())
         }));
         res.void_unwrap()
     }
