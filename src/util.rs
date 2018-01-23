@@ -2,6 +2,7 @@
 use priv_prelude::*;
 #[cfg(test)]
 use rand;
+/*
 #[cfg(test)]
 use rand::distributions::range::Range;
 
@@ -12,6 +13,7 @@ pub fn expovariant_rand() -> f32 {
     let offset = range.ind_sample(&mut rng);
     -f32::ln(1.0 - offset)
 }
+*/
 
 #[cfg(test)]
 pub fn random_vec(len: usize) -> Vec<u8> {

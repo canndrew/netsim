@@ -51,17 +51,14 @@
 //! let handle = core.handle();
 //!
 //! // Create a network interface named "netsim"
-//! let tap = {
-//!     TapBuilder::new()
-//!     .name("netsim")
-//!     .address(IfaceAddrV4 {
-//!         netmask: ipv4!("255.255.255.0"),
-//!         address: ipv4!("192.168.0.23"),
-//!     })
-//!     .build(&handle)
-//! };
+//! let tap = TapBuilder::new();
+//! tap.name("netsim");
+//! tap.address(ipv4!("192.168.0.23"));
+//! tap.netmask(ipv4!("255.255.255.0"));
+//! tap.route(RouteV4::new(SubnetV4::new(ipv4!("0.0.0.0), 0), Some(ipv4!("192.168.0.1"))));
+//! tap.build(&handle);
 //!
-//! // Read the first `EtherFrame` sent out the interface.
+//! // Read the first `EtherFrame` sent from the interface.
 //! let frame = core.run({
 //!     tap
 //!     .into_future()
@@ -69,17 +66,20 @@
 //! }).unwrap();
 //! ```
 //!
-//! # Configure routes
-//!
-//! TODO
-//!
 //! # Higher-level APIs
 //!
-//! TODO
+//! The other functions in the `spawn` module allow you to combine the steps above and more into a
+//! single call. For example, you can spawn a thread into an environment with a single NIC, a local
+//! IP address behind a NAT.
 //!
+//! ```ignore
+//! extern crate netsim;
+//! let (join_handle, gateway) = netsim::spawn::behind_gateway(|| {
+//!     // packets sent here will appear NATed on `gateway`
+//! });
+//! ```
 
 #![recursion_limit="128"]
-//#![deny(missing_docs)]
 
 extern crate libc;
 #[macro_use]

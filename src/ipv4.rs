@@ -114,8 +114,11 @@ impl Ipv4Packet {
 }
 
 pub trait Ipv4AddrExt {
+    /// Get a random, global IPv4 address.
     fn random_global() -> Ipv4Addr;
+    /// Returns `true` if this is a global IPv4 address
     fn is_global(&self) -> bool;
+    /// Returns `true` if this is a reserved IPv4 address.
     fn is_reserved(&self) -> bool;
 }
 

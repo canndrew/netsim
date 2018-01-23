@@ -197,6 +197,9 @@ where
     (join_handle, taps)
 }
 
+/// Spawn a function into a new network namespace with a network interface described by `iface`.
+/// Returns a `JoinHandle` which can be used to join the spawned thread, along with a `Tap` which
+/// can be used to read/write network activity from the spawned thread.
 pub fn with_iface<F, R>(
     handle: &Handle,
     iface: TapBuilderV4,
@@ -252,6 +255,9 @@ where
 }
 */
 
+/// Spawn a function into a new network namespace with a single network interface with an address
+/// in `subnet`. Returns a `JoinHandle` which can be used to join the spawned thread, along with
+/// an `EtherBox` which can be used to read/write network activity from the spawned thread.
 pub fn on_subnet<F, R>(
     handle: &Handle,
     subnet: SubnetV4,
