@@ -350,8 +350,6 @@ mod test {
                 &handle,
                 vec![tap_builder_1],
                 move || {
-                    println!("address is {}", addr_1);
-                    ::std::process::Command::new("ifconfig").status().unwrap();
                     let sock_1 = unwrap!(std::net::UdpSocket::bind(addr_1));
                     sock_1.set_read_timeout(Some(min_latency + mean_additional_latency * 100));
                     let mut total_latency = Duration::new(0, 0);

@@ -7,20 +7,11 @@ use priv_prelude::*;
 use libc;
 use std::sync::mpsc;
 use future_utils;
+use std::thread::JoinHandle;
+use sys;
+use void;
 
-const STACK_SIZE: usize = 8 * 1024 * 1024;
 const STACK_ALIGN: usize = 16;
-
-/// A join handle for a thread.
-pub struct JoinHandle<R> {
-    inner: Arc<JoinHandleInner<R>>,
-    stack_base: *mut u8,
-}
-
-struct JoinHandleInner<R> {
-    result: Mutex<Option<thread::Result<R>>>,
-    condvar: Condvar,
-}
 
 trait FnBox<R> {
     fn call_box(self: Box<Self>) -> R;
@@ -44,21 +35,12 @@ where
     F: Send + 'static,
     R: Send + 'static,
 {
-    let mut stack = Vec::with_capacity(STACK_SIZE + STACK_ALIGN);
+    let stack_size = unsafe { sys::getpagesize() } as usize;
+    let stack_size = cmp::max(stack_size, 4096);
+
+    let mut stack = Vec::with_capacity(stack_size + STACK_ALIGN);
     let stack_base = stack.as_mut_ptr();
     mem::forget(stack);
-
-    let inner = Arc::new(JoinHandleInner {
-        result: Mutex::new(None),
-        condvar: Condvar::new(),
-    });
-
-    let inner_cloned = inner.clone();
-
-    let join_handle = JoinHandle {
-        inner: inner,
-        stack_base: stack_base,
-    };
 
     let flags = 
         libc::CLONE_FILES |
@@ -73,50 +55,89 @@ where
 
     //type CbData<R: Send + 'static> = (Box<FnBox<R> + Send>, Arc<JoinHandleInner<R>>);
     //type CbData = (Box<FnBox<R> + Send>, Arc<JoinHandleInner<R>>);
+    /*
     struct CbData<R: Send + 'static> {
         func: Box<FnBox<R> + Send + 'static>,
         inner: Arc<JoinHandleInner<R>>,
     }
+    */
+
+    struct CbData<R: Send + 'static> {
+        func: Box<FnBox<R> + Send + 'static>,
+        joiner_tx: mpsc::Sender<JoinHandle<R>>,
+        stack_base: *mut u8,
+        stack_size: usize,
+    }
     
     extern "C" fn clone_cb<R: Send + 'static>(arg: *mut c_void) -> c_int {
-        let data: *mut CbData<R> = arg as *mut _;
-        let data: Box<CbData<R>> = unsafe { Box::from_raw(data) };
-        //let data: *mut CbData = arg as *mut _;
-        //let data: Box<CbData> = unsafe { Box::from_raw(data) };
-        let data = *data;
-        let CbData { func, inner } = data;
+        let (drop_tx, drop_rx) = mpsc::channel::<Void>();
+        {
+            let data: *mut CbData<R> = arg as *mut _;
+            let data: Box<CbData<R>> = unsafe { Box::from_raw(data) };
+            //let data: *mut CbData = arg as *mut _;
+            //let data: Box<CbData> = unsafe { Box::from_raw(data) };
+            let data = *data;
+            let CbData { func, joiner_tx, stack_base, stack_size } = data;
 
-        // WARNING: HACKERY
-        // 
-        // This should ideally be done without spawning another thread. We're already inside a
-        // thread (spawned by clone), but that thread doesn't respect rust's thread-local storage
-        // for some reason. So we spawn a thread in a thread in order to get our own local storage
-        // keys. There should be a way to do this which doesn't involve spawning two threads and
-        // letting one of them die.
-        //
-        // Additionally, if we do want to spawn a seperate thread then we should be able to use
-        // its JoinHandle rather than crafting our own.
+            struct StackBase(*mut u8);
+            unsafe impl Send for StackBase {}
 
-        thread::spawn(move || {
-            let func = AssertUnwindSafe(func);
-            let r = panic::catch_unwind(move || {
-                let AssertUnwindSafe(func) = func;
-                func.call_box()
+            let stack_base = StackBase(stack_base);
+
+            // WARNING: HACKERY
+            // 
+            // This should ideally be done without spawning another thread. We're already inside a
+            // thread (spawned by clone), but that thread doesn't respect rust's thread-local
+            // storage for some reason. So we spawn a thread in a thread in order to get our own
+            // local storage keys. There should be a way to do this which doesn't involve spawning
+            // two threads and letting one of them die. This would require going back to crafting
+            // our own `JoinHandle` though.
+
+            let tid = unsafe {
+                sys::syscall(sys::SYS_gettid as libc::c_long)
+            };
+            let joiner = thread::spawn(move || {
+                let ret = func.call_box();
+
+                // This will unblock when the clone_cb thread drops the drop_tx. This should be
+                // the last thing that happens before the thread ends, meaning it's now safe to
+                // free it's stack.
+                match drop_rx.recv() {
+                    Ok(v) => void::unreachable(v),
+                    Err(_) => (),
+                };
+
+                // Try to make sure the clone_cb thread has exited before freeing its stack. It's
+                // possible the tid could get reused, so we put a recursion limit on this to avoid
+                // going into a busy loop. Assume that if drop_rx fired then it's not going to take
+                // long for the clone_cb thread to really finish.
+                //
+                // TODO: Figure out a non-racy way of implementing this.
+                for _ in 0..100 {
+                    let res = unsafe {
+                        sys::syscall(sys::SYS_tkill as libc::c_long, tid, 0)
+                    };
+                    if res == 0 {
+                        break;
+                    }
+                    thread::yield_now();
+                }
+
+                // Free the stack.
+                let StackBase(stack_base) = stack_base;
+                let _stack = unsafe { Vec::from_raw_parts(stack_base, 0, stack_size + STACK_ALIGN) };
+                ret
             });
-
-            let mut result = unwrap!(inner.result.lock());
-            *result = Some(r);
-            drop(result);
-            inner.condvar.notify_one();
-        });
+            let _ = joiner_tx.send(joiner);
+        }
+        drop(drop_tx);
         0
     }
 
-    let stack_head = ((stack_base as usize + STACK_SIZE + STACK_ALIGN) & !(STACK_ALIGN - 1)) as *mut c_void;
+    let (joiner_tx, joiner_rx) = mpsc::channel();
+    let stack_head = ((stack_base as usize + stack_size + STACK_ALIGN) & !(STACK_ALIGN - 1)) as *mut c_void;
     let func = Box::new(func);
-    //let arg: Box<CbData<R>> = Box::new((func, inner_cloned));
-    let arg: Box<CbData<R>> = Box::new(CbData { func: func, inner: inner_cloned, });
-    //let arg: Box<CbData> = Box::new((func, inner_cloned));
+    let arg: Box<CbData<R>> = Box::new(CbData { func, joiner_tx, stack_base, stack_size });
     let arg = Box::into_raw(arg) as *mut c_void;
     
     let res = unsafe {
@@ -124,46 +145,14 @@ where
     };
     assert!(res != -1);
 
-    join_handle
-}
-
-impl<R> JoinHandle<R> {
-    /// Join a thread, returning its result.
-    pub fn join(mut self) -> thread::Result<R> {
-        let mut result = unwrap!(self.inner.result.lock());
-        loop {
-            if let Some(r) = result.take() {
-                let _v = unsafe { Vec::from_raw_parts(self.stack_base, 0, STACK_SIZE) };
-                self.stack_base = ptr::null_mut();
-                return r;
-            }
-            result = unwrap!(self.inner.condvar.wait(result));
-        }
-    }
-}
-
-impl<R> Drop for JoinHandle<R> {
-    fn drop(&mut self) {
-        if self.stack_base.is_null() {
-            return
-        }
-
-        let mut result = unwrap!(self.inner.result.lock());
-        loop {
-            if let Some(..) = result.take() {
-                let _v = unsafe { Vec::from_raw_parts(self.stack_base, 0, STACK_SIZE) };
-                return;
-            }
-            result = unwrap!(self.inner.condvar.wait(result));
-        }
-    }
+    unwrap!(joiner_rx.recv())
 }
 
 /// Spawn a function into a new network namespace with a set of network interfaces described by
 /// `ifaces`. Returns a `JoinHandle` which can be used to join the spawned thread, along with a set
 /// of `Tap`s, one for each interface, which can be used to read/write network activity from the
 /// spawned thread.
-pub fn spawn_with_ifaces<F, R>(
+pub fn with_ifaces<F, R>(
     handle: &Handle,
     ifaces: Vec<TapBuilderV4>,
     func: F,
@@ -173,12 +162,18 @@ where
     F: FnOnce() -> R + Send + 'static,
 {
     let (tx, rx) = mpsc::channel();
+    let mut timeouts = Vec::with_capacity(ifaces.len());
+    for _ in 0..ifaces.len() {
+        timeouts.push(Timeout::new(Duration::from_millis(100), handle));
+    }
+
     let join_handle = new_namespace(move || {
         let mut taps = Vec::with_capacity(ifaces.len());
         let mut drop_txs = Vec::with_capacity(ifaces.len());
-        for tap_builder in ifaces {
+        for (tap_builder, timeout) in ifaces.into_iter().zip(timeouts) {
             trace!("building tap {:?}", tap_builder);
             let (drop_tx, drop_rx) = future_utils::drop_notify();
+            let drop_rx = drop_rx.and_then(|()| timeout);
             let tap_unbound = unwrap!(tap_builder.build_unbound());
             taps.push((tap_unbound, drop_rx));
             drop_txs.push(drop_tx);
@@ -202,7 +197,39 @@ where
     (join_handle, taps)
 }
 
-pub fn spawn_on_internet<F, R>(
+pub fn with_iface<F, R>(
+    handle: &Handle,
+    iface: TapBuilderV4,
+    func: F,
+) -> (JoinHandle<R>, EtherBox)
+where
+    R: Send + 'static,
+    F: FnOnce() -> R + Send + 'static,
+{
+    let (tx, rx) = mpsc::channel();
+    let timeout = Timeout::new(Duration::from_millis(100), handle);
+    let join_handle = new_namespace(move || {
+        trace!("building tap {:?}", iface);
+        let (drop_tx, drop_rx) = future_utils::drop_notify();
+        let drop_rx = drop_rx.and_then(|()| timeout);
+        let tap_unbound = unwrap!(iface.build_unbound());
+        unwrap!(tx.send((tap_unbound, drop_rx)));
+        let ret = func();
+        drop(drop_tx);
+        ret
+    });
+
+    let (tap_unbound, drop_rx) = unwrap!(rx.recv());
+    let tap = tap_unbound.bind(handle);
+    let tap = WithDisconnect::new(tap, drop_rx);
+    let tap = Box::new(tap);
+    let tap = tap as EtherBox;
+
+    (join_handle, tap)
+}
+
+/*
+pub fn on_internet<F, R>(
     handle: &Handle,
     func: F,
 ) -> (JoinHandle<R>, EtherBox)
@@ -219,13 +246,13 @@ where
     //tap_builder.route(RouteV4::new(SubnetV4::new(ipv4!("0.0.0.0"), 0), None));
     tap_builder.route(route);
 
-    let (join_handle, taps) = spawn_with_ifaces(handle, vec![tap_builder], move || func(ip));
-    let tap = unwrap!(taps.into_iter().next());
+    let (join_handle, tap) = with_iface(handle, tap_builder, move || func(ip));
 
     (join_handle, tap)
 }
+*/
 
-pub fn spawn_on_subnet<F, R>(
+pub fn on_subnet<F, R>(
     handle: &Handle,
     subnet: SubnetV4,
     func: F,
@@ -240,8 +267,7 @@ where
     tap_builder.netmask(subnet.netmask());
     tap_builder.route(RouteV4::new(subnet, None));
 
-    let (join_handle, taps) = spawn_with_ifaces(handle, vec![tap_builder], move || func(ip));
-    let tap = unwrap!(taps.into_iter().next());
+    let (join_handle, tap) = with_iface(handle, tap_builder, move || func(ip));
 
     (join_handle, tap)
 }
@@ -249,10 +275,10 @@ where
 /// Spawn a function into a new network namespace with a single network interface behind a virtual
 /// NAT. The returned `Gateway` can be used to read/write network activity from the public side of
 /// the NAT.
-pub fn spawn_behind_gateway<F, R>(
+pub fn behind_gateway<F, R>(
     handle: &Handle,
     func: F,
-) -> (JoinHandle<R>, EtherBox)
+) -> (JoinHandle<R>, Gateway)
 where
     R: Send + 'static,
     F: FnOnce() -> R + Send + 'static,
@@ -263,14 +289,13 @@ where
     tap_builder.netmask(subnet.netmask());
     tap_builder.route(RouteV4::new(SubnetV4::global(), Some(subnet.gateway_ip())));
 
-    let (join_handle, taps) = spawn_with_ifaces(handle, vec![tap_builder], func);
-    let tap = unwrap!(taps.into_iter().next());
+    let (join_handle, tap) = with_iface(handle, tap_builder, func);
     let gateway = {
         GatewayBuilder::new(subnet)
         .build(Box::new(tap))
     };
 
-    (join_handle, Box::new(gateway))
+    (join_handle, gateway)
 }
 
 #[cfg(test)]
@@ -305,7 +330,7 @@ mod test {
         let handle = core.handle();
         let res = core.run(future::lazy(|| {
             let handle = handle.remote().handle().unwrap();
-            let (join_handle, taps) = spawn_with_ifaces(&handle, vec![], || {
+            let (join_handle, taps) = with_ifaces(&handle, vec![], || {
                 unwrap!(get_if_addrs::get_if_addrs())
             });
             assert!(taps.is_empty());
@@ -335,12 +360,11 @@ mod test {
             let payload: [u8; 8] = rand::random();
             let addr = addrv4!("1.2.3.4:56");
             trace!("spawning thread");
-            let (join_handle, mut taps) = spawn_with_ifaces(&handle, vec![tap_builder], move || {
+            let (join_handle, tap) = with_iface(&handle, tap_builder, move || {
                 let socket = unwrap!(std::net::UdpSocket::bind(addr!("0.0.0.0:0")));
                 unwrap!(socket.send_to(&payload[..], SocketAddr::V4(addr)));
                 trace!("sent udp packet");
             });
-            let tap = unwrap!(taps.pop());
 
             let mac_addr = rand::random();
             let (tap_tx, tap_rx) = tap.split();
@@ -391,6 +415,7 @@ mod test {
         res.void_unwrap()
     }
 
+    /*
     #[test]
     fn can_talk_to_self_on_internet() {
         use tokio_core::net::UdpSocket;
@@ -399,12 +424,11 @@ mod test {
         let mut core = unwrap!(Core::new());
         let handle = core.handle();
         let res = core.run(future::lazy(move || {
-            let (join_handle, tap) = spawn_on_internet(&handle, move || {
+            let (join_handle, tap) = on_internet(&handle, move || {
                 trace!("our pid is {:?}", unsafe { ::sys::getpid() });
                 thread::sleep(Duration::from_secs(10));
 
                 ::std::process::Command::new("route").status().unwrap();
-                //panic!("ass balls");
 
                 let mut core = unwrap!(Core::new());
                 let handle = core.handle();
@@ -440,6 +464,7 @@ mod test {
         }));
         res.void_unwrap()
     }
+    */
 
     /*
     #[test]

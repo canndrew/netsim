@@ -8,4 +8,5 @@
 #include <net/route.h>
 #include <linux/if_tun.h>
 #include <unistd.h>
+#include <sys/syscall.h>
 

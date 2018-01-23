@@ -29,18 +29,15 @@ impl Future for Hub {
     type Error = io::Error;
 
     fn poll(&mut self) -> io::Result<Async<()>> {
-        println!("polling hub");
         let mut i = 0;
         while i < self.clients.len() {
             match self.clients[i].channel.poll()? {
                 Async::Ready(Some(frame)) => {
-                    println!("hub received frame: {:?}", frame);
                     for client in &mut self.clients {
                         client.outgoing.push_back(frame.clone());
                     }
                 },
                 Async::Ready(None) => {
-                    println!("hub removing device #{}", i);
                     self.clients.swap_remove(i);
                 },
                 Async::NotReady => {

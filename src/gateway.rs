@@ -245,7 +245,6 @@ mod test {
     use util;
     use env_logger;
     use flush;
-    use void;
 
     #[test]
     fn udp_port_mapping() {
@@ -255,7 +254,7 @@ mod test {
         let res = core.run(future::lazy(move || {
             let dest_addr = Ipv4Addr::random_global();
             trace!("dest_addr == {}", dest_addr);
-            let (join_handle, gateway) = spawn::spawn_behind_gateway(&handle, move || {
+            let (join_handle, gateway) = spawn::behind_gateway(&handle, move || {
                 const PACKET_LEN: usize = 1024;
 
                 let sock0 = unwrap!(UdpSocket::bind(addr!("0.0.0.0:0")));
@@ -333,7 +332,7 @@ mod test {
                     gateway_rx
                     .into_future()
                     .while_driving(flush::new(gateway_tx))
-                    .map_err(|((e, _gateway_rx), flush_gateway_tx)| {
+                    .map_err(|((e, _gateway_rx), _flush_gateway_tx)| {
                         panic!("recv error: {}", e)
                     })
                     .map(|((packet_opt, _gateway_rx), flush_gateway_tx)| {

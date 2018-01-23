@@ -1,4 +1,3 @@
-pub use spawn::JoinHandle;
 pub use tap::{Tap, TapBuilderV4, TapBuildError};
 pub use gateway::{GatewayBuilder, Gateway};
 //pub use link::{LinkBuilder, Link};

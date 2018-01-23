@@ -205,9 +205,7 @@ impl TapBuilderV4 {
             match os_err as u32 {
                 sys::EPERM => return Err(TapBuildError::CreateTapPermissionDenied),
                 sys::EBUSY => {
-                    println!("our name == {}", self.name);
                     for iface in unwrap!(get_if_addrs::get_if_addrs()) {
-                        println!("{:?}", iface);
                         if iface.name == self.name {
                             return Err(TapBuildError::InterfaceAlreadyExists);
                         }
@@ -314,7 +312,6 @@ impl TapBuilderV4 {
         }
 
         trace!("creating TAP");
-        ::std::process::Command::new("ifconfig").status().unwrap();
 
         Ok(PreTap { fd })
     }
@@ -462,7 +459,7 @@ mod test {
         let join_handle = spawn::new_namespace(|| {
             unwrap!(unwrap!(capabilities::Capabilities::new()).apply());
 
-            let mut tap_builder = TapBuilderV4::new();
+            let tap_builder = TapBuilderV4::new();
             match tap_builder.build_unbound() {
                 Err(TapBuildError::CreateTapPermissionDenied) => (),
                 res => panic!("unexpected result: {:?}", res),
