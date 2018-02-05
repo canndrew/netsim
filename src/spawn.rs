@@ -188,7 +188,7 @@ where
     let mut taps = Vec::with_capacity(taps_unbound.len());
     for (tap_unbound, drop_rx) in taps_unbound {
         let tap = tap_unbound.bind(handle);
-        let tap = WithDisconnect::new(tap, drop_rx);
+        let tap = WithDisconnect::new(tap, drop_rx, handle);
         let tap = Box::new(tap);
         let tap = tap as EtherBox;
         taps.push(tap);
@@ -224,7 +224,7 @@ where
 
     let (tap_unbound, drop_rx) = unwrap!(rx.recv());
     let tap = tap_unbound.bind(handle);
-    let tap = WithDisconnect::new(tap, drop_rx);
+    let tap = WithDisconnect::new(tap, drop_rx, handle);
     let tap = Box::new(tap);
     let tap = tap as EtherBox;
 

@@ -110,7 +110,32 @@ extern crate env_logger;
 extern crate bincode;
 #[cfg(test)]
 extern crate capabilities;
+extern crate smoltcp;
 
+/// Convert a variable-length slice to a fixed-length array
+macro_rules! assert_len {
+    ($len:tt, $slice:expr) => {{
+        use std::ptr;
+
+        union MaybeUninit<T: Copy> {
+            init: T,
+            uninit: (),
+        }
+        
+        let mut array: MaybeUninit<[_; $len]> = MaybeUninit { uninit: () };
+        let slice: &[_] = $slice;
+        for i in 0..$len {
+            let x = slice[i];
+            unsafe {
+                ptr::write(&mut array.init[i], x)
+            }
+        }
+
+        unsafe {
+            array.init
+        }
+    }}
+}
 
 //mod machine;
 //pub mod plug;
@@ -129,14 +154,15 @@ mod gateway;
 mod util;
 mod time;
 mod subnet;
-mod arp;
+//mod arp;
 mod icmpv6;
 mod hub;
 mod veth;
 mod veth_adaptor;
-mod mac;
+//mod mac;
 mod flush;
 mod with_disconnect;
+mod latency;
 
 mod prelude;
 mod priv_prelude;

@@ -1,7 +1,8 @@
 use priv_prelude::*;
+//use futures::future::Loop;
 
 /// An ethernet frame.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct EtherFrame {
     data: Bytes,
 }
@@ -25,7 +26,7 @@ pub enum EtherPayload {
     /// IPv6
     Ipv6(Ipv6Packet),
     /// ARP (Address Resolution Protocol)
-    Arp(ArpPacket),
+    Arp(ArpPacket<Bytes>),
     /// Unknkown. The two bytes represent the Ethernet II EtherType of the packet. The `Bytes` is
     /// the payload.
     Unknown([u8; 2], Bytes),
@@ -51,13 +52,13 @@ impl EtherFrame {
     }
 
     /// Get the source MAC address of the frame.
-    pub fn source(&self) -> MacAddr {
-        MacAddr::from_bytes(&self.data[6..12])
+    pub fn source(&self) -> EthernetAddress {
+        EthernetAddress::from_bytes(&self.data[6..12])
     }
 
     /// Get the destination MAC address of the frame.
-    pub fn destination(&self) -> MacAddr {
-        MacAddr::from_bytes(&self.data[0..6])
+    pub fn destination(&self) -> EthernetAddress {
+        EthernetAddress::from_bytes(&self.data[0..6])
     }
 
     /// Get the payload of the frame.
@@ -65,7 +66,7 @@ impl EtherFrame {
         match (self.data[12], self.data[13]) {
             (0x08, 0x00) => EtherPayload::Ipv4(Ipv4Packet::from_bytes(self.data.slice_from(14))),
             (0x86, 0xdd) => EtherPayload::Ipv6(Ipv6Packet::from_bytes(self.data.slice_from(14))),
-            (0x08, 0x06) => EtherPayload::Arp(ArpPacket::from_bytes(self.data.slice_from(14))),
+            (0x08, 0x06) => EtherPayload::Arp(ArpPacket::new(self.data.slice_from(14))),
             (x, y) => EtherPayload::Unknown([x, y], self.data.slice_from(14)),
         }
     }
@@ -76,7 +77,7 @@ impl EtherFrame {
     }
 
     /// Set the source MAC address of the frame.
-    pub fn set_source(&mut self, addr: MacAddr) {
+    pub fn set_source(&mut self, addr: EthernetAddress) {
         let bytes = mem::replace(&mut self.data, Bytes::new());
         let mut bytes_mut = BytesMut::from(bytes);
         bytes_mut[6..12].clone_from_slice(&addr.as_bytes()[..]);
@@ -84,7 +85,7 @@ impl EtherFrame {
     }
 
     /// Set the destination MAC address of the frame.
-    pub fn set_destination(&mut self, addr: MacAddr) {
+    pub fn set_destination(&mut self, addr: EthernetAddress) {
         let bytes = mem::replace(&mut self.data, Bytes::new());
         let mut bytes_mut = BytesMut::from(bytes);
         bytes_mut[0..6].clone_from_slice(&addr.as_bytes()[..]);
@@ -106,7 +107,7 @@ impl EtherFrame {
             },
             EtherPayload::Arp(arp) => {
                 bytes_mut.extend_from_slice(&[0x08, 0x06]);
-                bytes_mut.extend_from_slice(arp.as_bytes());
+                bytes_mut.extend_from_slice(&arp.into_inner());
             },
             EtherPayload::Unknown(xy, payload) => {
                 bytes_mut.extend_from_slice(&xy);
@@ -139,4 +140,46 @@ where
        + Sized,
 {
 }
+
+// TODO: make this a method
+/*
+pub fn respond_to_arp(
+    this: EtherBox,
+    ip_addr: Ipv4Addr,
+    mac_addr: EthernetAddress,
+) -> BoxFuture<Option<EtherBox>, io::Error> {
+    future::loop_fn(this, move |this| {
+        this
+        .into_future()
+        .map_err(|(e, _)| e)
+        .and_then(move |(frame_opt, this)| {
+            match frame_opt {
+                Some(mut frame) => {
+                    if let EtherPayload::Arp(arp) = frame.payload() {
+                        if {
+                            arp.operation() == ArpOperation::Request &&
+                            arp.destination_ip() == ip_addr
+                        } {
+                            let arp = arp.response(mac_addr);
+                            frame.set_source(arp.source_mac());
+                            frame.set_destination(arp.destination_mac());
+                            frame.set_payload(EtherPayload::Arp(arp));
+
+                            return {
+                                this
+                                .send(frame)
+                                .map(|this| Loop::Break(Some(this)))
+                                .into_boxed()
+                            };
+                        }
+                    }
+                    future::ok(Loop::Continue(this)).into_boxed()
+                },
+                None => future::ok(Loop::Break(None)).into_boxed()
+            }
+        })
+    })
+    .into_boxed()
+}
+*/
 

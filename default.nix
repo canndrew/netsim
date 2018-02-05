@@ -3,11 +3,11 @@ with import <nixpkgs> {}; {
     name = "env";
     buildInputs = [
       stdenv
-      llvmPackages.clang-unwrapped
+      llvmPackages.clang-unwrapped.lib
       libcap
     ];
 
-    LIBCLANG_PATH = "${llvmPackages.clang-unwrapped}/lib";
+    LIBCLANG_PATH = "${llvmPackages.clang-unwrapped.lib}/lib";
     CPATH = "${stdenv.cc.libc.dev}/include";
   };
 }

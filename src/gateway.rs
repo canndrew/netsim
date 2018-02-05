@@ -4,16 +4,16 @@ use rand;
 /// Used to configure gateway settings before creating a gateway with `build`.
 pub struct GatewayBuilder {
     public_ip: Ipv4Addr,
-    public_mac_addr: MacAddr,
-    private_mac_addr: MacAddr,
+    public_mac_addr: EthernetAddress,
+    private_mac_addr: EthernetAddress,
     subnet: SubnetV4,
 }
 
 impl GatewayBuilder {
     /// Create a new gateway on the given subnet.
     pub fn new(subnet: SubnetV4) -> GatewayBuilder {
-        let public_mac_addr = rand::random();
-        let private_mac_addr = rand::random();
+        let public_mac_addr = EthernetAddress(rand::random());
+        let private_mac_addr = EthernetAddress(rand::random());
         GatewayBuilder {
             public_ip: Ipv4Addr::random_global(),
             public_mac_addr: public_mac_addr,

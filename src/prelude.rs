@@ -7,10 +7,11 @@ pub use udp::UdpPacket;
 pub use ethernet::{EtherFrame, EtherChannel, EtherBox, EtherPayload};
 pub use route::{RouteV4, AddRouteError};
 pub use subnet::SubnetV4;
-pub use arp::{ArpPacket, ArpOperation};
+//pub use arp::{ArpPacket, ArpOperation};
 pub use icmpv6::Icmpv6Packet;
 pub use hub::Hub;
 pub use veth::VethV4;
 pub use veth_adaptor::VethAdaptorV4;
-pub use mac::MacAddr;
+//pub use mac::MacAddr;
+pub use latency::Latency;
 

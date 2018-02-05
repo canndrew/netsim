@@ -422,6 +422,9 @@ mod test {
     use priv_prelude::*;
     use spawn;
     use capabilities;
+    use env_logger;
+    use std;
+    use rand;
 
     #[test]
     fn build_tap_name_contains_nul() {
@@ -466,6 +469,57 @@ mod test {
             }
         });
         unwrap!(join_handle.join());
+    }
+
+    #[test]
+    #[ignore]   // currently fails :(
+    fn tap_blocks_on_namespaced_side() {
+        let _ = env_logger::init();
+
+        const NUM_PACKETS: usize = 500000;
+        let mut core = unwrap!(Core::new());
+        let handle = core.handle();
+
+        let res = core.run(future::lazy(move || {
+            let (join_handle, tap) = spawn::on_subnet(&handle, SubnetV4::local_10(), move |_ip| {
+                let socket = unwrap!(std::net::UdpSocket::bind(addr!("0.0.0.0:0")));
+                unwrap!(socket.set_write_timeout(Some(Duration::from_secs(1))));
+                for _ in 0..NUM_PACKETS {
+                    match socket.send_to(&[], &addr!("10.2.3.4:567")) {
+                        Ok(_) => (),
+                        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                            return;
+                        },
+                        Err(e) => panic!("unexpected io error: {}", e),
+                    }
+                }
+                panic!("all packets got sent");
+            });
+
+            tap
+            .into_future()
+            .map_err(|(e, _)| panic!("tap read error: {}", e))
+            .and_then(move |(frame_opt, tap)| {
+                let mut frame = unwrap!(frame_opt);
+                let arp = match frame.payload() {
+                    EtherPayload::Arp(arp) => arp,
+                    p => panic!("unexpected payload: {:?}", p),
+                };
+
+                let arp = arp.response(rand::random());
+                frame.set_source(arp.source_mac());
+                frame.set_destination(arp.destination_mac());
+                frame.set_payload(EtherPayload::Arp(arp));
+
+                tap
+                .send(frame)
+                .map_err(|e| panic!("tap write error: {}", e))
+                .map(move |_tap| {
+                    unwrap!(join_handle.join());
+                })
+            })
+        }));
+        res.void_unwrap()
     }
 }
 

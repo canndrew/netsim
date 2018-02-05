@@ -1,16 +1,25 @@
 use priv_prelude::*;
 
+enum Disconnect<D> {
+    Connected(D),
+    Waiting(Timeout),
+    Finished,
+}
+
 pub struct WithDisconnect<C, D> {
     channel: C,
-    disconnect: Option<D>,
+    disconnect: Disconnect<D>,
+    handle: Handle,
 }
 
 impl<C, D> WithDisconnect<C, D> {
-    pub fn new(channel: C, disconnect: D) -> WithDisconnect<C, D> {
-        let disconnect = Some(disconnect);
+    pub fn new(channel: C, disconnect: D, handle: &Handle) -> WithDisconnect<C, D> {
+        let disconnect = Disconnect::Connected(disconnect);
+        let handle = handle.clone();
         WithDisconnect {
             channel,
             disconnect,
+            handle,
         }
     }
 }
@@ -24,26 +33,51 @@ where
     type Error = io::Error;
 
     fn poll(&mut self) -> io::Result<Async<Option<EtherFrame>>> {
-        if let Some(mut disconnect) = self.disconnect.take() {
-            match self.channel.poll()? {
-                Async::Ready(x) => {
-                    self.disconnect = Some(disconnect);
-                    Ok(Async::Ready(x))
-                },
-                Async::NotReady => {
-                    match disconnect.poll().void_unwrap() {
-                        Async::Ready(()) => {
-                            Ok(Async::Ready(None))
-                        },
-                        Async::NotReady => {
-                            self.disconnect = Some(disconnect);
-                            Ok(Async::NotReady)
-                        },
-                    }
-                },
+        let disconnect = mem::replace(&mut self.disconnect, Disconnect::Finished);
+
+        match disconnect {
+            Disconnect::Connected(mut d) => {
+                match self.channel.poll()? {
+                    Async::Ready(x) => {
+                        self.disconnect = Disconnect::Connected(d);
+                        Ok(Async::Ready(x))
+                    },
+                    Async::NotReady => {
+                        match d.poll().void_unwrap() {
+                            Async::Ready(()) => {
+                                let mut timeout = Timeout::new(Duration::from_millis(500), &self.handle);
+                                let _ = timeout.poll().void_unwrap();
+                                self.disconnect = Disconnect::Waiting(timeout);
+                            },
+                            Async::NotReady => {
+                                self.disconnect = Disconnect::Connected(d);
+                            },
+                        }
+                        Ok(Async::NotReady)
+                    },
+                }
+            },
+            Disconnect::Waiting(mut timeout) => {
+                match self.channel.poll()? {
+                    Async::Ready(x) => {
+                        timeout.reset(Instant::now() + Duration::from_millis(500));
+                        self.disconnect = Disconnect::Waiting(timeout);
+                        Ok(Async::Ready(x))
+                    },
+                    Async::NotReady => {
+                        match timeout.poll().void_unwrap() {
+                            Async::Ready(()) => {
+                                Ok(Async::Ready(None))
+                            },
+                            Async::NotReady => {
+                                self.disconnect = Disconnect::Waiting(timeout);
+                                Ok(Async::NotReady)
+                            },
+                        }
+                    },
+                }
             }
-        } else {
-            Ok(Async::Ready(None))
+            Disconnect::Finished => Ok(Async::Ready(None)),
         }
     }
 }
@@ -57,34 +91,20 @@ where
     type SinkError = io::Error;
 
     fn start_send(&mut self, item: EtherFrame) -> io::Result<AsyncSink<EtherFrame>> {
-        if let Some(mut disconnect) = self.disconnect.take() {
-            match disconnect.poll().void_unwrap() {
-                Async::Ready(()) => {
-                    Ok(AsyncSink::Ready)
-                },
-                Async::NotReady => {
-                    self.disconnect = Some(disconnect);
-                    self.channel.start_send(item)
-                },
+        match self.disconnect {
+            Disconnect::Connected(..) => {
+                self.channel.start_send(item)
             }
-        } else {
-            Ok(AsyncSink::Ready)
+            _ => Ok(AsyncSink::Ready)
         }
     }
 
     fn poll_complete(&mut self) -> io::Result<Async<()>> {
-        if let Some(mut disconnect) = self.disconnect.take() {
-            match disconnect.poll().void_unwrap() {
-                Async::Ready(()) => {
-                    Ok(Async::Ready(()))
-                },
-                Async::NotReady => {
-                    self.disconnect = Some(disconnect);
-                    self.channel.poll_complete()
-                },
+        match self.disconnect {
+            Disconnect::Connected(..) => {
+                self.channel.poll_complete()
             }
-        } else {
-            Ok(Async::Ready(()))
+            _ => Ok(Async::Ready(()))
         }
     }
 }

@@ -8,10 +8,10 @@ pub struct VethAdaptorV4 {
 }
 
 impl VethAdaptorV4 {
-    pub fn new(ip_addr: Ipv4Addr, channel: EtherBox) -> VethAdaptorV4 {
+    pub fn new<C: EtherChannel + 'static>(ip_addr: Ipv4Addr, channel: C) -> VethAdaptorV4 {
         VethAdaptorV4 {
-            channel: channel,
-            veth: VethV4::new(rand::random(), ip_addr),
+            channel: Box::new(channel) as EtherBox,
+            veth: VethV4::new(EthernetAddress(rand::random()), ip_addr),
             sending_frame: None,
         }
     }
@@ -26,8 +26,6 @@ impl Stream for VethAdaptorV4 {
     type Error = io::Error;
 
     fn poll(&mut self) -> io::Result<Async<Option<Ipv4Packet>>> {
-        let _ = self.poll_complete()?;
-
         let disconnected = loop {
             match self.channel.poll()? {
                 Async::Ready(Some(frame)) => {
@@ -39,7 +37,7 @@ impl Stream for VethAdaptorV4 {
             };
         };
 
-        match self.veth.next_incoming() {
+        let ret = match self.veth.next_incoming() {
             Async::Ready(packet) => Ok(Async::Ready(Some(packet))),
             Async::NotReady => {
                 if disconnected {
@@ -48,7 +46,10 @@ impl Stream for VethAdaptorV4 {
                     Ok(Async::NotReady)
                 }
             },
-        }
+        };
+
+        let _ = self.poll_complete()?;
+        ret
     }
 }
 
