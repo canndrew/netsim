@@ -24,7 +24,7 @@ pub enum EtherPayload {
     /// IPv4
     Ipv4(Ipv4Packet<Bytes>),
     /// IPv6
-    Ipv6(Ipv6Packet),
+    Ipv6(Ipv6Packet<Bytes>),
     /// ARP (Address Resolution Protocol)
     Arp(ArpPacket<Bytes>),
     /// Unknkown. The two bytes represent the Ethernet II EtherType of the packet. The `Bytes` is
@@ -65,7 +65,7 @@ impl EtherFrame {
     pub fn payload(&self) -> EtherPayload {
         match (self.data[12], self.data[13]) {
             (0x08, 0x00) => EtherPayload::Ipv4(Ipv4Packet::new(self.data.slice_from(14))),
-            (0x86, 0xdd) => EtherPayload::Ipv6(Ipv6Packet::from_bytes(self.data.slice_from(14))),
+            (0x86, 0xdd) => EtherPayload::Ipv6(Ipv6Packet::new(self.data.slice_from(14))),
             (0x08, 0x06) => EtherPayload::Arp(ArpPacket::new(self.data.slice_from(14))),
             (x, y) => EtherPayload::Unknown([x, y], self.data.slice_from(14)),
         }
@@ -103,7 +103,7 @@ impl EtherFrame {
             },
             EtherPayload::Ipv6(ipv6) => {
                 bytes_mut.extend_from_slice(&[0x86, 0xdd]);
-                bytes_mut.extend_from_slice(ipv6.as_bytes());
+                bytes_mut.extend_from_slice(&ipv6.into_inner());
             },
             EtherPayload::Arp(arp) => {
                 bytes_mut.extend_from_slice(&[0x08, 0x06]);

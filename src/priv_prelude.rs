@@ -26,6 +26,7 @@ pub use smoltcp::wire::{ArpPacket, ArpOperation, ArpRepr};
 pub use smoltcp::wire::{EthernetAddress};
 pub use smoltcp::wire::{UdpPacket, UdpRepr};
 pub use smoltcp::wire::{Ipv4Packet, Ipv4Repr};
+pub use smoltcp::wire::{Ipv6Packet, Ipv6Repr};
 pub use smoltcp::wire::IpProtocol;
 pub use smoltcp::phy::ChecksumCapabilities;
 
