@@ -5,9 +5,9 @@ use util;
 pub struct VethV4 {
     outgoing_tx: UnboundedSender<EtherFrame>,
     outgoing_rx: UnboundedReceiver<EtherFrame>,
-    incoming_tx: UnboundedSender<Ipv4Packet>,
-    incoming_rx: UnboundedReceiver<Ipv4Packet>,
-    waiting_on_mac: HashMap<Ipv4Addr, Vec<Ipv4Packet>>,
+    incoming_tx: UnboundedSender<Ipv4Packet<Bytes>>,
+    incoming_rx: UnboundedReceiver<Ipv4Packet<Bytes>>,
+    waiting_on_mac: HashMap<Ipv4Addr, Vec<Ipv4Packet<Bytes>>>,
     arp_table: HashMap<Ipv4Addr, EthernetAddress>,
     routes: Vec<RouteV4>,
     mac_addr: EthernetAddress,
@@ -46,8 +46,8 @@ impl VethV4 {
         self.routes.push(route);
     }
 
-    pub fn send_packet(&mut self, packet: Ipv4Packet) {
-        let dest_ip = packet.destination();
+    pub fn send_packet(&mut self, packet: Ipv4Packet<Bytes>) {
+        let dest_ip = packet.dst_addr().into();
         let mut correct_route = None;
         for route in &self.routes {
             if route.destination().contains(dest_ip) {
@@ -83,7 +83,7 @@ impl VethV4 {
                     target_hardware_addr: EthernetAddress::BROADCAST,
                     target_protocol_addr: dest_ip.into(),
                 };
-                let mut arp = ArpPacket::new(util::zeros_bytes(arp_repr.buffer_len()));
+                let mut arp = ArpPacket::new(util::bytes_mut_zeroed(arp_repr.buffer_len()));
                 arp_repr.emit(&mut arp);
                 let bytes = arp.into_inner();
                 let arp = ArpPacket::new(bytes.freeze());
@@ -127,7 +127,7 @@ impl VethV4 {
                             target_hardware_addr: source_mac,
                             target_protocol_addr: source_ip.into(),
                         };
-                        let mut arp = ArpPacket::new(util::zeros_bytes(arp_repr.buffer_len()));
+                        let mut arp = ArpPacket::new(util::bytes_mut_zeroed(arp_repr.buffer_len()));
                         arp_repr.emit(&mut arp);
                         let arp = ArpPacket::new(arp.into_inner().freeze());
 
@@ -151,7 +151,7 @@ impl VethV4 {
         }
     }
 
-    pub fn next_incoming(&mut self) -> Async<Ipv4Packet> {
+    pub fn next_incoming(&mut self) -> Async<Ipv4Packet<Bytes>> {
         match self.incoming_rx.poll().void_unwrap() {
             Async::Ready(Some(packet)) => Async::Ready(packet),
             Async::Ready(None) => unreachable!(),

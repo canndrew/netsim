@@ -22,7 +22,7 @@ impl fmt::Debug for EtherFrame {
 #[derive(Debug)]
 pub enum EtherPayload {
     /// IPv4
-    Ipv4(Ipv4Packet),
+    Ipv4(Ipv4Packet<Bytes>),
     /// IPv6
     Ipv6(Ipv6Packet),
     /// ARP (Address Resolution Protocol)
@@ -64,7 +64,7 @@ impl EtherFrame {
     /// Get the payload of the frame.
     pub fn payload(&self) -> EtherPayload {
         match (self.data[12], self.data[13]) {
-            (0x08, 0x00) => EtherPayload::Ipv4(Ipv4Packet::from_bytes(self.data.slice_from(14))),
+            (0x08, 0x00) => EtherPayload::Ipv4(Ipv4Packet::new(self.data.slice_from(14))),
             (0x86, 0xdd) => EtherPayload::Ipv6(Ipv6Packet::from_bytes(self.data.slice_from(14))),
             (0x08, 0x06) => EtherPayload::Arp(ArpPacket::new(self.data.slice_from(14))),
             (x, y) => EtherPayload::Unknown([x, y], self.data.slice_from(14)),
@@ -99,7 +99,7 @@ impl EtherFrame {
         match payload {
             EtherPayload::Ipv4(ipv4) => {
                 bytes_mut.extend_from_slice(&[0x08, 0x00]);
-                bytes_mut.extend_from_slice(ipv4.as_bytes());
+                bytes_mut.extend_from_slice(&ipv4.into_inner());
             },
             EtherPayload::Ipv6(ipv6) => {
                 bytes_mut.extend_from_slice(&[0x86, 0xdd]);

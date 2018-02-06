@@ -128,30 +128,42 @@ impl Stream for Gateway {
             }
         }
 
-        while let Async::Ready(mut packet) = self.private_veth.next_incoming() {
-            trace!("incoming IP packet from private side: {:?}", packet);
-            let mut udp = match packet.payload() {
-                Ipv4Payload::Udp(payload) => payload,
+        while let Async::Ready(ipv4) = self.private_veth.next_incoming() {
+            trace!("incoming IP packet from private side: {:?}", ipv4);
+            let mut ipv4 = Ipv4Packet::new(BytesMut::from(ipv4.into_inner()));
+
+            let hop_limit = match ipv4.hop_limit().checked_sub(1) {
+                Some(n) => n,
+                None => continue,
+            };
+            ipv4.set_hop_limit(hop_limit);
+
+            match ipv4.protocol() {
+                IpProtocol::Udp => {
+                    let src_ipv4_addr = ipv4.src_addr().into();
+                    let mut udp = UdpPacket::new(ipv4.payload_mut());
+                    let src_addr = SocketAddrV4::new(src_ipv4_addr, udp.src_port());
+                    let mapped_port = match self.udp_map.map_out(src_addr) {
+                        Some(port) => port,
+                        None => {
+                            trace!("cannot map packet. ignoring");
+                            continue;
+                        },
+                    };
+                    udp.set_src_port(mapped_port);
+                },
                 _ => {
                     trace!("packet is non-udp. ignoring");
                     continue;
                 },
             };
 
-            let source_addr = SocketAddrV4::new(packet.source(), udp.source_port());
-            let mapped_port = match self.udp_map.map_out(source_addr) {
-                Some(port) => port,
-                None => {
-                    trace!("cannot map packet. ignoring");
-                    continue;
-                },
-            };
+            ipv4.set_src_addr(self.public_veth.ip().into());
 
-            udp.set_source_port(mapped_port);
-            packet.set_payload(Ipv4Payload::Udp(udp));
-            packet.set_source(self.public_veth.ip());
-            trace!("enqueing packet to send on public side: {:?}", packet);
-            self.public_veth.send_packet(packet);
+            let ipv4 = Ipv4Packet::new(ipv4.into_inner().freeze());
+
+            trace!("enqueing packet to send on public side: {:?}", ipv4);
+            self.public_veth.send_packet(ipv4);
         }
 
         if let Async::Ready(frame) = self.public_veth.next_outgoing() {
@@ -171,33 +183,43 @@ impl Sink for Gateway {
         trace!("received frame on public side: {:?}", frame);
         self.public_veth.recv_frame(frame);
         
-        while let Async::Ready(mut packet) = self.public_veth.next_incoming() {
-            trace!("incoming IP packet from public side: {:?}", packet);
-            let mut udp = match packet.payload() {
-                Ipv4Payload::Udp(payload) => payload,
+        while let Async::Ready(ipv4) = self.public_veth.next_incoming() {
+            trace!("incoming IP packet from public side: {:?}", ipv4);
+
+            if Ipv4Addr::from(ipv4.dst_addr()) != self.public_veth.ip() {
+                trace!("packet was not addressed to our public IP. dropping.");
+                continue;
+            }
+
+            let mut ipv4 = Ipv4Packet::new(BytesMut::from(ipv4.into_inner()));
+
+            let hop_limit = match ipv4.hop_limit().checked_sub(1) {
+                Some(n) => n,
+                None => continue,
+            };
+            ipv4.set_hop_limit(hop_limit);
+
+            let addr = match ipv4.protocol() {
+                IpProtocol::Udp => {
+                    let mut udp = UdpPacket::new(ipv4.payload_mut());
+                    let unmapped_addr = match self.udp_map.map_in(udp.dst_port()) {
+                        Some(addr) => addr,
+                        None => {
+                            trace!("no internal mapping for port {}. dropping.", udp.dst_port());
+                            return Ok(AsyncSink::Ready);
+                        },
+                    };
+                    udp.set_dst_port(unmapped_addr.port());
+                    *unmapped_addr.ip()
+                },
                 _ => {
                     trace!("packet has unknown ipv4 protocol type. dropping.");
                     continue;
                 },
             };
-
-            if packet.destination() != self.public_veth.ip() {
-                trace!("packet was not addressed to our public IP. dropping.");
-                continue;
-            }
-
-            let unmapped_addr = match self.udp_map.map_in(udp.destination_port()) {
-                Some(addr) => addr,
-                None => {
-                    trace!("no internal mapping for port {}. dropping.", udp.destination_port());
-                    return Ok(AsyncSink::Ready);
-                },
-            };
-
-            udp.set_destination_port(unmapped_addr.port());
-            packet.set_payload(Ipv4Payload::Udp(udp));
-            packet.set_destination(*unmapped_addr.ip());
-            self.private_veth.send_packet(packet);
+            ipv4.set_dst_addr(addr.into());
+            let ipv4 = Ipv4Packet::new(ipv4.into_inner().freeze());
+            self.private_veth.send_packet(ipv4);
         }
 
         Ok(AsyncSink::Ready)

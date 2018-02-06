@@ -24,9 +24,13 @@ pub use std::str::FromStr;
 pub use future_utils::{BoxFuture, BoxStream};
 pub use smoltcp::wire::{ArpPacket, ArpOperation, ArpRepr};
 pub use smoltcp::wire::{EthernetAddress};
+pub use smoltcp::wire::{UdpPacket, UdpRepr};
+pub use smoltcp::wire::{Ipv4Packet, Ipv4Repr};
+pub use smoltcp::wire::IpProtocol;
+pub use smoltcp::phy::ChecksumCapabilities;
 
 pub use fd::AsyncFd;
-pub use ipv4::Ipv4AddrExt;
+pub use ipv4_addr::Ipv4AddrExt;
 pub use time::DurationExt;
 pub use with_disconnect::WithDisconnect;
 

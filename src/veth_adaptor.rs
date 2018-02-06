@@ -22,10 +22,10 @@ impl VethAdaptorV4 {
 }
 
 impl Stream for VethAdaptorV4 {
-    type Item = Ipv4Packet;
+    type Item = Ipv4Packet<Bytes>;
     type Error = io::Error;
 
-    fn poll(&mut self) -> io::Result<Async<Option<Ipv4Packet>>> {
+    fn poll(&mut self) -> io::Result<Async<Option<Ipv4Packet<Bytes>>>> {
         let disconnected = loop {
             match self.channel.poll()? {
                 Async::Ready(Some(frame)) => {
@@ -54,10 +54,10 @@ impl Stream for VethAdaptorV4 {
 }
 
 impl Sink for VethAdaptorV4 {
-    type SinkItem = Ipv4Packet;
+    type SinkItem = Ipv4Packet<Bytes>;
     type SinkError = io::Error;
 
-    fn start_send(&mut self, item: Ipv4Packet) -> io::Result<AsyncSink<Ipv4Packet>> {
+    fn start_send(&mut self, item: Ipv4Packet<Bytes>) -> io::Result<AsyncSink<Ipv4Packet<Bytes>>> {
         trace!("adaptor sending packet: {:?}", item);
         self.veth.send_packet(item);
         Ok(AsyncSink::Ready)

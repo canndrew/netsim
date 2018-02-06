@@ -19,7 +19,7 @@ pub fn random_vec(len: usize) -> Vec<u8> {
     ret
 }
 
-pub fn zeros_bytes(len: usize) -> BytesMut {
+pub fn bytes_mut_zeroed(len: usize) -> BytesMut {
     let mut ret = BytesMut::with_capacity(len);
     unsafe {
         ret.set_len(len);
