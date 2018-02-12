@@ -4,7 +4,7 @@ use rand;
 pub struct VethAdaptorV4 {
     channel: EtherBox,
     veth: VethV4,
-    sending_frame: Option<EtherFrame>,
+    sending_frame: Option<EthernetFrame<Bytes>>,
 }
 
 impl VethAdaptorV4 {
@@ -29,7 +29,7 @@ impl Stream for VethAdaptorV4 {
         let disconnected = loop {
             match self.channel.poll()? {
                 Async::Ready(Some(frame)) => {
-                    trace!("adaptor got frame: {:?}", frame);
+                    trace!("adaptor got frame: {}", PrettyPrinter::print(&frame));
                     self.veth.recv_frame(frame);
                 },
                 Async::Ready(None) => break true,
@@ -58,7 +58,7 @@ impl Sink for VethAdaptorV4 {
     type SinkError = io::Error;
 
     fn start_send(&mut self, item: Ipv4Packet<Bytes>) -> io::Result<AsyncSink<Ipv4Packet<Bytes>>> {
-        trace!("adaptor sending packet: {:?}", item);
+        trace!("adaptor sending packet: {}", PrettyPrinter::print(&item));
         self.veth.send_packet(item);
         Ok(AsyncSink::Ready)
     }
@@ -67,7 +67,7 @@ impl Sink for VethAdaptorV4 {
         trace!("VethAdapatorV4::poll_complete()");
         let complete = loop {
             if let Some(frame) = self.sending_frame.take() {
-                trace!("adaptor sending frame: {:?}", frame);
+                trace!("adaptor sending frame: {}", PrettyPrinter::print(&frame));
                 match self.channel.start_send(frame)? {
                     AsyncSink::Ready => (),
                     AsyncSink::NotReady(frame) => {

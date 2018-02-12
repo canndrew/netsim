@@ -21,17 +21,21 @@ pub use rand::Rng;
 pub use rand::distributions::IndependentSample;
 pub use future_utils::mpsc::{UnboundedSender, UnboundedReceiver};
 pub use std::str::FromStr;
-pub use future_utils::{BoxFuture, BoxStream};
+pub use future_utils::{BoxFuture, BoxStream, IoFuture, IoStream};
 pub use smoltcp::wire::{ArpPacket, ArpOperation, ArpRepr};
-pub use smoltcp::wire::{EthernetAddress};
+pub use smoltcp::wire::{EthernetFrame, EthernetAddress, EthernetProtocol, EthernetRepr};
 pub use smoltcp::wire::{UdpPacket, UdpRepr};
 pub use smoltcp::wire::{Ipv4Packet, Ipv4Repr};
 pub use smoltcp::wire::{Ipv6Packet, Ipv6Repr};
 pub use smoltcp::wire::IpProtocol;
 pub use smoltcp::phy::ChecksumCapabilities;
+pub use smoltcp::wire::pretty_print::PrettyPrinter;
+pub use smoltcp::wire;
 
 pub use fd::AsyncFd;
-pub use ipv4_addr::Ipv4AddrExt;
+pub use ipv4::{Ipv4AddrExt, Ipv4PacketExt};
 pub use time::DurationExt;
 pub use with_disconnect::WithDisconnect;
+pub use ethernet::EthernetFrameExt;
+pub use arp::ArpPacketExt;
 

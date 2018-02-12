@@ -347,10 +347,10 @@ pub struct Tap {
 }
 
 impl Stream for Tap {
-    type Item = EtherFrame;
+    type Item = EthernetFrame<Bytes>;
     type Error = io::Error;
     
-    fn poll(&mut self) -> io::Result<Async<Option<EtherFrame>>> {
+    fn poll(&mut self) -> io::Result<Async<Option<EthernetFrame<Bytes>>>> {
         if let Async::NotReady = self.fd.poll_read() {
             return Ok(Async::NotReady);
         }
@@ -378,7 +378,7 @@ impl Stream for Tap {
                 */
 
                 let bytes = Bytes::from(&buffer[..n]);
-                let frame = EtherFrame::from_bytes(bytes);
+                let frame = EthernetFrame::new(bytes);
                 Ok(Async::Ready(Some(frame)))
             },
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -391,24 +391,24 @@ impl Stream for Tap {
 }
 
 impl Sink for Tap {
-    type SinkItem = EtherFrame;
+    type SinkItem = EthernetFrame<Bytes>;
     type SinkError = io::Error;
     
-    fn start_send(&mut self, item: EtherFrame) -> io::Result<AsyncSink<EtherFrame>> {
+    fn start_send(&mut self, item: EthernetFrame<Bytes>) -> io::Result<AsyncSink<EthernetFrame<Bytes>>> {
         trace!("sending frame to TAP device");
         if let Async::NotReady = self.fd.poll_write() {
             return Ok(AsyncSink::NotReady(item));
         }
 
-        match self.fd.write(&item.as_bytes()[..]) {
-            Ok(n) => assert_eq!(n, item.as_bytes().len()),
+        match self.fd.write(item.as_ref()) {
+            Ok(n) => assert_eq!(n, item.as_ref().len()),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 self.fd.need_write();
                 return Ok(AsyncSink::NotReady(item));
             }
             Err(e) => return Err(e),
         }
-        trace!("sent: {:?}", item);
+        trace!("sent: {}", PrettyPrinter::print(&item));
         Ok(AsyncSink::Ready)
     }
 
@@ -424,7 +424,7 @@ mod test {
     use capabilities;
     use env_logger;
     use std;
-    use rand;
+    use ethernet;
 
     #[test]
     fn build_tap_name_contains_nul() {
@@ -479,13 +479,14 @@ mod test {
         const NUM_PACKETS: usize = 500000;
         let mut core = unwrap!(Core::new());
         let handle = core.handle();
+        let addr = addrv4!("10.2.3.4:567");
 
         let res = core.run(future::lazy(move || {
             let (join_handle, tap) = spawn::on_subnet(&handle, SubnetV4::local_10(), move |_ip| {
                 let socket = unwrap!(std::net::UdpSocket::bind(addr!("0.0.0.0:0")));
                 unwrap!(socket.set_write_timeout(Some(Duration::from_secs(1))));
                 for _ in 0..NUM_PACKETS {
-                    match socket.send_to(&[], &addr!("10.2.3.4:567")) {
+                    match socket.send_to(&[], &SocketAddr::V4(addr)) {
                         Ok(_) => (),
                         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                             return;
@@ -500,16 +501,33 @@ mod test {
             .into_future()
             .map_err(|(e, _)| panic!("tap read error: {}", e))
             .and_then(move |(frame_opt, tap)| {
-                let mut frame = unwrap!(frame_opt);
-                let arp = match frame.payload() {
-                    EtherPayload::Arp(arp) => arp,
-                    p => panic!("unexpected payload: {:?}", p),
+                let frame = unwrap!(frame_opt);
+                let mac_addr = ethernet::random_mac();
+                let arp = {
+                    let src_mac = frame.src_addr();
+                    let arp = match frame.ethertype() {
+                        EthernetProtocol::Arp => {
+                            let frame_ref = EthernetFrame::new(frame.as_ref());
+                            ArpPacket::new(frame_ref.payload())
+                        },
+                        p => panic!("unexpected payload: {:?}", p),
+                    };
+                    assert_eq!(arp.source_hardware_addr(), src_mac.as_bytes());
+                    let src_ip = Ipv4Addr::from(assert_len!(4, arp.source_protocol_addr()));
+                    assert_eq!(arp.target_hardware_addr(), EthernetAddress::BROADCAST.as_bytes());
+                    assert_eq!(arp.target_protocol_addr(), &addr.ip().octets());
+                    ArpPacket::new_reply(
+                        mac_addr,
+                        *addr.ip(),
+                        src_mac,
+                        src_ip,
+                    )
                 };
-
-                let arp = arp.response(rand::random());
-                frame.set_source(arp.source_mac());
-                frame.set_destination(arp.destination_mac());
-                frame.set_payload(EtherPayload::Arp(arp));
+                let frame = EthernetFrame::new_arp(
+                    mac_addr,
+                    frame.src_addr(),
+                    &arp,
+                );
 
                 tap
                 .send(frame)

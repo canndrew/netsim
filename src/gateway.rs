@@ -98,7 +98,7 @@ pub struct Gateway {
     channel: EtherBox,
     public_veth: VethV4,
     private_veth: VethV4,
-    sending_frame: Option<EtherFrame>,
+    sending_frame: Option<EthernetFrame<Bytes>>,
 }
 
 impl Gateway {
@@ -109,16 +109,16 @@ impl Gateway {
 }
 
 impl Stream for Gateway {
-    type Item = EtherFrame;
+    type Item = EthernetFrame<Bytes>;
     type Error = io::Error;
 
-    fn poll(&mut self) -> io::Result<Async<Option<EtherFrame>>> {
+    fn poll(&mut self) -> io::Result<Async<Option<EthernetFrame<Bytes>>>> {
         let _ = self.poll_complete()?;
 
         loop {
             match self.channel.poll()? {
                 Async::Ready(Some(frame)) => {
-                    trace!("recevied frame on private side: {:?}", frame);
+                    trace!("received frame on private side: {}", PrettyPrinter::print(&frame));
                     self.private_veth.recv_frame(frame);
                 },
                 Async::Ready(None) => {
@@ -129,7 +129,7 @@ impl Stream for Gateway {
         }
 
         while let Async::Ready(ipv4) = self.private_veth.next_incoming() {
-            trace!("incoming IP packet from private side: {:?}", ipv4);
+            trace!("incoming IP packet from private side: {}", PrettyPrinter::print(&ipv4));
             let mut ipv4 = Ipv4Packet::new(BytesMut::from(ipv4.into_inner()));
 
             let hop_limit = match ipv4.hop_limit().checked_sub(1) {
@@ -141,6 +141,7 @@ impl Stream for Gateway {
             match ipv4.protocol() {
                 IpProtocol::Udp => {
                     let src_ipv4_addr = ipv4.src_addr().into();
+                    let dst_ipv4_addr = ipv4.dst_addr().into();
                     let mut udp = UdpPacket::new(ipv4.payload_mut());
                     let src_addr = SocketAddrV4::new(src_ipv4_addr, udp.src_port());
                     let mapped_port = match self.udp_map.map_out(src_addr) {
@@ -151,6 +152,7 @@ impl Stream for Gateway {
                         },
                     };
                     udp.set_src_port(mapped_port);
+                    udp.fill_checksum(&wire::IpAddress::Ipv4(self.public_veth.ip().into()), &wire::IpAddress::Ipv4(dst_ipv4_addr));
                 },
                 _ => {
                     trace!("packet is non-udp. ignoring");
@@ -159,15 +161,20 @@ impl Stream for Gateway {
             };
 
             ipv4.set_src_addr(self.public_veth.ip().into());
+            trace!("old checksum: {}", ipv4.checksum());
+            ipv4.fill_checksum();
+            trace!("new checksum: {}", ipv4.checksum());
+            trace!("ok checksum: {}", ipv4.verify_checksum());
 
             let ipv4 = Ipv4Packet::new(ipv4.into_inner().freeze());
+            trace!("still ok checksum: {}", ipv4.verify_checksum());
 
-            trace!("enqueing packet to send on public side: {:?}", ipv4);
+            trace!("enqueing packet to send on public side: {}", PrettyPrinter::print(&ipv4));
             self.public_veth.send_packet(ipv4);
         }
 
         if let Async::Ready(frame) = self.public_veth.next_outgoing() {
-            trace!("sending frame on public side: {:?}", frame);
+            trace!("sending frame on public side: {}", PrettyPrinter::print(&frame));
             return Ok(Async::Ready(Some(frame)));
         }
 
@@ -176,15 +183,15 @@ impl Stream for Gateway {
 }
 
 impl Sink for Gateway {
-    type SinkItem = EtherFrame;
+    type SinkItem = EthernetFrame<Bytes>;
     type SinkError = io::Error;
 
-    fn start_send(&mut self, frame: EtherFrame) -> io::Result<AsyncSink<EtherFrame>> {
-        trace!("received frame on public side: {:?}", frame);
+    fn start_send(&mut self, frame: EthernetFrame<Bytes>) -> io::Result<AsyncSink<EthernetFrame<Bytes>>> {
+        trace!("received frame on public side: {}", PrettyPrinter::print(&frame));
         self.public_veth.recv_frame(frame);
         
         while let Async::Ready(ipv4) = self.public_veth.next_incoming() {
-            trace!("incoming IP packet from public side: {:?}", ipv4);
+            trace!("incoming IP packet from public side: {}", PrettyPrinter::print(&ipv4));
 
             if Ipv4Addr::from(ipv4.dst_addr()) != self.public_veth.ip() {
                 trace!("packet was not addressed to our public IP. dropping.");
@@ -201,6 +208,7 @@ impl Sink for Gateway {
 
             let addr = match ipv4.protocol() {
                 IpProtocol::Udp => {
+                    let src_addr = ipv4.src_addr();
                     let mut udp = UdpPacket::new(ipv4.payload_mut());
                     let unmapped_addr = match self.udp_map.map_in(udp.dst_port()) {
                         Some(addr) => addr,
@@ -210,7 +218,12 @@ impl Sink for Gateway {
                         },
                     };
                     udp.set_dst_port(unmapped_addr.port());
-                    *unmapped_addr.ip()
+                    let dst_addr = *unmapped_addr.ip();
+                    udp.fill_checksum(
+                        &wire::IpAddress::Ipv4(src_addr),
+                        &wire::IpAddress::Ipv4(dst_addr.into()),
+                    );
+                    dst_addr
                 },
                 _ => {
                     trace!("packet has unknown ipv4 protocol type. dropping.");
@@ -218,6 +231,7 @@ impl Sink for Gateway {
                 },
             };
             ipv4.set_dst_addr(addr.into());
+            ipv4.fill_checksum();
             let ipv4 = Ipv4Packet::new(ipv4.into_inner().freeze());
             self.private_veth.send_packet(ipv4);
         }
@@ -228,7 +242,7 @@ impl Sink for Gateway {
     fn poll_complete(&mut self) -> io::Result<Async<()>> {
         let complete = loop {
             if let Some(frame) = self.sending_frame.take() {
-                trace!("sending frame on private side: {:?}", frame);
+                trace!("sending frame on private side: {}", PrettyPrinter::print(&frame));
                 match self.channel.start_send(frame)? {
                     AsyncSink::Ready => (),
                     AsyncSink::NotReady(frame) => {
@@ -284,29 +298,29 @@ mod test {
 
                 let bytes0 = util::random_vec(PACKET_LEN);
                 let bytes1 = util::random_vec(PACKET_LEN);
-                trace!("sending first packet");
+                trace!("behind gateway: sending first packet");
                 let n = unwrap!(sock0.send_to(&bytes0, SocketAddrV4::new(dest_addr, 123)));
                 assert_eq!(n, bytes0.len());
-                trace!("sending second packet");
+                trace!("behind gateway: sending second packet");
                 let n = unwrap!(sock1.send_to(&bytes1, SocketAddrV4::new(dest_addr, 123)));
                 assert_eq!(n, bytes1.len());
 
                 let mut buffer = [0u8; PACKET_LEN + 1];
-                trace!("receiving bounced first packet");
+                trace!("behind gateway: receiving bounced first packet");
                 let (n, addr) = unwrap!(sock0.recv_from(&mut buffer[..]));
                 assert_eq!(n, PACKET_LEN);
                 assert_eq!(addr.ip(), dest_addr);
                 if buffer[..n] != bytes0[..] {
-                    panic!("reply packet is mangled. ({} bytes) != ({} bytes)", n, bytes0.len());
+                    panic!("behind gateway: reply packet is mangled. ({} bytes) != ({} bytes)", n, bytes0.len());
                 }
-                trace!("receiving bounced second packet");
+                trace!("behind gateway: receiving bounced second packet");
                 let (n, addr) = unwrap!(sock1.recv_from(&mut buffer[..]));
                 assert_eq!(n, PACKET_LEN);
                 assert_eq!(addr.ip(), dest_addr);
                 if buffer[..n] != bytes1[..] {
-                    panic!("reply packet is mangled. ({} bytes) != ({} bytes)", n, bytes1.len());
+                    panic!("behind gateway: reply packet is mangled. ({} bytes) != ({} bytes)", n, bytes1.len());
                 }
-                trace!("gateway thread done");
+                trace!("behind gateway: gateway thread done");
             });
 
             let public_ip = gateway.public_ip();
@@ -323,29 +337,36 @@ mod test {
                 panic!("recv error: {}", e)
             })
             .and_then(move |((packet_opt, gateway_rx), flush_gateway_tx)| {
-                let mut packet = unwrap!(packet_opt);
+                let packet = unwrap!(packet_opt);
                 trace!("received first packet");
-                let mut udp = match packet.payload() {
-                    Ipv4Payload::Udp(udp) => udp,
-                    payload => panic!("unexpected ipv4 payload: {:?}", payload),
+                let mut udp = match packet.protocol() {
+                    IpProtocol::Udp => {
+                        let packet = Ipv4Packet::new(packet.as_ref());
+                        UdpPacket::new(packet.payload().to_owned())
+                    },
+                    protocol => panic!("unexpected ipv4 payload: {:?}", protocol),
                 };
-                let udp_source_port = udp.source_port();
-                let udp_destination_port = udp.destination_port();
-                udp.set_source_port(udp_destination_port);
-                udp.set_destination_port(udp_source_port);
-                
-                let packet_source = packet.source();
-                let packet_destination = packet.destination();
-                assert_eq!(packet_destination, dest_addr);
-                assert_eq!(packet_source, public_ip);
-                packet.set_source(packet_destination);
-                packet.set_destination(packet_source);
-                packet.set_payload(Ipv4Payload::Udp(udp));
+
+                let udp_src_port = udp.src_port();
+                let udp_dst_port = udp.dst_port();
+                udp.set_src_port(udp_dst_port);
+                udp.set_dst_port(udp_src_port);
+
+                assert_eq!(Ipv4Addr::from(packet.src_addr()), public_ip);
+                assert_eq!(Ipv4Addr::from(packet.dst_addr()), dest_addr);
+                let packet = Ipv4Packet::new_udp(
+                    dest_addr,
+                    public_ip,
+                    16,
+                    &udp,
+                );
 
                 let gateway_tx = match flush_gateway_tx.into_inner() {
                     FinishInner::Running(flush_gateway_tx) => flush_gateway_tx.into_inner(),
                     FinishInner::Ran(res) => unwrap!(res),
                 };
+
+                trace!("sending packet to gateway: {}", PrettyPrinter::print(&packet));
 
                 gateway_tx
                 .send(packet)
@@ -367,24 +388,31 @@ mod test {
                 })
             })
             .and_then(move |(gateway_tx, packet_opt)| {
-                let mut packet = unwrap!(packet_opt);
+                let packet = unwrap!(packet_opt);
+                let packet = Ipv4Packet::new(packet.as_ref());
                 trace!("received second packet");
-                let mut udp = match packet.payload() {
-                    Ipv4Payload::Udp(udp) => udp,
-                    payload => panic!("unexpected ipv4 payload: {:?}", payload),
+                let mut udp = match packet.protocol() {
+                    IpProtocol::Udp => {
+                        UdpPacket::new(packet.payload().to_owned())
+                    },
+                    protocol => panic!("unexpected ipv4 payload: {:?}", protocol),
                 };
-                let udp_source_port = udp.source_port();
-                let udp_destination_port = udp.destination_port();
-                udp.set_source_port(udp_destination_port);
-                udp.set_destination_port(udp_source_port);
-                
-                let packet_source = packet.source();
-                let packet_destination = packet.destination();
+
+                let udp_src_port = udp.src_port();
+                let udp_dst_port = udp.dst_port();
+                udp.set_src_port(udp_dst_port);
+                udp.set_dst_port(udp_src_port);
+
+                let packet_source = packet.src_addr().into();
+                let packet_destination = packet.dst_addr().into();
                 assert_eq!(packet_destination, dest_addr);
                 assert_eq!(packet_source, public_ip);
-                packet.set_source(packet_destination);
-                packet.set_destination(packet_source);
-                packet.set_payload(Ipv4Payload::Udp(udp));
+                let packet = Ipv4Packet::new_udp(
+                    packet_destination,
+                    packet_source,
+                    16,
+                    &udp,
+                );
 
                 gateway_tx
                 .send(packet)

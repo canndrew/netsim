@@ -3,14 +3,14 @@ use util;
 
 struct FrameInTransit {
     arrival: Timeout,
-    frame: Option<EtherFrame>,
+    frame: Option<EthernetFrame<Bytes>>,
 }
 
 impl Future for FrameInTransit {
-    type Item = EtherFrame;
+    type Item = EthernetFrame<Bytes>;
     type Error = Void;
 
-    fn poll(&mut self) -> Result<Async<EtherFrame>, Void> {
+    fn poll(&mut self) -> Result<Async<EthernetFrame<Bytes>>, Void> {
         match self.arrival.poll().void_unwrap() {
             Async::Ready(()) => {
                 let frame = unwrap!(self.frame.take());
@@ -29,7 +29,7 @@ pub struct Latency {
     mean_additional_latency: Duration,
     frames_rx: FuturesUnordered<FrameInTransit>,
     frames_tx: FuturesUnordered<FrameInTransit>,
-    sending: VecDeque<EtherFrame>,
+    sending: VecDeque<EthernetFrame<Bytes>>,
     handle: Handle,
 }
 
@@ -53,10 +53,10 @@ impl Latency {
 }
 
 impl Stream for Latency {
-    type Item = EtherFrame;
+    type Item = EthernetFrame<Bytes>;
     type Error = io::Error;
 
-    fn poll(&mut self) -> io::Result<Async<Option<EtherFrame>>> {
+    fn poll(&mut self) -> io::Result<Async<Option<EthernetFrame<Bytes>>>> {
         println!("polling latency");
         if let Some(mut channel) = self.channel.take() {
             loop {
@@ -101,10 +101,10 @@ impl Stream for Latency {
 }
 
 impl Sink for Latency {
-    type SinkItem = EtherFrame;
+    type SinkItem = EthernetFrame<Bytes>;
     type SinkError = io::Error;
 
-    fn start_send(&mut self, frame: EtherFrame) -> io::Result<AsyncSink<EtherFrame>> {
+    fn start_send(&mut self, frame: EthernetFrame<Bytes>) -> io::Result<AsyncSink<EthernetFrame<Bytes>>> {
         let r = util::expovariant_rand();
         let additional_latency = self.mean_additional_latency.mul_f32(r);
         let latency = self.min_latency + additional_latency;
@@ -160,7 +160,6 @@ mod test {
     use std;
     use bincode;
     use env_logger;
-    use rand;
     use ethernet;
 
     #[test]
@@ -187,10 +186,10 @@ mod test {
                 }
             });
 
-            ethernet::respond_to_arp(tap, ipv4!("10.2.3.4"), rand::random())
+            let mac_addr = ethernet::random_mac();
+            ethernet::respond_to_arp(tap, ipv4!("10.2.3.4"), mac_addr)
             .map_err(|e| panic!("early tap read error: {}", e))
-            .and_then(move |tap_opt| {
-                let tap = unwrap!(tap_opt);
+            .and_then(move |tap| {
                 let latency = Latency::new(
                     tap,
                     min_latency,
@@ -201,8 +200,11 @@ mod test {
                 latency
                 .map_err(|e| panic!("tap read error: {}", e))
                 .filter_map(move |frame| {
-                    if let EtherPayload::Ipv4(ipv4) = frame.payload() {
-                        if let Ipv4Payload::Udp(udp) = ipv4.payload() {
+                    let frame = EthernetFrame::new(frame.as_ref());
+                    if let EthernetProtocol::Ipv4 = frame.ethertype() {
+                        let ipv4 = Ipv4Packet::new(frame.payload());
+                        if let IpProtocol::Udp = ipv4.protocol() {
+                            let udp = UdpPacket::new(ipv4.payload());
                             let data = udp.payload();
                             let sent_time: Duration = unwrap!(bincode::deserialize(&data));
                             let sent_time = start_time + sent_time;

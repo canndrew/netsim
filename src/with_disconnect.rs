@@ -26,13 +26,13 @@ impl<C, D> WithDisconnect<C, D> {
 
 impl<C, D> Stream for WithDisconnect<C, D>
 where
-    C: Stream<Item = EtherFrame, Error = io::Error>,
+    C: Stream<Item = EthernetFrame<Bytes>, Error = io::Error>,
     D: Future<Item = (), Error = Void>,
 {
-    type Item = EtherFrame;
+    type Item = EthernetFrame<Bytes>;
     type Error = io::Error;
 
-    fn poll(&mut self) -> io::Result<Async<Option<EtherFrame>>> {
+    fn poll(&mut self) -> io::Result<Async<Option<EthernetFrame<Bytes>>>> {
         let disconnect = mem::replace(&mut self.disconnect, Disconnect::Finished);
 
         match disconnect {
@@ -84,13 +84,13 @@ where
 
 impl<C, D> Sink for WithDisconnect<C, D>
 where
-    C: Sink<SinkItem = EtherFrame, SinkError = io::Error>,
+    C: Sink<SinkItem = EthernetFrame<Bytes>, SinkError = io::Error>,
     D: Future<Item = (), Error = Void>,
 {
-    type SinkItem = EtherFrame;
+    type SinkItem = EthernetFrame<Bytes>;
     type SinkError = io::Error;
 
-    fn start_send(&mut self, item: EtherFrame) -> io::Result<AsyncSink<EtherFrame>> {
+    fn start_send(&mut self, item: EthernetFrame<Bytes>) -> io::Result<AsyncSink<EthernetFrame<Bytes>>> {
         match self.disconnect {
             Disconnect::Connected(..) => {
                 self.channel.start_send(item)

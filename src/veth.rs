@@ -1,10 +1,9 @@
 use priv_prelude::*;
 use future_utils;
-use util;
 
 pub struct VethV4 {
-    outgoing_tx: UnboundedSender<EtherFrame>,
-    outgoing_rx: UnboundedReceiver<EtherFrame>,
+    outgoing_tx: UnboundedSender<EthernetFrame<Bytes>>,
+    outgoing_rx: UnboundedReceiver<EthernetFrame<Bytes>>,
     incoming_tx: UnboundedSender<Ipv4Packet<Bytes>>,
     incoming_rx: UnboundedReceiver<Ipv4Packet<Bytes>>,
     waiting_on_mac: HashMap<Ipv4Addr, Vec<Ipv4Packet<Bytes>>>,
@@ -69,50 +68,45 @@ impl VethV4 {
         
         match self.arp_table.get(&next_ip) {
             Some(dest_mac) => {
-                let mut frame = EtherFrame::new();
-                frame.set_source(self.mac_addr);
-                frame.set_destination(*dest_mac);
-                frame.set_payload(EtherPayload::Ipv4(packet));
+                let frame = EthernetFrame::new_ipv4(self.mac_addr, *dest_mac, &packet);
                 let _ = self.outgoing_tx.unbounded_send(frame);
             },
             None => {
-                let arp_repr = ArpRepr::EthernetIpv4 {
-                    operation: ArpOperation::Request,
-                    source_hardware_addr: self.mac_addr,
-                    source_protocol_addr: self.ip_addr.into(),
-                    target_hardware_addr: EthernetAddress::BROADCAST,
-                    target_protocol_addr: dest_ip.into(),
-                };
-                let mut arp = ArpPacket::new(util::bytes_mut_zeroed(arp_repr.buffer_len()));
-                arp_repr.emit(&mut arp);
-                let bytes = arp.into_inner();
-                let arp = ArpPacket::new(bytes.freeze());
-
-                let mut frame = EtherFrame::new();
-                frame.set_source(self.mac_addr);
-                frame.set_destination(EthernetAddress::BROADCAST);
-                frame.set_payload(EtherPayload::Arp(arp));
+                let arp = ArpPacket::new_request(
+                    self.mac_addr,
+                    self.ip_addr,
+                    dest_ip,
+                );
+                let frame = EthernetFrame::new_arp(
+                    self.mac_addr,
+                    EthernetAddress::BROADCAST,
+                    &arp,
+                );
                 let _ = self.outgoing_tx.unbounded_send(frame);
                 self.waiting_on_mac.entry(next_ip).or_insert(Vec::new()).push(packet);
             },
         }
     }
 
-    pub fn recv_frame(&mut self, frame: EtherFrame) {
-        if frame.destination() != EthernetAddress::BROADCAST
-            && frame.destination() != self.mac_addr
+    pub fn recv_frame(&mut self, frame: EthernetFrame<Bytes>) {
+        if frame.dst_addr() != EthernetAddress::BROADCAST
+            && frame.dst_addr() != self.mac_addr
         {
             trace!("veth dropping frame: {:?}", frame);
             return;
         }
 
-        match frame.payload() {
-            EtherPayload::Ipv6(..) => (),
-            EtherPayload::Unknown(..) => (),
-            EtherPayload::Ipv4(ipv4) => {
+        match frame.ethertype() {
+            EthernetProtocol::Ipv6 => (),
+            EthernetProtocol::Unknown(..) => (),
+            EthernetProtocol::Ipv4 => {
+                let frame_ref = EthernetFrame::new(frame.as_ref());
+                let ipv4 = Ipv4Packet::new(Bytes::from(frame_ref.payload()));
                 let _ = self.incoming_tx.unbounded_send(ipv4);
             },
-            EtherPayload::Arp(arp) => {
+            EthernetProtocol::Arp => {
+                let frame_ref = EthernetFrame::new(frame.as_ref());
+                let arp = ArpPacket::new(Bytes::from(frame_ref.payload()));
                 let source_ip = Ipv4Addr::from(assert_len!(4, arp.source_protocol_addr()));
                 let source_mac = EthernetAddress(assert_len!(6, arp.source_hardware_addr()));
                 let dest_ip = Ipv4Addr::from(assert_len!(4, arp.target_protocol_addr()));
@@ -120,30 +114,24 @@ impl VethV4 {
                 let _ = self.arp_table.insert(source_ip, source_mac);
                 if arp.operation() == ArpOperation::Request {
                     if dest_ip == self.ip_addr {
-                        let arp_repr = ArpRepr::EthernetIpv4 {
-                            operation: ArpOperation::Reply,
-                            source_hardware_addr: self.mac_addr,
-                            source_protocol_addr: self.ip_addr.into(),
-                            target_hardware_addr: source_mac,
-                            target_protocol_addr: source_ip.into(),
-                        };
-                        let mut arp = ArpPacket::new(util::bytes_mut_zeroed(arp_repr.buffer_len()));
-                        arp_repr.emit(&mut arp);
-                        let arp = ArpPacket::new(arp.into_inner().freeze());
+                        let arp = ArpPacket::new_reply(
+                            self.mac_addr,
+                            self.ip_addr,
+                            source_mac,
+                            source_ip,
+                        );
+                        let frame = EthernetFrame::new_arp(
+                            self.mac_addr,
+                            source_mac,
+                            &arp,
+                        );
 
-                        let mut frame = EtherFrame::new();
-                        frame.set_source(self.mac_addr);
-                        frame.set_destination(source_mac);
-                        frame.set_payload(EtherPayload::Arp(arp));
                         let _ = self.outgoing_tx.unbounded_send(frame);
                     }
                 }
                 if let Some(packets) = self.waiting_on_mac.remove(&source_ip) {
                     for packet in packets {
-                        let mut frame = EtherFrame::new();
-                        frame.set_source(self.mac_addr);
-                        frame.set_destination(source_mac);
-                        frame.set_payload(EtherPayload::Ipv4(packet));
+                        let frame = EthernetFrame::new_ipv4(self.mac_addr, source_mac, &packet);
                         let _ = self.outgoing_tx.unbounded_send(frame);
                     }
                 }
@@ -159,7 +147,7 @@ impl VethV4 {
         }
     }
 
-    pub fn next_outgoing(&mut self) -> Async<EtherFrame> {
+    pub fn next_outgoing(&mut self) -> Async<EthernetFrame<Bytes>> {
         match self.outgoing_rx.poll().void_unwrap() {
             Async::Ready(Some(frame)) => Async::Ready(frame),
             Async::Ready(None) => unreachable!(),

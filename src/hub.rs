@@ -2,7 +2,7 @@ use priv_prelude::*;
 
 struct Client {
     channel: EtherBox,
-    outgoing: VecDeque<EtherFrame>,
+    outgoing: VecDeque<EthernetFrame<Bytes>>,
 }
 
 pub struct Hub {

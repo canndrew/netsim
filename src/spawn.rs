@@ -312,6 +312,7 @@ mod test {
     use rand;
     use std::cell::Cell;
     use env_logger;
+    use ethernet;
 
     #[test]
     fn respects_thread_local_storage() {
@@ -372,20 +373,37 @@ mod test {
                 trace!("sent udp packet");
             });
 
-            let mac_addr = rand::random();
+            let gateway_mac = ethernet::random_mac();
             let (tap_tx, tap_rx) = tap.split();
             tap_rx
             .map_err(|e| panic!("error reading tap: {}", e))
             .into_future()
             .map_err(|(v, _)| v)
             .and_then(move |(frame_opt, tap_rx)| {
-                let mut frame = unwrap!(frame_opt);
-                match frame.payload() {
-                    EtherPayload::Arp(arp) => {
-                        let src_mac = frame.source();
-                        frame.set_destination(src_mac);
-                        frame.set_source(mac_addr);
-                        frame.set_payload(EtherPayload::Arp(arp.response(mac_addr)));
+                let frame = unwrap!(frame_opt);
+                match frame.ethertype() {
+                    EthernetProtocol::Arp => {
+                        let arp = {
+                            let src_mac = frame.src_addr();
+                            let frame_ref = EthernetFrame::new(frame.as_ref());
+                            let arp = ArpPacket::new(frame_ref.payload());
+                            assert_eq!(arp.source_hardware_addr(), src_mac.as_bytes());
+                            let src_ip = arp.source_protocol_addr();
+                            //assert_eq!(arp.target_hardware_addr(), EthernetAddress::BROADCAST.as_bytes());
+                            assert_eq!(arp.target_hardware_addr(), &[0, 0, 0, 0, 0, 0]);
+                            assert_eq!(arp.target_protocol_addr(), &subnet.gateway_ip().octets());
+                            ArpPacket::new_reply(
+                                gateway_mac,
+                                subnet.gateway_ip(),
+                                src_mac,
+                                Ipv4Addr::from(assert_len!(4, src_ip)),
+                            )
+                        };
+                        let frame = EthernetFrame::new_arp(
+                            gateway_mac,
+                            frame.src_addr(),
+                            &arp,
+                        );
 
                         tap_tx
                         .send(frame)
@@ -401,19 +419,23 @@ mod test {
             })
             .map(move |(frame_opt, _tap_rx)| {
                 let frame = unwrap!(frame_opt);
-                match frame.payload() {
-                    EtherPayload::Ipv4(ipv4_packet) => {
-                        let dest_ip = ipv4_packet.destination();
-                        let udp_packet = match ipv4_packet.payload() {
-                            Ipv4Payload::Udp(udp_packet) => udp_packet,
+                match frame.ethertype() {
+                    EthernetProtocol::Ipv4 => {
+                        let frame_ref = EthernetFrame::new(frame.as_ref());
+                        let ipv4 = Ipv4Packet::new(frame_ref.payload());
+                        let dest_ip = ipv4.dst_addr().into();
+                        let udp_packet = match ipv4.protocol() {
+                            IpProtocol::Udp => {
+                                UdpPacket::new(ipv4.payload())
+                            },
                             x => panic!("unexpected packet type: {:?}", x),
                         };
-                        let dest_port = udp_packet.destination_port();
+                        let dest_port = udp_packet.dst_port();
                         let dest = SocketAddrV4::new(dest_ip, dest_port);
                         assert_eq!(dest, addr);
                         assert_eq!(udp_packet.payload(), &payload[..]);
                     }
-                    _ => panic!("unexpected frame {:?}", frame),
+                    _ => panic!("unexpected frame {}", PrettyPrinter::<EthernetFrame<&[u8]>>::new("", &frame.as_ref())),
                 }
             })
             .map(move |()| unwrap!(join_handle.join()))
