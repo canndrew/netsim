@@ -231,7 +231,6 @@ where
     (join_handle, tap)
 }
 
-/*
 pub fn on_internet<F, R>(
     handle: &Handle,
     func: F,
@@ -253,7 +252,6 @@ where
 
     (join_handle, tap)
 }
-*/
 
 /// Spawn a function into a new network namespace with a single network interface with an address
 /// in `subnet`. Returns a `JoinHandle` which can be used to join the spawned thread, along with
@@ -452,7 +450,7 @@ mod test {
         let mut core = unwrap!(Core::new());
         let handle = core.handle();
         let res = core.run(future::lazy(move || {
-            let (join_handle, tap) = on_internet(&handle, move || {
+            let (join_handle, tap) = on_internet(&handle, move |_ip| {
                 trace!("our pid is {:?}", unsafe { ::sys::getpid() });
                 thread::sleep(Duration::from_secs(10));
 
