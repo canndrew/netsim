@@ -7,6 +7,7 @@ pub struct GatewayBuilder {
     public_mac_addr: EthernetAddress,
     private_mac_addr: EthernetAddress,
     subnet: SubnetV4,
+    udp_forwards: HashMap<u16, SocketAddrV4>,
 }
 
 impl GatewayBuilder {
@@ -19,6 +20,7 @@ impl GatewayBuilder {
             public_mac_addr: public_mac_addr,
             private_mac_addr: private_mac_addr,
             subnet: subnet,
+            udp_forwards: HashMap::new(),
         }
     }
 
@@ -29,6 +31,15 @@ impl GatewayBuilder {
     }
     */
 
+    pub fn forward_udp_port(
+        &mut self,
+        internal_addr: SocketAddrV4,
+        external_port: u16,
+    ) {
+        self.udp_forwards.insert(external_port, internal_addr);
+    }
+
+
     /// Build the gateway. The gateway acts as a NAT on `channel`. The returned gateway can be used
     /// to read/write NATed packets from the public side of the gateway.
     pub fn build(self, channel: EtherBox) -> Gateway {
@@ -37,6 +48,10 @@ impl GatewayBuilder {
         public_veth.add_route(RouteV4::new(SubnetV4::new(ipv4!("0.0.0.0"), 0), None));
         let mut private_veth = VethV4::new(self.private_mac_addr, private_ip);
         private_veth.add_route(RouteV4::new(self.subnet, None));
+        let mut udp_map = PortMap::new();
+        for (external_port, internal_addr) in self.udp_forwards {
+            udp_map.add_mapping(external_port, internal_addr);
+        }
         Gateway {
             udp_map: PortMap::new(),
             channel: channel,
@@ -87,6 +102,11 @@ impl PortMap {
 
     pub fn map_in(&mut self, port: u16) -> Option<SocketAddrV4> {
         self.map_in.get(&port).map(|addr| *addr)
+    }
+
+    pub fn add_mapping(&mut self, external_port: u16, internal_addr: SocketAddrV4) {
+        self.map_out.insert(internal_addr, external_port);
+        self.map_in.insert(external_port, internal_addr);
     }
 }
 
