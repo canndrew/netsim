@@ -5,34 +5,31 @@ authors = ["Andrew Cann <shum@canndrew.org>"]
 description = "Network simulator"
 
 [dependencies]
-libc = "*"
+libc = "0.2.36"
 unwrap = "1.1"
 get_if_addrs = "0.4"
-lazy_static = "*"
-future-utils = { path = "../../rust/future-utils" }
-futures = "*"
-tokio-core = "*"
-tokio-io = "*"
-void = "*"
-net-literals = "*"
+lazy_static = "1.0.0"
+future-utils = "0.8.0"
+futures = "0.1.18"
+tokio-core = "0.1.12"
+tokio-io = "0.1.5"
+void = "1.0.2"
+net-literals = "0.1.2"
 rand = "0.4"
-rand_derive = "*"
-#rand = { path = "../rand" }
-#rand_derive = { path = "../rand/rand-derive" }
-ioctl-sys = "*"
-bytes = "*"
-#backtrace-sys = "=0.1.15"
+rand_derive = "0.3.1"
+ioctl-sys = "0.5.2"
+bytes = "0.4.6"
 backtrace = "0.3.3"
-mio = "*"
-quick-error = "*"
-log = "*"
-env_logger = "*"
-capabilities = "*"
-smoltcp = { path = "../smoltcp" }
+mio = "0.6.13"
+quick-error = "1.2.1"
+log = "0.4.1"
+env_logger = "0.4.0"
+capabilities = "0.3.0"
+smoltcp = { git = "https://github.com/canndrew/smoltcp", branch = "stable-fork" }
 
 [build-dependencies]
 bindgen = "0.30.0"
 
 [dev-dependencies]
-bincode = "*"
+bincode = "0.9.2"
 
