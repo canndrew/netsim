@@ -67,12 +67,11 @@ impl EthernetFrameExt for EthernetFrame<Bytes> {
             src_addr: src_addr,
             dst_addr: dst_addr,
             ethertype: EthernetProtocol::Ipv4,
-            payload_len: bytes.len(),
         };
 
         let len = bytes.len() + frame_repr.buffer_len();
         let mut frame = EthernetFrame::new(util::bytes_mut_zeroed(len));
-        frame_repr.emit(&mut frame, &ChecksumCapabilities::ignored());
+        frame_repr.emit(&mut frame);
         frame.payload_mut().clone_from_slice(bytes);
         EthernetFrame::new(frame.into_inner().freeze())
     }
@@ -91,12 +90,11 @@ impl EthernetFrameExt for EthernetFrame<Bytes> {
             src_addr: src_addr,
             dst_addr: dst_addr,
             ethertype: EthernetProtocol::Arp,
-            payload_len: bytes.len(),
         };
 
         let len = bytes.len() + frame_repr.buffer_len();
         let mut frame = EthernetFrame::new(util::bytes_mut_zeroed(len));
-        frame_repr.emit(&mut frame, &ChecksumCapabilities::ignored());
+        frame_repr.emit(&mut frame);
         frame.payload_mut().clone_from_slice(bytes);
         EthernetFrame::new(frame.into_inner().freeze())
     }
@@ -115,12 +113,11 @@ impl EthernetFrameExt for EthernetFrame<Bytes> {
             src_addr: src_addr,
             dst_addr: dst_addr,
             ethertype: EthernetProtocol::Ipv6,
-            payload_len: bytes.len(),
         };
 
         let len = bytes.len() + frame_repr.buffer_len();
         let mut frame = EthernetFrame::new(util::bytes_mut_zeroed(len));
-        frame_repr.emit(&mut frame, &ChecksumCapabilities::ignored());
+        frame_repr.emit(&mut frame);
         frame.payload_mut().clone_from_slice(bytes);
         EthernetFrame::new(frame.into_inner().freeze())
     }
