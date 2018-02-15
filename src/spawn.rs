@@ -499,7 +499,6 @@ mod test {
         let port = 1234;
 
         let listener_thread = move |ip0, _ip1| {
-            println!("listening get_if_addrs: {:?}", get_if_addrs::get_if_addrs());
             thread::sleep(Duration::from_secs(1));
             unwrap!(Command::new("route").status());
             thread::sleep(Duration::from_secs(2));
@@ -532,7 +531,6 @@ mod test {
         };
 
         let connecting_thread = move |ip0, _ip1| {
-            println!("connecting get_if_addrs: {:?}", get_if_addrs::get_if_addrs());
             thread::sleep(Duration::from_secs(2));
             unwrap!(Command::new("route").status());
             thread::sleep(Duration::from_secs(2));

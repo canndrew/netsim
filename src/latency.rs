@@ -57,12 +57,10 @@ impl Stream for Latency {
     type Error = io::Error;
 
     fn poll(&mut self) -> io::Result<Async<Option<EthernetFrame<Bytes>>>> {
-        println!("polling latency");
         if let Some(mut channel) = self.channel.take() {
             loop {
                 match channel.poll()? {
                     Async::Ready(Some(frame)) => {
-                        println!("adding incoming frame: {:?}", frame);
                         let r = util::expovariant_rand();
                         let additional_latency = self.mean_additional_latency.mul_f32(r);
                         let latency = self.min_latency + additional_latency;
@@ -73,11 +71,9 @@ impl Stream for Latency {
                         self.frames_rx.push(fit);
                     },
                     Async::Ready(None) => {
-                        println!("tap died");
                         break;
                     },
                     Async::NotReady => {
-                        println!("tap not ready");
                         self.channel = Some(channel);
                         break;
                     },
@@ -88,7 +84,6 @@ impl Stream for Latency {
         match self.frames_rx.poll().void_unwrap() {
             Async::Ready(Some(frame)) => Ok(Async::Ready(Some(frame))),
             Async::Ready(None) => {
-                println!("no frames finished transit yet");
                 if self.channel.is_some() {
                     Ok(Async::NotReady)
                 } else {
