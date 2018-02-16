@@ -8,6 +8,7 @@ pub struct GatewayBuilder {
     private_mac_addr: EthernetAddress,
     subnet: SubnetV4,
     udp_forwards: HashMap<u16, SocketAddrV4>,
+    block_endpoints: bool,
 }
 
 impl GatewayBuilder {
@@ -21,6 +22,7 @@ impl GatewayBuilder {
             private_mac_addr: private_mac_addr,
             subnet: subnet,
             udp_forwards: HashMap::new(),
+            block_endpoints: false,
         }
     }
 
@@ -39,6 +41,9 @@ impl GatewayBuilder {
         self.udp_forwards.insert(external_port, internal_addr);
     }
 
+    pub fn block_endpoints_that_send_unexpected_traffic(&mut self) {
+        self.block_endpoints = true;
+    }
 
     /// Build the gateway. The gateway acts as a NAT on `channel`. The returned gateway can be used
     /// to read/write NATed packets from the public side of the gateway.
@@ -58,6 +63,8 @@ impl GatewayBuilder {
             public_veth: public_veth,
             private_veth: private_veth,
             sending_frame: None,
+            block_endpoints: self.block_endpoints,
+            udp_blocked: HashSet::new(),
         }
     }
 }
@@ -119,6 +126,8 @@ pub struct Gateway {
     public_veth: VethV4,
     private_veth: VethV4,
     sending_frame: Option<EthernetFrame<Bytes>>,
+    block_endpoints: bool,
+    udp_blocked: HashSet<SocketAddrV4>,
 }
 
 impl Gateway {
@@ -164,9 +173,16 @@ impl Stream for Gateway {
                     let dst_ipv4_addr = ipv4.dst_addr().into();
                     let mut udp = UdpPacket::new(ipv4.payload_mut());
                     let src_addr = SocketAddrV4::new(src_ipv4_addr, udp.src_port());
+                    if self.udp_blocked.contains(&src_addr) {
+                        trace!("endpoint is blocked. dropping packet");
+                        continue;
+                    }
                     let mapped_port = match self.udp_map.map_out(src_addr) {
                         Some(port) => port,
                         None => {
+                            if self.block_endpoints {
+                                self.udp_blocked.insert(src_addr);
+                            }
                             trace!("cannot map packet. ignoring");
                             continue;
                         },

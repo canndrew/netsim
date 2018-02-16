@@ -2,7 +2,7 @@ pub use prelude::*;
 pub use std::{io, mem, fmt, thread, panic, ptr, slice, str, u16, f32, cmp};
 pub use std::io::{Read, Write};
 pub use std::os::unix::io::{RawFd, AsRawFd, FromRawFd};
-pub use std::collections::{BinaryHeap, HashMap, BTreeMap, VecDeque};
+pub use std::collections::{BinaryHeap, HashMap, HashSet, BTreeMap, VecDeque};
 pub use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 pub use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6};
 pub use std::ffi::CString;
