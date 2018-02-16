@@ -161,6 +161,7 @@ mod veth_adaptor;
 mod flush;
 mod with_disconnect;
 mod latency;
+mod hops;
 
 mod prelude;
 mod priv_prelude;

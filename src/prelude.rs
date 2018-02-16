@@ -10,4 +10,5 @@ pub use hub::Hub;
 pub use veth::VethV4;
 pub use veth_adaptor::VethAdaptorV4;
 pub use latency::Latency;
+pub use hops::Hops;
 
