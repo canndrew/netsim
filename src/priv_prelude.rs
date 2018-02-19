@@ -1,4 +1,4 @@
-pub use std::mem;
+pub use std::{mem, fmt};
 pub use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 pub use bytes::{Bytes, BytesMut};
 pub use byteorder::{ByteOrder, NetworkEndian};

@@ -1,10 +1,23 @@
 use priv_prelude::*;
 use checksum;
 
+#[derive(Clone)]
 pub struct UdpPacket {
     buffer: Bytes,
 }
 
+impl fmt::Debug for UdpPacket {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f
+        .debug_struct("UdpPacket")
+        .field("source_port", &self.source_port())
+        .field("dest_port", &self.dest_port())
+        .field("payload", &self.payload())
+        .finish()
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum UdpFields {
     V4 {
         source_addr: SocketAddrV4,

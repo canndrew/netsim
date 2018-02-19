@@ -1,14 +1,34 @@
 use priv_prelude::*;
 
+#[derive(Clone)]
 pub struct EtherFrame {
     buffer: Bytes,
 }
 
+impl fmt::Debug for EtherFrame {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let payload = self.payload();
+
+        f
+        .debug_struct("EtherFrame")
+        .field("source_mac", &self.source_mac())
+        .field("dest_mac", &self.dest_mac())
+        .field("payload", match payload {
+            EtherPayload::Arp(ref arp) => arp,
+            EtherPayload::Ipv4(ref ipv4) => ipv4,
+            EtherPayload::Unknown { .. } => &payload,
+        })
+        .finish()
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct EtherFields {
     pub source_mac: MacAddr,
     pub dest_mac: MacAddr,
 }
 
+#[derive(Clone, Debug)]
 pub enum EtherPayload {
     Arp(ArpPacket),
     Ipv4(Ipv4Packet),

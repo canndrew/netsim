@@ -1,16 +1,36 @@
 use priv_prelude::*;
 use checksum;
 
+#[derive(Clone)]
 pub struct Ipv4Packet {
     buffer: Bytes,
 }
 
+impl fmt::Debug for Ipv4Packet {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let payload = self.payload();
+
+        f
+        .debug_struct("Ipv4Packet")
+        .field("source_ip", &self.source_ip())
+        .field("dest_ip", &self.dest_ip())
+        .field("ttl", &self.ttl())
+        .field("payload", match payload {
+            Ipv4Payload::Udp(ref udp) => udp,
+            Ipv4Payload::Unknown { .. } => &payload,
+        })
+        .finish()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct Ipv4Fields {
     pub source_ip: Ipv4Addr,
     pub dest_ip: Ipv4Addr,
     pub ttl: u8,
 }
 
+#[derive(Debug, Clone)]
 pub enum Ipv4Payload {
     Udp(UdpPacket),
     Unknown {

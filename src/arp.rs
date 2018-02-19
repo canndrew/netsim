@@ -1,7 +1,33 @@
 use priv_prelude::*;
 
+#[derive(Clone)]
 pub struct ArpPacket {
     buffer: Bytes,
+}
+
+impl fmt::Debug for ArpPacket {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.fields() {
+            ArpFields::Request { .. } => {
+                f
+                .debug_struct("ArpPacket::Request")
+                .field("source_mac", &self.source_mac())
+                .field("source_ip", &self.source_ip())
+                .field("dest_mac", &self.dest_mac())
+                .field("dest_ip", &self.dest_ip())
+                .finish()
+            },
+            ArpFields::Response { .. } => {
+                f
+                .debug_struct("ArpPacket::Response")
+                .field("source_mac", &self.source_mac())
+                .field("source_ip", &self.source_ip())
+                .field("dest_mac", &self.dest_mac())
+                .field("dest_ip", &self.dest_ip())
+                .finish()
+            },
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -45,7 +71,7 @@ impl ArpPacket {
                 dest_mac,
                 dest_ip,
             } => {
-                buffer[6..8].clone_from_slice(&[0x00, 0x01]);
+                buffer[6..8].clone_from_slice(&[0x00, 0x02]);
                 buffer[8..14].clone_from_slice(source_mac.as_bytes());
                 buffer[14..18].clone_from_slice(&source_ip.octets());
                 buffer[18..24].clone_from_slice(dest_mac.as_bytes());
@@ -60,6 +86,23 @@ impl ArpPacket {
     pub fn from_bytes(buffer: Bytes) -> ArpPacket {
         ArpPacket {
             buffer,
+        }
+    }
+
+    pub fn fields(&self) -> ArpFields {
+        match NetworkEndian::read_u16(&self.buffer[6..8]) {
+            0x0001 => ArpFields::Request {
+                source_mac: self.source_mac(),
+                source_ip: self.source_ip(),
+                dest_ip: self.dest_ip(),
+            },
+            0x0002 => ArpFields::Response {
+                source_mac: self.source_mac(),
+                source_ip: self.source_ip(),
+                dest_mac: self.dest_mac(),
+                dest_ip: self.dest_ip(),
+            },
+            x => panic!("unexpected ARP operation type (0x{:04x})", x),
         }
     }
 

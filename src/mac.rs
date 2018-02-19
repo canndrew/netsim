@@ -1,9 +1,22 @@
-//pub use priv_prelude::*;
+pub use priv_prelude::*;
 use rand;
 
 #[derive(Clone, Copy)]
 pub struct MacAddr {
     bytes: [u8; 6],
+}
+
+impl fmt::Debug for MacAddr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+            self.bytes[0],
+            self.bytes[1],
+            self.bytes[2],
+            self.bytes[3],
+            self.bytes[4],
+            self.bytes[5],
+        )
+    }
 }
 
 impl MacAddr {
