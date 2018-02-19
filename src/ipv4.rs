@@ -62,6 +62,12 @@ impl Ipv4Packet {
         }
     }
 
+    pub fn from_bytes(buffer: Bytes) -> Ipv4Packet {
+        Ipv4Packet {
+            buffer,
+        }
+    }
+
     pub fn set_fields(&mut self, fields: Ipv4Fields) {
         let buffer = mem::replace(&mut self.buffer, Bytes::new());
         let mut buffer = BytesMut::from(buffer);
@@ -90,7 +96,7 @@ impl Ipv4Packet {
         }
     }
 
-    pub fn as_bytes(&self) -> &[u8] {
+    pub fn as_bytes(&self) -> &Bytes {
         &self.buffer
     }
 }

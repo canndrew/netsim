@@ -79,6 +79,12 @@ impl UdpPacket {
         }
     }
 
+    pub fn from_bytes(buffer: Bytes) -> UdpPacket {
+        UdpPacket {
+            buffer,
+        }
+    }
+
     pub fn set_fields(&mut self, fields: UdpFields) {
         let buffer = mem::replace(&mut self.buffer, Bytes::new());
         let mut buffer = BytesMut::from(buffer);
@@ -98,7 +104,7 @@ impl UdpPacket {
         self.buffer.slice_from(8)
     }
 
-    pub fn as_bytes(&self) -> &[u8] {
+    pub fn as_bytes(&self) -> &Bytes {
         &self.buffer
     }
 }

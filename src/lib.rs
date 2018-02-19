@@ -35,6 +35,7 @@ pub mod mac;
 pub mod arp;
 pub mod ipv4;
 pub mod udp;
+pub mod ether;
 
 pub use prelude::*;
 

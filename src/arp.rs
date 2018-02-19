@@ -57,6 +57,12 @@ impl ArpPacket {
         }
     }
 
+    pub fn from_bytes(buffer: Bytes) -> ArpPacket {
+        ArpPacket {
+            buffer,
+        }
+    }
+
     pub fn source_mac(&self) -> MacAddr {
         MacAddr::from_bytes(&self.buffer[8..14])
     }
@@ -73,7 +79,7 @@ impl ArpPacket {
         Ipv4Addr::from(slice_assert_len!(4, &self.buffer[24..28]))
     }
 
-    pub fn as_bytes(&self) -> &[u8] {
+    pub fn as_bytes(&self) -> &Bytes {
         &self.buffer
     }
 }
