@@ -72,5 +72,9 @@ impl ArpPacket {
     pub fn dest_ip(&self) -> Ipv4Addr {
         Ipv4Addr::from(slice_assert_len!(4, &self.buffer[24..28]))
     }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.buffer
+    }
 }
 

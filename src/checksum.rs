@@ -39,7 +39,6 @@ pub fn data(mut data: &[u8]) -> u16 {
     propagate_carries(accum)
 }
 
-/*
 /// Combine several RFC 1071 compliant checksums.
 pub fn combine(checksums: &[u16]) -> u16 {
     let mut accum: u32 = 0;
@@ -83,5 +82,4 @@ pub fn pseudo_header_ipv6(
         data(&proto_len[..])
     ])
 }
-*/
 

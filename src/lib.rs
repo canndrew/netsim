@@ -1,4 +1,5 @@
 extern crate rand;
+extern crate byteorder;
 extern crate bytes;
 
 /// Convert a variable-length slice to a fixed-length array
@@ -29,8 +30,11 @@ macro_rules! slice_assert_len {
 mod prelude;
 mod priv_prelude;
 mod util;
+mod checksum;
 pub mod mac;
 pub mod arp;
+pub mod ipv4;
+pub mod udp;
 
 pub use prelude::*;
 

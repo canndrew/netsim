@@ -12,6 +12,7 @@ pub struct Ipv4Fields {
 }
 
 pub enum Ipv4Payload {
+    Udp(UdpPacket),
     Unknown {
         protocol: u8,
         payload: Bytes,
@@ -21,6 +22,8 @@ pub enum Ipv4Payload {
 fn set_fields(buffer: &mut BytesMut, fields: Ipv4Fields) {
     buffer[0] = 0x45;
     buffer[1] = 0x00;
+    let len = buffer.len() as u16;
+    NetworkEndian::write_u16(&mut buffer[2..4], len);
     buffer[4..6].clone_from_slice(&[0x00, 0x00]);
     buffer[6..8].clone_from_slice(&[0x00, 0x00]);
     buffer[8] = fields.ttl;
@@ -38,17 +41,19 @@ impl Ipv4Packet {
         payload: &Ipv4Payload,
     ) -> Ipv4Packet {
         let len = 20 + match *payload {
+            Ipv4Payload::Udp(ref udp) => udp.as_bytes().len(),
             Ipv4Payload::Unknown { ref payload, .. } => payload.len(),
         };
         let mut buffer = unsafe { BytesMut::uninit(len) };
-        NetworkEndian::write_u16(&mut buffer[2..4], len as u16);
         buffer[9] = match *payload {
+            Ipv4Payload::Udp(..) => 17,
             Ipv4Payload::Unknown { protocol, .. } => protocol,
         };
 
         set_fields(&mut buffer, fields);
 
         match *payload {
+            Ipv4Payload::Udp(ref udp) => buffer[20..].clone_from_slice(udp.as_bytes()),
             Ipv4Payload::Unknown { ref payload, .. } => buffer[20..].clone_from_slice(&payload),
         }
 
@@ -83,6 +88,10 @@ impl Ipv4Packet {
                 payload: self.buffer.slice_from(20),
             },
         }
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.buffer
     }
 }
 
