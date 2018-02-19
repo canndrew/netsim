@@ -7,5 +7,3 @@ pub use util::bytes_mut::BytesMutExt;
 pub use util::ipv4_addr::Ipv4AddrExt;
 pub use util::ipv6_addr::Ipv6AddrExt;
 
-pub use prelude::*;
-

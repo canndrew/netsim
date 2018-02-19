@@ -1,5 +1,5 @@
 use priv_prelude::*;
-use checksum;
+use super::*;
 
 #[derive(Clone)]
 pub struct Ipv4Packet {

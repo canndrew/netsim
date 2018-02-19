@@ -27,15 +27,7 @@ macro_rules! slice_assert_len {
     }}
 }
 
-mod prelude;
 mod priv_prelude;
 mod util;
-mod checksum;
-pub mod mac;
-pub mod arp;
-pub mod ipv4;
-pub mod udp;
-pub mod ether;
-
-pub use prelude::*;
+pub mod wire;
 

@@ -1,4 +1,5 @@
 use priv_prelude::*;
+use super::*;
 
 #[derive(Clone)]
 pub struct ArpPacket {
