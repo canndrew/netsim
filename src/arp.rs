@@ -1,57 +1,76 @@
 use priv_prelude::*;
-use util;
 
-pub trait ArpPacketExt {
-    fn new_request(
-        src_mac_addr: EthernetAddress,
-        src_ipv4_addr: Ipv4Addr,
-        dst_ipv4_addr: Ipv4Addr,
-    ) -> ArpPacket<Bytes>;
-
-    fn new_reply(
-        src_mac_addr: EthernetAddress,
-        src_ipv4_addr: Ipv4Addr,
-        dst_mac_addr: EthernetAddress,
-        dst_ipv4_addr: Ipv4Addr,
-    ) -> ArpPacket<Bytes>;
+pub struct ArpPacket {
+    buffer: Bytes,
 }
 
-impl ArpPacketExt for ArpPacket<Bytes> {
-    fn new_request(
-        src_mac_addr: EthernetAddress,
-        src_ipv4_addr: Ipv4Addr,
-        dst_ipv4_addr: Ipv4Addr,
-    ) -> ArpPacket<Bytes> {
-        let packet_repr = ArpRepr::EthernetIpv4 {
-            operation: ArpOperation::Request,
-            source_hardware_addr: src_mac_addr,
-            source_protocol_addr: src_ipv4_addr.into(),
-            target_hardware_addr: EthernetAddress::BROADCAST,
-            target_protocol_addr: dst_ipv4_addr.into(),
-        };
-        let len = packet_repr.buffer_len();
-        let mut packet = ArpPacket::new(util::bytes_mut_zeroed(len));
-        packet_repr.emit(&mut packet);
-        ArpPacket::new(packet.into_inner().freeze())
+#[derive(Clone, Copy)]
+pub enum ArpFields {
+    Request {
+        source_mac: MacAddr,
+        source_ip: Ipv4Addr,
+        dest_ip: Ipv4Addr,
+    },
+    Response {
+        source_mac: MacAddr,
+        source_ip: Ipv4Addr,
+        dest_mac: MacAddr,
+        dest_ip: Ipv4Addr,
+    },
+}
+
+impl ArpPacket {
+    pub fn new_from_fields(fields: ArpFields) -> ArpPacket {
+        let mut buffer = unsafe { BytesMut::uninit(28) };
+        buffer[0..6].clone_from_slice(&[
+            0x00, 0x01,
+            0x08, 0x00,
+            0x06, 0x04,
+        ]);
+        match fields {
+            ArpFields::Request {
+                source_mac,
+                source_ip,
+                dest_ip,
+            } => {
+                buffer[6..8].clone_from_slice(&[0x00, 0x01]);
+                buffer[8..14].clone_from_slice(source_mac.as_bytes());
+                buffer[14..18].clone_from_slice(&source_ip.octets());
+                buffer[18..24].clone_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+                buffer[24..28].clone_from_slice(&dest_ip.octets());
+            },
+            ArpFields::Response {
+                source_mac,
+                source_ip,
+                dest_mac,
+                dest_ip,
+            } => {
+                buffer[6..8].clone_from_slice(&[0x00, 0x01]);
+                buffer[8..14].clone_from_slice(source_mac.as_bytes());
+                buffer[14..18].clone_from_slice(&source_ip.octets());
+                buffer[18..24].clone_from_slice(dest_mac.as_bytes());
+                buffer[24..28].clone_from_slice(&dest_ip.octets());
+            },
+        }
+        ArpPacket {
+            buffer: buffer.freeze(),
+        }
     }
 
-    fn new_reply(
-        src_mac_addr: EthernetAddress,
-        src_ipv4_addr: Ipv4Addr,
-        dst_mac_addr: EthernetAddress,
-        dst_ipv4_addr: Ipv4Addr,
-    ) -> ArpPacket<Bytes> {
-        let packet_repr = ArpRepr::EthernetIpv4 {
-            operation: ArpOperation::Reply,
-            source_hardware_addr: src_mac_addr,
-            source_protocol_addr: src_ipv4_addr.into(),
-            target_hardware_addr: dst_mac_addr,
-            target_protocol_addr: dst_ipv4_addr.into(),
-        };
-        let len = packet_repr.buffer_len();
-        let mut packet = ArpPacket::new(util::bytes_mut_zeroed(len));
-        packet_repr.emit(&mut packet);
-        ArpPacket::new(packet.into_inner().freeze())
+    pub fn source_mac(&self) -> MacAddr {
+        MacAddr::from_bytes(&self.buffer[8..14])
+    }
+
+    pub fn source_ip(&self) -> Ipv4Addr {
+        Ipv4Addr::from(slice_assert_len!(4, &self.buffer[14..18]))
+    }
+
+    pub fn dest_mac(&self) -> MacAddr {
+        MacAddr::from_bytes(&self.buffer[18..24])
+    }
+
+    pub fn dest_ip(&self) -> Ipv4Addr {
+        Ipv4Addr::from(slice_assert_len!(4, &self.buffer[24..28]))
     }
 }
 
