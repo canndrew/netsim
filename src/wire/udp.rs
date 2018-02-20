@@ -1,7 +1,7 @@
 use priv_prelude::*;
 use super::*;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct UdpPacket {
     buffer: Bytes,
 }

@@ -1,5 +1,6 @@
 pub use std::{mem, str, fmt, cmp, io, thread, ptr, slice};
 pub use std::thread::JoinHandle;
+pub use std::collections::{HashMap, HashSet, BTreeMap, BTreeSet, VecDeque};
 pub use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 pub use std::io::{Read, Write};
 pub use bytes::{Bytes, BytesMut};

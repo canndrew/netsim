@@ -60,6 +60,7 @@ mod tap;
 mod async_fd;
 mod route;
 mod subnet;
+pub mod veth;
 pub mod wire;
 pub mod spawn;
 

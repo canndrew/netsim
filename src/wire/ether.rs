@@ -1,7 +1,7 @@
 use priv_prelude::*;
 use future_utils;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct EtherFrame {
     buffer: Bytes,
 }
@@ -68,22 +68,22 @@ fn set_fields(buffer: &mut [u8], fields: EtherFields) {
 impl EtherFrame {
     pub fn new_from_fields(
         fields: EtherFields,
-        payload: &EtherPayload,
+        payload: EtherPayload,
     ) -> EtherFrame {
-        let len = 14 + match *payload {
+        let len = 14 + match payload {
             EtherPayload::Arp(ref arp) => arp.as_bytes().len(),
             EtherPayload::Ipv4(ref ipv4) => ipv4.as_bytes().len(),
             EtherPayload::Unknown { ref payload, .. } => payload.len(),
         };
         let mut buffer = unsafe { BytesMut::uninit(len) };
         set_fields(&mut buffer, fields);
-        let ethertype = match *payload {
+        let ethertype = match payload {
             EtherPayload::Arp(..) => 0x0806,
             EtherPayload::Ipv4(..) => 0x0800,
             EtherPayload::Unknown { ethertype, .. } => ethertype,
         };
         NetworkEndian::write_u16(&mut buffer[12..14], ethertype);
-        buffer[14..].clone_from_slice(match *payload {
+        buffer[14..].clone_from_slice(match payload {
             EtherPayload::Arp(ref arp) => arp.as_bytes(),
             EtherPayload::Ipv4(ref ipv4) => ipv4.as_bytes(),
             EtherPayload::Unknown { ref payload, .. } => &payload,

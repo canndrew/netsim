@@ -1,7 +1,8 @@
 use priv_prelude::*;
 use super::*;
+use future_utils;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Ipv4Packet {
     buffer: Bytes,
 }
@@ -166,6 +167,27 @@ impl Ipv4Packet {
 
     pub fn as_bytes(&self) -> &Bytes {
         &self.buffer
+    }
+}
+
+pub struct Ipv4Plug {
+    pub tx: UnboundedSender<Ipv4Packet>,
+    pub rx: UnboundedReceiver<Ipv4Packet>,
+}
+
+impl Ipv4Plug {
+    pub fn new_wire() -> (Ipv4Plug, Ipv4Plug) {
+        let (a_tx, b_rx) = future_utils::mpsc::unbounded();
+        let (b_tx, a_rx) = future_utils::mpsc::unbounded();
+        let a = Ipv4Plug {
+            tx: a_tx,
+            rx: a_rx,
+        };
+        let b = Ipv4Plug {
+            tx: b_tx,
+            rx: b_rx,
+        };
+        (a, b)
     }
 }
 

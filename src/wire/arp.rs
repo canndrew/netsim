@@ -1,6 +1,6 @@
 use priv_prelude::*;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct ArpPacket {
     buffer: Bytes,
 }

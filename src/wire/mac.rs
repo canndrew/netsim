@@ -20,6 +20,10 @@ impl fmt::Debug for MacAddr {
 }
 
 impl MacAddr {
+    pub const BROADCAST: MacAddr = MacAddr {
+        bytes: [0xff, 0xff, 0xff, 0xff, 0xff, 0xff],
+    };
+
     pub fn from_bytes(bytes: &[u8]) -> MacAddr {
         let mut b = [0u8; 6];
         b[..].clone_from_slice(bytes);
@@ -38,6 +42,10 @@ impl MacAddr {
         MacAddr {
             bytes: b,
         }
+    }
+
+    pub fn is_broadcast(&self) -> bool {
+        *self == MacAddr::BROADCAST
     }
 }
 
