@@ -1,5 +1,4 @@
 use priv_prelude::*;
-use super::*;
 
 #[derive(Clone)]
 pub struct ArpPacket {
@@ -31,7 +30,7 @@ impl fmt::Debug for ArpPacket {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ArpFields {
     Request {
         source_mac: MacAddr,
@@ -46,42 +45,53 @@ pub enum ArpFields {
     },
 }
 
+fn set_fields(buffer: &mut [u8], fields: ArpFields) {
+    buffer[0..6].clone_from_slice(&[
+        0x00, 0x01,
+        0x08, 0x00,
+        0x06, 0x04,
+    ]);
+    match fields {
+        ArpFields::Request {
+            source_mac,
+            source_ip,
+            dest_ip,
+        } => {
+            buffer[6..8].clone_from_slice(&[0x00, 0x01]);
+            buffer[8..14].clone_from_slice(source_mac.as_bytes());
+            buffer[14..18].clone_from_slice(&source_ip.octets());
+            buffer[18..24].clone_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+            buffer[24..28].clone_from_slice(&dest_ip.octets());
+        },
+        ArpFields::Response {
+            source_mac,
+            source_ip,
+            dest_mac,
+            dest_ip,
+        } => {
+            buffer[6..8].clone_from_slice(&[0x00, 0x02]);
+            buffer[8..14].clone_from_slice(source_mac.as_bytes());
+            buffer[14..18].clone_from_slice(&source_ip.octets());
+            buffer[18..24].clone_from_slice(dest_mac.as_bytes());
+            buffer[24..28].clone_from_slice(&dest_ip.octets());
+        },
+    }
+}
+
 impl ArpPacket {
     pub fn new_from_fields(fields: ArpFields) -> ArpPacket {
         let mut buffer = unsafe { BytesMut::uninit(28) };
-        buffer[0..6].clone_from_slice(&[
-            0x00, 0x01,
-            0x08, 0x00,
-            0x06, 0x04,
-        ]);
-        match fields {
-            ArpFields::Request {
-                source_mac,
-                source_ip,
-                dest_ip,
-            } => {
-                buffer[6..8].clone_from_slice(&[0x00, 0x01]);
-                buffer[8..14].clone_from_slice(source_mac.as_bytes());
-                buffer[14..18].clone_from_slice(&source_ip.octets());
-                buffer[18..24].clone_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-                buffer[24..28].clone_from_slice(&dest_ip.octets());
-            },
-            ArpFields::Response {
-                source_mac,
-                source_ip,
-                dest_mac,
-                dest_ip,
-            } => {
-                buffer[6..8].clone_from_slice(&[0x00, 0x02]);
-                buffer[8..14].clone_from_slice(source_mac.as_bytes());
-                buffer[14..18].clone_from_slice(&source_ip.octets());
-                buffer[18..24].clone_from_slice(dest_mac.as_bytes());
-                buffer[24..28].clone_from_slice(&dest_ip.octets());
-            },
-        }
+        set_fields(&mut buffer, fields);
         ArpPacket {
             buffer: buffer.freeze(),
         }
+    }
+
+    pub fn write_to_buffer(
+        buffer: &mut [u8],
+        fields: ArpFields,
+    ) {
+        set_fields(buffer, fields);
     }
 
     pub fn from_bytes(buffer: Bytes) -> ArpPacket {

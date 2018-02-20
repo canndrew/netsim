@@ -1,7 +1,7 @@
 pub use priv_prelude::*;
 use rand;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct MacAddr {
     bytes: [u8; 6],
 }
@@ -32,7 +32,7 @@ impl MacAddr {
         &self.bytes[..]
     }
 
-    pub fn random(&self) -> MacAddr {
+    pub fn random() -> MacAddr {
         let mut b: [u8; 6] = rand::random();
         b[0] &= 0xfc;
         MacAddr {

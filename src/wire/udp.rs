@@ -29,7 +29,7 @@ pub enum UdpFields {
     },
 }
 
-fn set_fields(buffer: &mut BytesMut, fields: UdpFields) {
+fn set_fields(buffer: &mut [u8], fields: UdpFields) {
     match fields {
         UdpFields::V4 {
             source_addr,
@@ -85,11 +85,19 @@ impl UdpPacket {
     ) -> UdpPacket {
         let len = 8 + payload.len();
         let mut buffer = unsafe { BytesMut::uninit(len) };
-        buffer[8..].clone_from_slice(&payload);
-        set_fields(&mut buffer, fields);
+        UdpPacket::write_to_buffer(&mut buffer, fields, payload);
         UdpPacket {
             buffer: buffer.freeze(),
         }
+    }
+
+    pub fn write_to_buffer(
+        buffer: &mut [u8],
+        fields: UdpFields,
+        payload: Bytes,
+    ) {
+        buffer[8..].clone_from_slice(&payload);
+        set_fields(buffer, fields);
     }
 
     pub fn from_bytes(buffer: Bytes) -> UdpPacket {

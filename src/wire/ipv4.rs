@@ -39,7 +39,23 @@ pub enum Ipv4Payload {
     },
 }
 
-fn set_fields(buffer: &mut BytesMut, fields: Ipv4Fields) {
+#[derive(Debug, Clone)]
+pub enum Ipv4PayloadFields {
+    Udp {
+        fields: UdpFields,
+        payload: Bytes,
+    },
+}
+
+impl Ipv4PayloadFields {
+    pub fn total_packet_len(&self) -> usize {
+        20 + match *self {
+            Ipv4PayloadFields::Udp { ref payload, .. } => 8 + payload.len(),
+        }
+    }
+}
+
+fn set_fields(buffer: &mut [u8], fields: Ipv4Fields) {
     buffer[0] = 0x45;
     buffer[1] = 0x00;
     let len = buffer.len() as u16;
@@ -81,6 +97,37 @@ impl Ipv4Packet {
             buffer: buffer.freeze(),
         }
     }
+    
+    pub fn new_from_fields_recursive(
+        fields: Ipv4Fields,
+        payload_fields: Ipv4PayloadFields,
+    ) -> Ipv4Packet {
+        let len = payload_fields.total_packet_len();
+        let mut buffer = unsafe { BytesMut::uninit(len) };
+        Ipv4Packet::write_to_buffer(&mut buffer, fields, payload_fields);
+        Ipv4Packet {
+            buffer: buffer.freeze()
+        }
+    }
+
+    pub fn write_to_buffer(
+        buffer: &mut [u8],
+        fields: Ipv4Fields,
+        payload_fields: Ipv4PayloadFields,
+    ) {
+        buffer[9] = match payload_fields {
+            Ipv4PayloadFields::Udp { .. } => 17,
+        };
+
+        set_fields(buffer, fields);
+
+        match payload_fields {
+            Ipv4PayloadFields::Udp { fields, payload } => {
+                UdpPacket::write_to_buffer(&mut buffer[20..], fields, payload);
+            },
+        }
+    }
+
 
     pub fn from_bytes(buffer: Bytes) -> Ipv4Packet {
         Ipv4Packet {
@@ -109,6 +156,7 @@ impl Ipv4Packet {
 
     pub fn payload(&self) -> Ipv4Payload {
         match self.buffer[9] {
+            17 => Ipv4Payload::Udp(UdpPacket::from_bytes(self.buffer.slice_from(20))),
             p => Ipv4Payload::Unknown {
                 protocol: p,
                 payload: self.buffer.slice_from(20),
