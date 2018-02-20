@@ -61,6 +61,7 @@ mod async_fd;
 mod route;
 mod subnet;
 pub mod veth;
+pub mod router;
 pub mod wire;
 pub mod spawn;
 
