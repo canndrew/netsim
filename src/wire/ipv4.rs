@@ -24,7 +24,7 @@ impl fmt::Debug for Ipv4Packet {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Ipv4Fields {
     pub source_ip: Ipv4Addr,
     pub dest_ip: Ipv4Addr,
@@ -133,6 +133,14 @@ impl Ipv4Packet {
     pub fn from_bytes(buffer: Bytes) -> Ipv4Packet {
         Ipv4Packet {
             buffer,
+        }
+    }
+
+    pub fn fields(&self) -> Ipv4Fields {
+        Ipv4Fields {
+            source_ip: self.source_ip(),
+            dest_ip: self.dest_ip(),
+            ttl: self.ttl(),
         }
     }
 

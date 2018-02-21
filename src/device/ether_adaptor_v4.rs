@@ -1,20 +1,6 @@
 use priv_prelude::*;
 
-pub fn new_v4(handle: &Handle, addr: Ipv4Addr, ether: EtherPlug, ipv4: Ipv4Plug) -> MacAddr {
-    let mac_addr = MacAddr::random();
-    let veth_v4 = VethV4 {
-        ether_plug: ether,
-        ipv4_plug: ipv4,
-        ipv4_addr: addr,
-        mac_addr: mac_addr,
-        arp_table: HashMap::new(),
-        arp_pending: HashMap::new(),
-    };
-    handle.spawn(veth_v4.infallible());
-    mac_addr
-}
-
-struct VethV4 {
+pub struct EtherAdaptorV4 {
     ether_plug: EtherPlug,
     ipv4_plug: Ipv4Plug,
     ipv4_addr: Ipv4Addr,
@@ -23,7 +9,35 @@ struct VethV4 {
     arp_pending: HashMap<Ipv4Addr, Vec<Ipv4Packet>>,
 }
 
-impl Future for VethV4 {
+impl EtherAdaptorV4 {
+    pub fn new(addr: Ipv4Addr, ether: EtherPlug, ipv4: Ipv4Plug) -> EtherAdaptorV4 {
+        let mac_addr = MacAddr::random();
+        EtherAdaptorV4 {
+            ether_plug: ether,
+            ipv4_plug: ipv4,
+            ipv4_addr: addr,
+            mac_addr: mac_addr,
+            arp_table: HashMap::new(),
+            arp_pending: HashMap::new(),
+        }
+    }
+
+    pub fn mac_addr(&self) -> MacAddr {
+        self.mac_addr
+    }
+
+    pub fn spawn(
+        handle: &Handle,
+        addr: Ipv4Addr,
+        ether: EtherPlug,
+        ipv4: Ipv4Plug,
+    ) {
+        let ether_adaptor = EtherAdaptorV4::new(addr, ether, ipv4);
+        handle.spawn(ether_adaptor.infallible());
+    }
+}
+
+impl Future for EtherAdaptorV4 {
     type Item = ();
     type Error = Void;
 
@@ -153,7 +167,9 @@ fn test() {
         let (ether_plug_0, ether_plug_1) = EtherPlug::new_wire();
         let (ipv4_plug_0, ipv4_plug_1) = Ipv4Plug::new_wire();
         let veth_ip = Ipv4Addr::random_global();
-        let veth_mac = new_v4(&handle, veth_ip, ether_plug_0, ipv4_plug_0);
+        let veth = EtherAdaptorV4::new(veth_ip, ether_plug_0, ipv4_plug_0);
+        let veth_mac = veth.mac_addr();
+        handle.spawn(veth.infallible());
 
         let EtherPlug { tx: ether_tx, rx: ether_rx } = ether_plug_1;
         let Ipv4Plug { tx: ipv4_tx, rx: ipv4_rx } = ipv4_plug_1;

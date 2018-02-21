@@ -1,21 +1,58 @@
 use priv_prelude::*;
 
-pub fn new_v4(handle: &Handle, ipv4_addr: Ipv4Addr, connections: Vec<(Ipv4Plug, Vec<RouteV4>)>) {
-    let mut rxs = Vec::with_capacity(connections.len());
-    let mut txs = Vec::with_capacity(connections.len());
-    for (Ipv4Plug { tx, rx }, routes) in connections {
-        rxs.push(rx);
-        txs.push((tx, routes));
-    }
-
-    let router = RouterV4 { rxs, txs, ipv4_addr };
-    handle.spawn(router.infallible());
+pub struct RouterV4Builder {
+    ipv4_addr: Ipv4Addr,
+    connections: Vec<(Ipv4Plug, Vec<RouteV4>)>,
 }
 
-struct RouterV4 {
+impl RouterV4Builder {
+    pub fn new(ipv4_addr: Ipv4Addr) -> RouterV4Builder {
+        RouterV4Builder {
+            ipv4_addr: ipv4_addr,
+            connections: Vec::new(),
+        }
+    }
+
+    pub fn connect(mut self, plug: Ipv4Plug, routes: Vec<RouteV4>) -> RouterV4Builder {
+        self.connections.push((plug, routes));
+        self
+    }
+
+    pub fn build(self) -> RouterV4 {
+        RouterV4::new(self.ipv4_addr, self.connections)
+    }
+
+    pub fn spawn(self, handle: &Handle) {
+        RouterV4::spawn(handle, self.ipv4_addr, self.connections)
+    }
+}
+
+pub struct RouterV4 {
     rxs: Vec<UnboundedReceiver<Ipv4Packet>>,
     txs: Vec<(UnboundedSender<Ipv4Packet>, Vec<RouteV4>)>,
     ipv4_addr: Ipv4Addr,
+}
+
+impl RouterV4 {
+    pub fn new(ipv4_addr: Ipv4Addr, connections: Vec<(Ipv4Plug, Vec<RouteV4>)>) -> RouterV4 {
+        let mut rxs = Vec::with_capacity(connections.len());
+        let mut txs = Vec::with_capacity(connections.len());
+        for (Ipv4Plug { tx, rx }, routes) in connections {
+            rxs.push(rx);
+            txs.push((tx, routes));
+        }
+
+        RouterV4 { rxs, txs, ipv4_addr }
+    }
+
+    pub fn spawn(
+        handle: &Handle,
+        ipv4_addr: Ipv4Addr,
+        connections: Vec<(Ipv4Plug, Vec<RouteV4>)>,
+    ) {
+        let router_v4 = RouterV4::new(ipv4_addr, connections);
+        handle.spawn(router_v4.infallible());
+    }
 }
 
 impl Future for RouterV4 {
