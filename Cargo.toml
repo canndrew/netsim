@@ -27,6 +27,7 @@ env_logger = "0.4.0"
 capabilities = "0.3.0"
 smoltcp = { git = "https://github.com/canndrew/smoltcp", branch = "stable-fork" }
 byteorder = "*"
+statrs = "*"
 
 [build-dependencies]
 bindgen = "0.30.0"

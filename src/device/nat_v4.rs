@@ -38,6 +38,7 @@ impl NatV4 {
 
 pub struct NatV4Builder {
     ipv4_addr: Option<Ipv4Addr>,
+    subnet: Option<SubnetV4>,
     hair_pinning: bool,
     udp_map_out: HashMap<SocketAddrV4, u16>,
     udp_map_in: HashMap<u16, SocketAddrV4>,
@@ -47,15 +48,29 @@ impl NatV4Builder {
     pub fn new() -> NatV4Builder {
         NatV4Builder {
             ipv4_addr: None,
+            subnet: None,
             hair_pinning: false,
             udp_map_out: HashMap::new(),
             udp_map_in: HashMap::new(),
         }
     }
 
+    pub fn subnet(mut self, subnet: SubnetV4) -> NatV4Builder {
+        self.subnet = Some(subnet);
+        self
+    }
+
+    pub fn get_subnet(&self) -> Option<SubnetV4> {
+        self.subnet
+    }
+
     pub fn ip(mut self, addr: Ipv4Addr) -> NatV4Builder {
         self.ipv4_addr = Some(addr);
         self
+    }
+
+    pub fn get_ip(&self) -> Option<Ipv4Addr> {
+        self.ipv4_addr
     }
 
     pub fn hair_pinning(mut self, hair_pinning: bool) -> NatV4Builder {
@@ -73,12 +88,13 @@ impl NatV4Builder {
         self, 
         public_plug: Ipv4Plug,
         private_plug: Ipv4Plug,
-        subnet: SubnetV4,
     ) -> NatV4 {
+        let subnet = self.subnet.unwrap_or(SubnetV4::random_local());
+        let ipv4_addr = self.ipv4_addr.unwrap_or(subnet.gateway_ip());
         NatV4 {
             private_plug: private_plug,
             public_plug: public_plug,
-            ipv4_addr: self.ipv4_addr.unwrap_or(subnet.gateway_ip()),
+            ipv4_addr: ipv4_addr,
             subnet: subnet, 
             hair_pinning: self.hair_pinning,
             udp_map_out: self.udp_map_out,
@@ -92,9 +108,8 @@ impl NatV4Builder {
         handle: &Handle,
         public_plug: Ipv4Plug,
         private_plug: Ipv4Plug,
-        subnet: SubnetV4,
     ) {
-        let nat_v4 = self.build(public_plug, private_plug, subnet);
+        let nat_v4 = self.build(public_plug, private_plug);
         handle.spawn(nat_v4.infallible());
     }
 }

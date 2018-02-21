@@ -26,6 +26,8 @@ extern crate future_utils;
 extern crate capabilities;
 #[cfg(test)]
 extern crate env_logger;
+#[cfg(test)]
+extern crate statrs;
 
 
 /// Convert a variable-length slice to a fixed-length array
