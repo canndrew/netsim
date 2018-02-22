@@ -82,6 +82,11 @@ impl SubnetV4 {
         Ipv4Addr::from(!(0xffffffffu32.checked_shr(self.bits as u32).unwrap_or(0)))
     }
 
+    /// Get the number of netmask bits
+    pub fn netmask_bits(&self) -> u8 {
+        self.bits
+    }
+
     /// Get the base address of the subnet, ie. the lowest IP address which is part of the subnet.
     pub fn base_addr(&self) -> Ipv4Addr {
         self.addr

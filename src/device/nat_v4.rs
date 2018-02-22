@@ -3,7 +3,7 @@ use priv_prelude::*;
 pub struct NatV4 {
     private_plug: Ipv4Plug,
     public_plug: Ipv4Plug,
-    ipv4_addr: Ipv4Addr,
+    public_ip: Ipv4Addr,
     subnet: SubnetV4, 
     hair_pinning: bool,
     udp_map_out: HashMap<SocketAddrV4, u16>,
@@ -12,11 +12,16 @@ pub struct NatV4 {
 }
 
 impl NatV4 {
-    pub fn new(public_plug: Ipv4Plug, private_plug: Ipv4Plug, subnet: SubnetV4) -> NatV4 {
+    pub fn new(
+        public_plug: Ipv4Plug,
+        private_plug: Ipv4Plug,
+        public_ip: Ipv4Addr,
+        subnet: SubnetV4,
+    ) -> NatV4 {
         NatV4 {
             private_plug: private_plug,
             public_plug: public_plug,
-            ipv4_addr: subnet.gateway_ip(),
+            public_ip: public_ip,
             subnet: subnet,
             hair_pinning: false,
             udp_map_out: HashMap::new(),
@@ -29,15 +34,16 @@ impl NatV4 {
         handle: &Handle,
         public_plug: Ipv4Plug,
         private_plug: Ipv4Plug,
+        public_ip: Ipv4Addr,
         subnet: SubnetV4,
     ) {
-        let nat_v4 = NatV4::new(public_plug, private_plug, subnet);
+        let nat_v4 = NatV4::new(public_plug, private_plug, public_ip, subnet);
         handle.spawn(nat_v4.infallible());
     }
 }
 
+#[derive(Default)]
 pub struct NatV4Builder {
-    ipv4_addr: Option<Ipv4Addr>,
     subnet: Option<SubnetV4>,
     hair_pinning: bool,
     udp_map_out: HashMap<SocketAddrV4, u16>,
@@ -46,13 +52,7 @@ pub struct NatV4Builder {
 
 impl NatV4Builder {
     pub fn new() -> NatV4Builder {
-        NatV4Builder {
-            ipv4_addr: None,
-            subnet: None,
-            hair_pinning: false,
-            udp_map_out: HashMap::new(),
-            udp_map_in: HashMap::new(),
-        }
+        NatV4Builder::default()
     }
 
     pub fn subnet(mut self, subnet: SubnetV4) -> NatV4Builder {
@@ -62,15 +62,6 @@ impl NatV4Builder {
 
     pub fn get_subnet(&self) -> Option<SubnetV4> {
         self.subnet
-    }
-
-    pub fn ip(mut self, addr: Ipv4Addr) -> NatV4Builder {
-        self.ipv4_addr = Some(addr);
-        self
-    }
-
-    pub fn get_ip(&self) -> Option<Ipv4Addr> {
-        self.ipv4_addr
     }
 
     pub fn hair_pinning(mut self, hair_pinning: bool) -> NatV4Builder {
@@ -88,13 +79,13 @@ impl NatV4Builder {
         self, 
         public_plug: Ipv4Plug,
         private_plug: Ipv4Plug,
+        public_ip: Ipv4Addr,
     ) -> NatV4 {
         let subnet = self.subnet.unwrap_or(SubnetV4::random_local());
-        let ipv4_addr = self.ipv4_addr.unwrap_or(subnet.gateway_ip());
         NatV4 {
             private_plug: private_plug,
             public_plug: public_plug,
-            ipv4_addr: ipv4_addr,
+            public_ip: public_ip,
             subnet: subnet, 
             hair_pinning: self.hair_pinning,
             udp_map_out: self.udp_map_out,
@@ -108,8 +99,9 @@ impl NatV4Builder {
         handle: &Handle,
         public_plug: Ipv4Plug,
         private_plug: Ipv4Plug,
+        public_ip: Ipv4Addr,
     ) {
-        let nat_v4 = self.build(public_plug, private_plug);
+        let nat_v4 = self.build(public_plug, private_plug, public_ip);
         handle.spawn(nat_v4.infallible());
     }
 }
@@ -137,7 +129,7 @@ impl Future for NatV4 {
                         None => continue,
                     };
 
-                    if self.hair_pinning && dest_ip == self.ipv4_addr {
+                    if self.hair_pinning && dest_ip == self.public_ip {
                         match packet.payload() {
                             Ipv4Payload::Udp(udp) => {
                                 let dest_port = udp.dest_port();
@@ -190,13 +182,13 @@ impl Future for NatV4 {
                             };
                             let natted_packet = Ipv4Packet::new_from_fields_recursive(
                                 Ipv4Fields {
-                                    source_ip: self.ipv4_addr,
+                                    source_ip: self.public_ip,
                                     ttl: next_ttl,
                                     .. ipv4_fields
                                 },
                                 Ipv4PayloadFields::Udp {
                                     fields: UdpFields::V4 {
-                                        source_addr: SocketAddrV4::new(self.ipv4_addr, mapped_source_port),
+                                        source_addr: SocketAddrV4::new(self.public_ip, mapped_source_port),
                                         dest_addr: SocketAddrV4::new(packet.dest_ip(), udp.dest_port()),
                                     },
                                     payload: udp.payload(),
@@ -223,7 +215,7 @@ impl Future for NatV4 {
                     };
                     match packet.payload() {
                         Ipv4Payload::Udp(udp) => {
-                            if packet.dest_ip() != self.ipv4_addr {
+                            if packet.dest_ip() != self.public_ip {
                                 continue;
                             }
                             let dest_port = udp.dest_port();

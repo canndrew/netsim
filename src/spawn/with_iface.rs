@@ -69,7 +69,7 @@ impl Future for TapTask {
     type Error = Void;
 
     fn poll(&mut self) -> Result<Async<()>, Void> {
-        static GRACE_PERIOD: Duration = Duration::from_millis(100);
+        let grace_period: Duration = Duration::from_millis(100);
 
         let mut received_frames = false;
         loop {
@@ -127,7 +127,7 @@ impl Future for TapTask {
                     trace!("state == receiving");
                     match drop_rx.poll().void_unwrap() {
                         Async::Ready(()) => {
-                            state = TapTaskState::Dying(Timeout::new(GRACE_PERIOD, &self.handle));
+                            state = TapTaskState::Dying(Timeout::new(grace_period, &self.handle));
                             continue;
                         },
                         Async::NotReady => {
@@ -139,7 +139,7 @@ impl Future for TapTask {
                 TapTaskState::Dying(mut timeout) => {
                     trace!("state == dying");
                     if received_frames {
-                        timeout.reset(Instant::now() + GRACE_PERIOD);
+                        timeout.reset(Instant::now() + grace_period);
                     }
                     match timeout.poll().void_unwrap() {
                         Async::Ready(()) => {

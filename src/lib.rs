@@ -62,7 +62,10 @@ mod tap;
 mod async_fd;
 mod route;
 mod subnet;
+pub mod node;
 pub mod device;
 pub mod wire;
 pub mod spawn;
+
+pub use subnet::SubnetV4;
 

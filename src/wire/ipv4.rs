@@ -197,5 +197,30 @@ impl Ipv4Plug {
         };
         (a, b)
     }
+
+    pub fn with_latency(
+        self, 
+        handle: &Handle,
+        min_latency: Duration,
+        mean_additional_latency: Duration,
+    ) -> Ipv4Plug {
+        let (plug_0, plug_1) = Ipv4Plug::new_wire();
+        LatencyV4::spawn(handle, min_latency, mean_additional_latency, self, plug_0);
+        plug_1
+    }
+
+    pub fn with_hops(
+        self,
+        handle: &Handle,
+        num_hops: u32,
+    ) -> Ipv4Plug {
+        let mut plug = self;
+        for _ in 0..num_hops {
+            let (plug_0, plug_1) = Ipv4Plug::new_wire();
+            HopV4::spawn(handle, plug, plug_0);
+            plug = plug_1;
+        }
+        plug
+    }
 }
 

@@ -18,7 +18,7 @@ impl Future for InTransit {
     }
 }
 
-pub struct Latency {
+pub struct LatencyV4 {
     handle: Handle,
     plug_a: Ipv4Plug,
     plug_b: Ipv4Plug,
@@ -28,7 +28,7 @@ pub struct Latency {
     mean_additional_latency: Duration,
 }
 
-impl Latency {
+impl LatencyV4 {
     pub fn spawn(
         handle: &Handle,
         min_latency: Duration,
@@ -36,7 +36,7 @@ impl Latency {
         plug_a: Ipv4Plug,
         plug_b: Ipv4Plug,
     ) {
-        let latency = Latency {
+        let latency = LatencyV4 {
             handle: handle.clone(),
             plug_a: plug_a,
             plug_b: plug_b,
@@ -49,7 +49,7 @@ impl Latency {
     }
 }
 
-impl Future for Latency {
+impl Future for LatencyV4 {
     type Item = ();
     type Error = Void;
 
@@ -157,7 +157,7 @@ fn test() {
 
     let (plug_a, plug_a_pass) = Ipv4Plug::new_wire();
     let (plug_b, plug_b_pass) = Ipv4Plug::new_wire();
-    Latency::spawn(&handle, min_latency, mean_additional_latency, plug_a_pass, plug_b_pass);
+    LatencyV4::spawn(&handle, min_latency, mean_additional_latency, plug_a_pass, plug_b_pass);
 
     let res = core.run({
         let start_time_0 = Instant::now();

@@ -29,5 +29,6 @@ pub use wire::*;
 pub use route::{RouteV4, AddRouteError};
 pub use subnet::SubnetV4;
 pub use tap::{Tap, IfaceBuilder, IfaceBuildError};
-pub use device::{EtherAdaptorV4, NatV4Builder};
+pub use device::{EtherAdaptorV4, NatV4Builder, LatencyV4, HopV4, RouterV4Builder};
+pub use node::Node;
 
