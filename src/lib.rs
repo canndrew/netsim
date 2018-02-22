@@ -1,3 +1,7 @@
+//! `netsim` is a crate for simulating networks for the sake of testing network-oriented Rust
+//! software. You can use it to run Rust functions in network-isolated containers, and assemble
+//! virtual network for these functions to communicate over.
+
 extern crate libc;
 extern crate rand;
 extern crate byteorder;
@@ -28,7 +32,6 @@ extern crate capabilities;
 extern crate env_logger;
 #[cfg(test)]
 extern crate statrs;
-
 
 /// Convert a variable-length slice to a fixed-length array
 macro_rules! slice_assert_len {
