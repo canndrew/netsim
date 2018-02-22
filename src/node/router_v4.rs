@@ -97,12 +97,29 @@ tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,);
 tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,);
 tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15,);
 
+pub struct ImplNode<C> {
+    clients: C,
+}
 
+/// Contruct a hierarchical network 
 pub fn router_v4<C: RouterClientsV4>(
-    handle: &Handle,
-    subnet: SubnetV4,
     clients: C,
 ) -> (JoinHandle<C::Output>, Ipv4Plug) {
-    clients.build(handle, subnet)
+    NodeImpl { clients }
+}
+
+impl<C> Node for ImplNode<C>
+where
+    C: RouterClientsV4,
+{
+    type Output = C::Output;
+
+    fn build(
+        self,
+        handle: &Handle,
+        subnet: SubnetV4,
+    ) -> (JoinHandle<C::Output>, Ipv4Plug) {
+        self.clients.build(handle, subnet)
+    }
 }
 

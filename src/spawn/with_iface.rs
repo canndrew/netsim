@@ -4,8 +4,8 @@ use future_utils;
 use spawn;
 
 /// Spawn a function into a new network namespace with a network interface described by `iface`.
-/// Returns a `JoinHandle` which can be used to join the spawned thread, along with a `Tap` which
-/// can be used to read/write network activity from the spawned thread.
+/// Returns a `JoinHandle` which can be used to join the spawned thread, along with a channel which
+/// can be used to read/write ethernet frames to the spawned thread's interface.
 pub fn with_iface<F, R>(
     handle: &Handle,
     iface: IfaceBuilder,

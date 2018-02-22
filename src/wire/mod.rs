@@ -1,3 +1,5 @@
+//! Types for describing ethernet/IP packets.
+
 mod arp;
 mod checksum;
 mod ether;

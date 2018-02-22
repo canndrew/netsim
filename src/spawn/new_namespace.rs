@@ -22,7 +22,7 @@ where
 
 /// Run the function `func` in its own network namespace. This namespace will not have any network
 /// interfaces. You can create virtual interfaces using `Tap`, or use one of the other functions in
-/// this module which do this for you.
+/// the `spawn` module which do this for you.
 pub fn new_namespace<F, R>(func: F) -> JoinHandle<R>
 where
     F: FnOnce() -> R,
