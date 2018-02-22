@@ -178,6 +178,7 @@ impl Ipv4Packet {
     }
 }
 
+#[derive(Debug)]
 pub struct Ipv4Plug {
     pub tx: UnboundedSender<Ipv4Packet>,
     pub rx: UnboundedReceiver<Ipv4Packet>,

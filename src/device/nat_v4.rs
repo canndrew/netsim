@@ -1,5 +1,6 @@
 use priv_prelude::*;
 
+#[derive(Debug)]
 pub struct NatV4 {
     private_plug: Ipv4Plug,
     public_plug: Ipv4Plug,
@@ -18,7 +19,7 @@ impl NatV4 {
         public_ip: Ipv4Addr,
         subnet: SubnetV4,
     ) -> NatV4 {
-        NatV4 {
+        let ret = NatV4 {
             private_plug: private_plug,
             public_plug: public_plug,
             public_ip: public_ip,
@@ -27,7 +28,9 @@ impl NatV4 {
             udp_map_out: HashMap::new(),
             udp_map_in: HashMap::new(),
             next_udp_port: 1000,
-        }
+        };
+        debug!("building {:?}", ret);
+        ret
     }
 
     pub fn spawn(
@@ -82,7 +85,7 @@ impl NatV4Builder {
         public_ip: Ipv4Addr,
     ) -> NatV4 {
         let subnet = self.subnet.unwrap_or(SubnetV4::random_local());
-        NatV4 {
+        let ret = NatV4 {
             private_plug: private_plug,
             public_plug: public_plug,
             public_ip: public_ip,
@@ -91,7 +94,9 @@ impl NatV4Builder {
             udp_map_out: self.udp_map_out,
             udp_map_in: self.udp_map_in,
             next_udp_port: 1000,
-        }
+        };
+        debug!("building {:?}", ret);
+        ret
     }
 
     pub fn spawn(
@@ -121,12 +126,20 @@ impl Future for NatV4 {
                     let ipv4_fields = packet.fields();
 
                     if !self.subnet.contains(source_ip) {
+                        info!("nat {:?} dropping outbound packet which does not originate from our \
+                               subnet. {:?}", self.public_ip, packet);
                         continue;
                     }
 
                     let next_ttl = match ipv4_fields.ttl.checked_sub(1) {
                         Some(ttl) => ttl,
-                        None => continue,
+                        None => {
+                            info!(
+                                "nat {:?} dropping outbound packet with ttl zero {:?}",
+                                self.public_ip, packet
+                            );
+                            continue;
+                        },
                     };
 
                     if self.hair_pinning && dest_ip == self.public_ip {
@@ -195,6 +208,11 @@ impl Future for NatV4 {
                                 }
                             );
 
+                            info!(
+                                "nat {} rewrote packet source address: {:?}",
+                                self.public_ip, natted_packet,
+                            );
+
                             let _ = self.public_plug.tx.unbounded_send(natted_packet);
                         },
                         _ => (),
@@ -209,15 +227,25 @@ impl Future for NatV4 {
                 Async::Ready(None) => break true,
                 Async::Ready(Some(packet)) => {
                     let ipv4_fields = packet.fields();
+                    if packet.dest_ip() != self.public_ip {
+                        info!(
+                            "nat {} dropping inbound packet not directed at our public ip: {:?}",
+                            self.public_ip, packet,
+                        );
+                        continue;
+                    }
                     let next_ttl = match ipv4_fields.ttl.checked_sub(1) {
                         Some(ttl) => ttl,
-                        None => continue,
+                        None => {
+                            info!(
+                                "nat {} dropping inbound packet with ttl zero {:?}",
+                                self.public_ip, packet,
+                            );
+                            continue
+                        },
                     };
                     match packet.payload() {
                         Ipv4Payload::Udp(udp) => {
-                            if packet.dest_ip() != self.public_ip {
-                                continue;
-                            }
                             let dest_port = udp.dest_port();
                             match self.udp_map_in.get(&dest_port) {
                                 Some(private_dest_addr) => {
@@ -235,6 +263,12 @@ impl Future for NatV4 {
                                             payload: udp.payload(),
                                         }
                                     );
+
+                                    info!(
+                                        "nat {} rewrote destination of inbound packet: {:?}",
+                                        self.public_ip, natted_packet,
+                                    );
+
                                     let _ = self.private_plug.tx.unbounded_send(natted_packet);
                                 },
                                 None => (),

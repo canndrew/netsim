@@ -1,5 +1,6 @@
 use priv_prelude::*;
 
+#[derive(Debug)]
 pub struct EtherAdaptorV4 {
     ether_plug: EtherPlug,
     ipv4_plug: Ipv4Plug,
@@ -12,14 +13,16 @@ pub struct EtherAdaptorV4 {
 impl EtherAdaptorV4 {
     pub fn new(addr: Ipv4Addr, ether: EtherPlug, ipv4: Ipv4Plug) -> EtherAdaptorV4 {
         let mac_addr = MacAddr::random();
-        EtherAdaptorV4 {
+        let ret = EtherAdaptorV4 {
             ether_plug: ether,
             ipv4_plug: ipv4,
             ipv4_addr: addr,
             mac_addr: mac_addr,
             arp_table: HashMap::new(),
             arp_pending: HashMap::new(),
-        }
+        };
+        debug!("building {:?}", ret);
+        ret
     }
 
     pub fn mac_addr(&self) -> MacAddr {
@@ -48,6 +51,10 @@ impl Future for EtherAdaptorV4 {
                 Async::Ready(None) => break true,
                 Async::Ready(Some(frame)) => {
                     if !(frame.dest_mac().is_broadcast() || frame.dest_mac() == self.mac_addr) {
+                        info!(
+                            "ether adaptor {} {} dropping frame not addressed to it: {:?}",
+                            self.ipv4_addr, self.mac_addr, frame
+                        );
                         continue;
                     }
                     match frame.payload() {
@@ -58,23 +65,33 @@ impl Future for EtherAdaptorV4 {
                                     source_ip,
                                     dest_ip,
                                 } => {
-                                    if dest_ip == self.ipv4_addr {
-                                        let frame = EtherFrame::new_from_fields_recursive(
-                                            EtherFields {
-                                                source_mac: self.mac_addr,
-                                                dest_mac: source_mac,
-                                            },
-                                            EtherPayloadFields::Arp {
-                                                fields: ArpFields::Response {
-                                                    source_mac: self.mac_addr,
-                                                    source_ip: self.ipv4_addr,
-                                                    dest_mac: source_mac,
-                                                    dest_ip: source_ip,
-                                                },
-                                            },
+                                    if dest_ip != self.ipv4_addr {
+                                        info!(
+                                            "ether adaptor {} {} dropping arp request not \
+                                            addressed to it: {:?}",
+                                            self.ipv4_addr, self.mac_addr, arp
                                         );
-                                        let _ = self.ether_plug.tx.unbounded_send(frame);
+                                        continue;
                                     }
+                                    let frame = EtherFrame::new_from_fields_recursive(
+                                        EtherFields {
+                                            source_mac: self.mac_addr,
+                                            dest_mac: source_mac,
+                                        },
+                                        EtherPayloadFields::Arp {
+                                            fields: ArpFields::Response {
+                                                source_mac: self.mac_addr,
+                                                source_ip: self.ipv4_addr,
+                                                dest_mac: source_mac,
+                                                dest_ip: source_ip,
+                                            },
+                                        },
+                                    );
+                                    info!(
+                                        "ether adaptor {} {} replying to arp request: {:?}",
+                                        self.ipv4_addr, self.mac_addr, frame
+                                    );
+                                    let _ = self.ether_plug.tx.unbounded_send(frame);
                                 },
                                 ArpFields::Response {
                                     source_mac,
@@ -82,25 +99,44 @@ impl Future for EtherAdaptorV4 {
                                     dest_mac,
                                     dest_ip,
                                 } => {
-                                    if dest_mac == self.mac_addr && dest_ip == self.ipv4_addr  {
-                                        let _ = self.arp_table.insert(source_ip, source_mac);
-                                        if let Some(pending) = self.arp_pending.remove(&source_ip) {
-                                            for packet in pending {
-                                                let frame = EtherFrame::new_from_fields(
-                                                    EtherFields {
-                                                        source_mac: self.mac_addr,
-                                                        dest_mac: source_mac,
-                                                    },
-                                                    EtherPayload::Ipv4(packet),
-                                                );
-                                                let _ = self.ether_plug.tx.unbounded_send(frame);
-                                            }
+                                    if !(dest_mac == self.mac_addr && dest_ip == self.ipv4_addr) {
+                                        info!(
+                                            "ether adaptor {} {} ignoring arp response not
+                                            addressed to it: {:?}",
+                                            self.ipv4_addr, self.mac_addr, arp
+                                        );
+                                        continue;
+                                    }
+                                    info!(
+                                        "ether adaptor {} {} received arp response: {:?}",
+                                        self.ipv4_addr, self.mac_addr, arp
+                                    );
+                                    let _ = self.arp_table.insert(source_ip, source_mac);
+                                    if let Some(pending) = self.arp_pending.remove(&source_ip) {
+                                        for packet in pending {
+                                            let frame = EtherFrame::new_from_fields(
+                                                EtherFields {
+                                                    source_mac: self.mac_addr,
+                                                    dest_mac: source_mac,
+                                                },
+                                                EtherPayload::Ipv4(packet),
+                                            );
+                                            info!(
+                                                "ether adaptor {} {} sending queued IPv4 packet \
+                                                which it now knows the destination MAC for: {:?}",
+                                                self.ipv4_addr, self.mac_addr, frame
+                                            );
+                                            let _ = self.ether_plug.tx.unbounded_send(frame);
                                         }
                                     }
                                 },
                             }
                         },
                         EtherPayload::Ipv4(ipv4) => {
+                            info!(
+                                "ether adaptor {} {} forwarding IPv4 packet: {:?}",
+                                self.ipv4_addr, self.mac_addr, ipv4
+                            );
                             let _ = self.ipv4_plug.tx.unbounded_send(ipv4);
                         },
                         EtherPayload::Unknown { .. } => (),
@@ -131,6 +167,11 @@ impl Future for EtherAdaptorV4 {
                                     },
                                 },
                             );
+                            info!(
+                                "ether adaptor {} {} sending ARP request and queing \
+                                unsendable IPv4 packet: {:?}, {:?}",
+                                self.ipv4_addr, self.mac_addr, frame, packet
+                            );
                             let _ = self.ether_plug.tx.unbounded_send(frame);
                             self.arp_pending.entry(dest_ip).or_insert(Vec::new()).push(packet);
                             continue;
@@ -142,6 +183,11 @@ impl Future for EtherAdaptorV4 {
                             dest_mac: dest_mac,
                         },
                         EtherPayload::Ipv4(packet),
+                    );
+
+                    info!(
+                        "ether adaptor {} {} forwarding ethernet frame: {:?}",
+                        self.ipv4_addr, self.mac_addr, frame
                     );
                     let _ = self.ether_plug.tx.unbounded_send(frame);
                 },

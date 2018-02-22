@@ -379,6 +379,7 @@ impl Stream for Tap {
 
                 let bytes = Bytes::from(&buffer[..n]);
                 let frame = EtherFrame::from_bytes(bytes);
+                info!("TAP sending frame: {:?}", frame);
                 Ok(Async::Ready(Some(frame)))
             },
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -395,7 +396,7 @@ impl Sink for Tap {
     type SinkError = io::Error;
     
     fn start_send(&mut self, item: EtherFrame) -> io::Result<AsyncSink<EtherFrame>> {
-        trace!("sending frame to TAP device");
+        info!("TAP received frame: {:?}", item);
         if let Async::NotReady = self.fd.poll_write() {
             return Ok(AsyncSink::NotReady(item));
         }

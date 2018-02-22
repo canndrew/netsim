@@ -38,7 +38,13 @@ impl Future for HopV4 {
                 Async::Ready(Some(mut packet)) => {
                     let next_ttl = match packet.ttl().checked_sub(1) {
                         Some(ttl) => ttl,
-                        None => continue,
+                        None => {
+                            info!(
+                                "hop dropping packet due to expired ttl: {:?}",
+                                packet
+                            );
+                            continue;
+                        },
                     };
                     let fields = packet.fields();
                     packet.set_fields(Ipv4Fields {
@@ -57,7 +63,13 @@ impl Future for HopV4 {
                 Async::Ready(Some(mut packet)) => {
                     let next_ttl = match packet.ttl().checked_sub(1) {
                         Some(ttl) => ttl,
-                        None => continue,
+                        None => {
+                            info!(
+                                "hop dropping packet due to expired ttl: {:?}",
+                                packet
+                            );
+                            continue;
+                        },
                     };
                     let fields = packet.fields();
                     packet.set_fields(Ipv4Fields {

@@ -77,10 +77,13 @@ impl Future for RouterV4 {
                                 for route in routes {
                                     if route.destination().contains(dest_ip) {
                                         let _ = tx.unbounded_send(packet);
+                                        info!("router {} routing packet on route {:?}", self.ipv4_addr, route);
                                         continue 'next_packet;
                                     }
                                 }
                             }
+
+                            info!("router {} dropping unroutable packet {:?}", self.ipv4_addr, packet);
                         },
                     }
                 }

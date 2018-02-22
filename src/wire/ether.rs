@@ -174,6 +174,7 @@ impl EtherFrame {
     }
 }
 
+#[derive(Debug)]
 pub struct EtherPlug {
     pub tx: UnboundedSender<EtherFrame>,
     pub rx: UnboundedReceiver<EtherFrame>,

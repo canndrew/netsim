@@ -19,6 +19,12 @@ impl fmt::Debug for MacAddr {
     }
 }
 
+impl fmt::Display for MacAddr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", *self)
+    }
+}
+
 impl MacAddr {
     pub const BROADCAST: MacAddr = MacAddr {
         bytes: [0xff, 0xff, 0xff, 0xff, 0xff, 0xff],
