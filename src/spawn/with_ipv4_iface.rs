@@ -34,8 +34,8 @@ where
     let task = TunTask {
         tun: tun,
         handle: handle.clone(),
-        frame_tx: plug_a.tx,
-        frame_rx: plug_a.rx,
+        packet_tx: plug_a.tx,
+        packet_rx: plug_a.rx,
         sending_frame: None,
         state: TunTaskState::Receiving {
             drop_rx: drop_rx,
@@ -49,8 +49,8 @@ where
 
 struct TunTask {
     tun: Ipv4Iface,
-    frame_tx: UnboundedSender<Ipv4Packet>,
-    frame_rx: UnboundedReceiver<Ipv4Packet>,
+    packet_tx: UnboundedSender<Ipv4Packet>,
+    packet_rx: UnboundedReceiver<Ipv4Packet>,
     sending_frame: Option<Ipv4Packet>,
     handle: Handle,
     state: TunTaskState,
@@ -69,13 +69,14 @@ impl Future for TunTask {
     type Error = Void;
 
     fn poll(&mut self) -> Result<Async<()>, Void> {
+        trace!("polling TunTask");
         let grace_period: Duration = Duration::from_millis(100);
 
         let mut received_frames = false;
         loop {
             match self.tun.poll() {
                 Ok(Async::Ready(Some(frame))) => {
-                    let _ = self.frame_tx.unbounded_send(frame);
+                    let _ = self.packet_tx.unbounded_send(frame);
                     received_frames = true;
                 },
                 Ok(Async::Ready(None)) => {
@@ -89,10 +90,13 @@ impl Future for TunTask {
         }
 
         loop {
+            trace!("looping receiver ...");
             if let Some(frame) = self.sending_frame.take() {
+                trace!("we have a frame ready to send");
                 match self.tun.start_send(frame) {
                     Ok(AsyncSink::Ready) => (),
                     Ok(AsyncSink::NotReady(frame)) => {
+                        trace!("couldn't send the frame ;(");
                         self.sending_frame = Some(frame);
                         break;
                     },
@@ -102,14 +106,17 @@ impl Future for TunTask {
                 }
             }
 
-            match self.frame_rx.poll().void_unwrap() {
+            match self.packet_rx.poll().void_unwrap() {
                 Async::Ready(Some(frame)) => {
+                    trace!("we received a frame");
                     self.sending_frame = Some(frame);
                     continue;
                 },
                 _ => break,
             }
         }
+        trace!("done looping");
+
         match self.tun.poll_complete() {
             Ok(..) => (),
             Err(e) => {
@@ -118,7 +125,6 @@ impl Future for TunTask {
         }
 
         let mut state = mem::replace(&mut self.state, TunTaskState::Invalid);
-        trace!("polling TunTask");
         loop {
             match state {
                 TunTaskState::Receiving {
@@ -160,5 +166,87 @@ impl Future for TunTask {
 
         Ok(Async::NotReady)
     }
+}
+
+#[cfg(test)]
+#[test]
+fn test() {
+    use rand;
+    use void;
+    use env_logger;
+
+    let  _ = env_logger::init();
+
+    let mut core = unwrap!(Core::new());
+    let handle = core.handle();
+
+    let res = core.run(future::lazy(move || {
+        let remote_ip = Ipv4Addr::random_global();
+        let remote_port = 123;
+        let remote_addr = SocketAddrV4::new(remote_ip, remote_port);
+
+        let iface_ip = Ipv4Addr::random_global();
+
+        let mut iface = Ipv4IfaceBuilder::new();
+        iface.address(iface_ip);
+        iface.route(RouteV4::new(SubnetV4::global(), None));
+
+        let (join_handle, ipv4_plug) = with_ipv4_iface(&handle, iface, move || {
+            let buffer_out = rand::random::<[u8; 8]>();
+            let socket = unwrap!(std::net::UdpSocket::bind(addr!("0.0.0.0:0")));
+            let n = unwrap!(socket.send_to(&buffer_out, &SocketAddr::V4(remote_addr)));
+            assert_eq!(n, 8);
+
+            let mut buffer_in = [0u8; 8];
+            trace!("waiting to receive reply");
+            let (n, recv_addr) = unwrap!(socket.recv_from(&mut buffer_in));
+            assert_eq!(n, 8);
+            assert_eq!(recv_addr, SocketAddr::V4(remote_addr));
+            assert_eq!(buffer_out, buffer_in);
+            trace!("spawned namespace exiting");
+        });
+
+        let Ipv4Plug { tx: plug_tx, rx: plug_rx } = ipv4_plug;
+
+        plug_rx
+        .into_future()
+        .map_err(|(v, _plug_rx)| void::unreachable(v))
+        .and_then(move |(packet_opt, _plug_rx)| {
+            let packet = unwrap!(packet_opt);
+            assert_eq!(packet.source_ip(), iface_ip);
+            assert_eq!(packet.dest_ip(), remote_ip);
+
+            let udp = match packet.payload() {
+                Ipv4Payload::Udp(udp) => udp,
+                payload => panic!("unexpected packet payload: {:?}", payload),
+            };
+            assert_eq!(udp.dest_port(), remote_port);
+            let iface_port = udp.source_port();
+
+            let reply_packet = Ipv4Packet::new_from_fields_recursive(
+                Ipv4Fields {
+                    source_ip: remote_ip,
+                    dest_ip: iface_ip,
+                    ttl: 64,
+                },
+                Ipv4PayloadFields::Udp {
+                    fields: UdpFields::V4 {
+                        source_addr: remote_addr,
+                        dest_addr: SocketAddrV4::new(iface_ip, iface_port),
+                    },
+                    payload: udp.payload(),
+                },
+            );
+
+            trace!("sending reply packet");
+            plug_tx
+            .send(reply_packet)
+            .map_err(|_e| panic!("plug hung up!"))
+            .and_then(move |_plug_tx| {
+                future_utils::thread_future(|| unwrap!(join_handle.join()))
+            })
+        })
+    }));
+    res.void_unwrap()
 }
 

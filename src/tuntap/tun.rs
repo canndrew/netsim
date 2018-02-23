@@ -101,42 +101,48 @@ impl Stream for Ipv4Iface {
     type Error = io::Error;
     
     fn poll(&mut self) -> io::Result<Async<Option<Ipv4Packet>>> {
-        if let Async::NotReady = self.fd.poll_read() {
-            return Ok(Async::NotReady);
-        }
+        loop {
+            if let Async::NotReady = self.fd.poll_read() {
+                return Ok(Async::NotReady);
+            }
 
-        let mut buffer: [u8; sys::ETH_FRAME_LEN as usize] = unsafe {
-            mem::uninitialized()
-        };
-        match self.fd.read(&mut buffer[..]) {
-            Ok(0) => Ok(Async::Ready(None)),
-            Ok(n) => {
+            let mut buffer: [u8; sys::ETH_FRAME_LEN as usize] = unsafe {
+                mem::uninitialized()
+            };
+            match self.fd.read(&mut buffer[..]) {
+                Ok(0) => return Ok(Async::Ready(None)),
+                Ok(n) => {
 
-                /*
-                'out: for i in 0.. {
-                    println!("");
-                    for j in 0..4 {
-                        let pos = i * 4 + j;
-                        if pos < n {
-                            print!("{:02x}", buffer[pos]);
-                        } else {
-                            break 'out;
+                    /*
+                    'out: for i in 0.. {
+                        println!("");
+                        for j in 0..4 {
+                            let pos = i * 4 + j;
+                            if pos < n {
+                                print!("{:02x}", buffer[pos]);
+                            } else {
+                                break 'out;
+                            }
                         }
                     }
-                }
-                println!("");
-                */
+                    println!("");
+                    */
 
-                let bytes = Bytes::from(&buffer[..n]);
-                let frame = Ipv4Packet::from_bytes(bytes);
-                info!("TUN sending frame: {:?}", frame);
-                Ok(Async::Ready(Some(frame)))
-            },
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.fd.need_read();
-                Ok(Async::NotReady)
-            },
-            Err(e) => Err(e),
+                    if buffer[0] >> 4 != 4 {
+                        info!("TUN dropping packet with version {}", buffer[0] >> 4);
+                        continue;
+                    }
+                    let bytes = Bytes::from(&buffer[..n]);
+                    let frame = Ipv4Packet::from_bytes(bytes);
+                    info!("TUN emitting frame: {:?}", frame);
+                    return Ok(Async::Ready(Some(frame)));
+                },
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    self.fd.need_read();
+                    return Ok(Async::NotReady);
+                },
+                Err(e) => return Err(e),
+            }
         }
     }
 }

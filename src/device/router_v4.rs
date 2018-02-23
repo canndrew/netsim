@@ -76,8 +76,8 @@ impl Future for RouterV4 {
                             for &mut (ref mut tx, ref routes) in &mut self.txs {
                                 for route in routes {
                                     if route.destination().contains(dest_ip) {
+                                        info!("router {} routing packet on route {:?} {:?}", self.ipv4_addr, route, packet);
                                         let _ = tx.unbounded_send(packet);
-                                        info!("router {} routing packet on route {:?}", self.ipv4_addr, route);
                                         continue 'next_packet;
                                     }
                                 }
