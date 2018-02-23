@@ -14,22 +14,14 @@ where
     R: Send + 'static,
     F: FnOnce(Ipv4Addr) -> R + Send + 'static
 {
-    let mut iface = EtherIfaceBuilder::new();
+    let mut iface = Ipv4IfaceBuilder::new();
     let iface_ip = subnet.random_client_addr();
     iface.address(iface_ip);
     iface.netmask(subnet.netmask());
     iface.route(RouteV4::new(subnet, None));
 
-    let (join_handle, ether_plug) = spawn::with_iface(handle, iface, move || func(iface_ip));
-    let (ipv4_plug_0, ipv4_plug_1) = Ipv4Plug::new_wire();
+    let (join_handle, ipv4_plug) = spawn::with_ipv4_iface(handle, iface, move || func(iface_ip));
 
-    EtherAdaptorV4::spawn(
-        handle,
-        subnet.random_client_addr(),
-        ether_plug,
-        ipv4_plug_0,
-    );
-
-    (join_handle, ipv4_plug_1)
+    (join_handle, ipv4_plug)
 }
 

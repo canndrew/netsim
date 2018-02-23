@@ -17,24 +17,16 @@ where
     };
     let nat = nat.subnet(subnet);
 
-    let mut iface = EtherIfaceBuilder::new();
+    let mut iface = Ipv4IfaceBuilder::new();
     iface.address(subnet.random_client_addr());
     iface.netmask(subnet.netmask());
     iface.route(RouteV4::new(SubnetV4::global(), Some(subnet.gateway_ip())));
 
-    let (join_handle, ether_plug) = spawn::with_iface(handle, iface, func);
+    let (join_handle, ipv4_plug) = spawn::with_ipv4_iface(handle, iface, func);
 
-    let (ipv4_plug_a0, ipv4_plug_a1) = Ipv4Plug::new_wire();
-    EtherAdaptorV4::spawn(
-        handle,
-        subnet.gateway_ip(),
-        ether_plug,
-        ipv4_plug_a0,
-    );
+    let (ipv4_plug_0, ipv4_plug_1) = Ipv4Plug::new_wire();
+    nat.spawn(handle, ipv4_plug_1, ipv4_plug, public_ip);
 
-    let (ipv4_plug_b0, ipv4_plug_b1) = Ipv4Plug::new_wire();
-    nat.spawn(handle, ipv4_plug_b1, ipv4_plug_a1, public_ip);
-
-    (join_handle, ipv4_plug_b0)
+    (join_handle, ipv4_plug_0)
 }
 

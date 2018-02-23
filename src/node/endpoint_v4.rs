@@ -26,17 +26,15 @@ where
         subnet: SubnetV4,
     ) -> (JoinHandle<R>, Ipv4Plug) {
         let address = subnet.random_client_addr();
-        let mut iface = EtherIfaceBuilder::new();
+        let mut iface = Ipv4IfaceBuilder::new();
         iface.address(address);
         iface.netmask(subnet.netmask());
         iface.route(RouteV4::new(SubnetV4::global(), None));
-        let (join_handle, ether_plug) = spawn::with_iface(
+        let (join_handle, ipv4_plug) = spawn::with_ipv4_iface(
             handle,
             iface, move || (self.func)(address),
         );
-        let (ipv4_plug_0, ipv4_plug_1) = Ipv4Plug::new_wire();
-        EtherAdaptorV4::spawn(handle, subnet.random_client_addr(), ether_plug, ipv4_plug_1);
-        (join_handle, ipv4_plug_0)
+        (join_handle, ipv4_plug)
     }
 }
 

@@ -6,7 +6,7 @@ use spawn;
 /// Spawn a function into a new network namespace with a network interface described by `iface`.
 /// Returns a `JoinHandle` which can be used to join the spawned thread, along with a channel which
 /// can be used to read/write ethernet frames to the spawned thread's interface.
-pub fn with_iface<F, R>(
+pub fn with_ether_iface<F, R>(
     handle: &Handle,
     iface: EtherIfaceBuilder,
     func: F,
@@ -195,7 +195,7 @@ mod test {
             let target_addr = SocketAddrV4::new(target_ip, target_port);
 
             trace!("spawning thread");
-            let (join_handle, EtherPlug { tx, rx }) = with_iface(
+            let (join_handle, EtherPlug { tx, rx }) = with_ether_iface(
                 &handle,
                 iface,
                 move || {
