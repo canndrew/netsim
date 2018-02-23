@@ -299,11 +299,11 @@ fn test() {
     let res = core.run(future::lazy(move || {
         let (public_plug_0, public_plug_1) = Ipv4Plug::new_wire();
         let (private_plug_0, private_plug_1) = Ipv4Plug::new_wire();
+        let public_ip = Ipv4Addr::random_global();
         let subnet = SubnetV4::random_local();
 
-        NatV4::spawn(&handle, public_plug_0, private_plug_0, subnet);
+        NatV4::spawn(&handle, public_plug_0, private_plug_0, public_ip, subnet);
 
-        let nat_ip = subnet.gateway_ip();
         let Ipv4Plug { tx: public_tx, rx: public_rx } = public_plug_1;
         let Ipv4Plug { tx: private_tx, rx: private_rx } = private_plug_1;
 
@@ -342,7 +342,7 @@ fn test() {
             .and_then(move |(packet_opt, _public_rx)| {
                 let packet = unwrap!(packet_opt);
                 assert_eq!(packet.fields(), Ipv4Fields {
-                    source_ip: nat_ip,
+                    source_ip: public_ip,
                     dest_ip: *remote_addr.ip(),
                     ttl: initial_ttl - 1,
                 });
@@ -358,13 +358,13 @@ fn test() {
                 let packet = Ipv4Packet::new_from_fields_recursive(
                     Ipv4Fields {
                         source_ip: *remote_addr.ip(),
-                        dest_ip: nat_ip,
+                        dest_ip: public_ip,
                         ttl: initial_ttl,
                     },
                     Ipv4PayloadFields::Udp {
                         fields: UdpFields::V4 {
                             source_addr: remote_addr,
-                            dest_addr: SocketAddrV4::new(nat_ip, mapped_port),
+                            dest_addr: SocketAddrV4::new(public_ip, mapped_port),
                         },
                         payload: payload.clone(),
                     },

@@ -26,7 +26,7 @@ where
         subnet: SubnetV4,
     ) -> (JoinHandle<R>, Ipv4Plug) {
         let address = subnet.random_client_addr();
-        let mut iface = IfaceBuilder::new();
+        let mut iface = EtherIfaceBuilder::new();
         iface.address(address);
         iface.netmask(subnet.netmask());
         iface.route(RouteV4::new(SubnetV4::global(), None));

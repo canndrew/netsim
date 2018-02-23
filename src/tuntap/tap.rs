@@ -6,7 +6,7 @@ use sys;
 use get_if_addrs;
 
 quick_error! {
-    /// Error returned by `IfaceBuilder::build`
+    /// Error returned by `EtherIfaceBuilder::build`
     #[allow(missing_docs)]
     #[derive(Debug)]
     pub enum IfaceBuildError {
@@ -75,10 +75,11 @@ quick_error! {
     }
 }
 
-/// This object can be used to set the configuration options for a `Tap` before creating the `Tap`
+/// This object can be used to set the configuration options for a `EtherIface` before creating the
+/// `EtherIface`
 /// using `build`.
 #[derive(Debug)]
-pub struct IfaceBuilder {
+pub struct EtherIfaceBuilder {
     name: String,
     //address: Option<IfaceAddrV4>,
     address: Ipv4Addr,
@@ -96,9 +97,9 @@ pub struct IfaceAddrV4 {
 }
 */
 
-impl Default for IfaceBuilder {
-    fn default() -> IfaceBuilder {
-        IfaceBuilder {
+impl Default for EtherIfaceBuilder {
+    fn default() -> EtherIfaceBuilder {
+        EtherIfaceBuilder {
             name: String::from("netsim"),
             address: ipv4!("0.0.0.0"),
             netmask: ipv4!("0.0.0.0"),
@@ -119,9 +120,9 @@ mod ioctl {
     ioctl!(write tunsetiff with b'T', 202; c_int);
 }
 
-impl IfaceBuilder {
-    /// Start building a new `Tap` with the default configuration options.
-    pub fn new() -> IfaceBuilder {
+impl EtherIfaceBuilder {
+    /// Start building a new `EtherIface` with the default configuration options.
+    pub fn new() -> EtherIfaceBuilder {
         Default::default()
     }
 
@@ -148,11 +149,11 @@ impl IfaceBuilder {
         self
     }
 
-    /// Consume this `IfaceBuilder` and build a `PreTap`. This creates the TAP device but does not
+    /// Consume this `EtherIfaceBuilder` and build a `UnboundEtherIface`. This creates the TAP device but does not
     /// bind it to a tokio event loop. This is useful if the event loop lives in a different thread
-    /// to where you need to create the device. You can send a `PreTap` to another thread then
-    /// `bind` it to create your `Tap`.
-    pub fn build_unbound(self) -> Result<PreTap, IfaceBuildError> {
+    /// to where you need to create the device. You can send a `UnboundEtherIface` to another thread then
+    /// `bind` it to create your `EtherIface`.
+    pub fn build_unbound(self) -> Result<UnboundEtherIface, IfaceBuildError> {
         let name = match CString::new(self.name.clone()) {
             Ok(name) => name,
             Err(..) => {
@@ -313,40 +314,40 @@ impl IfaceBuilder {
 
         trace!("creating TAP");
 
-        Ok(PreTap { fd })
+        Ok(UnboundEtherIface { fd })
     }
 
-    /// Consume this `IfaceBuilder` and build the TAP interface. The returned `Tap` object can be
+    /// Consume this `EtherIfaceBuilder` and build the TAP interface. The returned `EtherIface` object can be
     /// used to read/write ethernet frames from this interface. `handle` is a handle to a tokio
     /// event loop which will be used for reading/writing.
-    pub fn build(self, handle: &Handle) -> Result<Tap, IfaceBuildError> {
+    pub fn build(self, handle: &Handle) -> Result<EtherIface, IfaceBuildError> {
         Ok(self.build_unbound()?.bind(handle))
     }
 }
 
 /// Represents a TAP device which has been built but not bound to a tokio event loop.
 #[derive(Debug)]
-pub struct PreTap {
+pub struct UnboundEtherIface {
     fd: AsyncFd,
 }
 
-impl PreTap {
-    /// Bind the tap device to the event loop, creating a `Tap` which you can read/write ethernet
+impl UnboundEtherIface {
+    /// Bind the tap device to the event loop, creating a `EtherIface` which you can read/write ethernet
     /// frames with.
-    pub fn bind(self, handle: &Handle) -> Tap {
-        let PreTap { fd } = self;
+    pub fn bind(self, handle: &Handle) -> EtherIface {
+        let UnboundEtherIface { fd } = self;
         let fd = unwrap!(PollEvented::new(fd, handle));
-        Tap { fd }
+        EtherIface { fd }
     }
 }
 
 /// A handle to a virtual (TAP) network interface. Can be used to read/write ethernet frames
 /// directly to the device.
-pub struct Tap {
+pub struct EtherIface {
     fd: PollEvented<AsyncFd>,
 }
 
-impl Stream for Tap {
+impl Stream for EtherIface {
     type Item = EtherFrame;
     type Error = io::Error;
     
@@ -391,7 +392,7 @@ impl Stream for Tap {
     }
 }
 
-impl Sink for Tap {
+impl Sink for EtherIface {
     type SinkItem = EtherFrame;
     type SinkError = io::Error;
     
@@ -438,7 +439,7 @@ mod test {
 
     #[test]
     fn build_tap_name_contains_nul() {
-        let mut tap_builder = IfaceBuilder::new();
+        let mut tap_builder = EtherIfaceBuilder::new();
         tap_builder.address(Ipv4Addr::random_global());
         tap_builder.name("hello\0");
         let res = tap_builder.build_unbound();
@@ -451,12 +452,12 @@ mod test {
     #[test]
     fn build_tap_duplicate_name() {
         let join_handle = spawn::new_namespace(|| {
-            let mut tap_builder = IfaceBuilder::new();
+            let mut tap_builder = EtherIfaceBuilder::new();
             tap_builder.address(Ipv4Addr::random_global());
             tap_builder.name("hello");
             let _tap = unwrap!(tap_builder.build_unbound());
             
-            let mut tap_builder = IfaceBuilder::new();
+            let mut tap_builder = EtherIfaceBuilder::new();
             tap_builder.address(Ipv4Addr::random_global());
             tap_builder.name("hello");
             match tap_builder.build_unbound() {
@@ -472,7 +473,7 @@ mod test {
         let join_handle = spawn::new_namespace(|| {
             unwrap!(unwrap!(capabilities::Capabilities::new()).apply());
 
-            let tap_builder = IfaceBuilder::new();
+            let tap_builder = EtherIfaceBuilder::new();
             match tap_builder.build_unbound() {
                 Err(IfaceBuildError::CreateIfacePermissionDenied) => (),
                 res => panic!("unexpected result: {:?}", res),

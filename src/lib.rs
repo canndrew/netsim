@@ -61,7 +61,7 @@ macro_rules! slice_assert_len {
 mod priv_prelude;
 mod util;
 mod sys;
-mod tap;
+mod tuntap;
 mod async_fd;
 mod route;
 mod subnet;

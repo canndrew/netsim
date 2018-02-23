@@ -8,7 +8,7 @@ use spawn;
 /// can be used to read/write ethernet frames to the spawned thread's interface.
 pub fn with_iface<F, R>(
     handle: &Handle,
-    iface: IfaceBuilder,
+    iface: EtherIfaceBuilder,
     func: F,
 ) -> (JoinHandle<R>, EtherPlug)
 where
@@ -48,7 +48,7 @@ where
 }
 
 struct TapTask {
-    tap: Tap,
+    tap: EtherIface,
     frame_tx: UnboundedSender<EtherFrame>,
     frame_rx: UnboundedReceiver<EtherFrame>,
     sending_frame: Option<EtherFrame>,
@@ -179,7 +179,7 @@ mod test {
         let res = core.run(future::lazy(|| {
             trace!("starting");
             let subnet = SubnetV4::random_local();
-            let mut iface = IfaceBuilder::new();
+            let mut iface = EtherIfaceBuilder::new();
             let iface_ip = subnet.random_client_addr();
             let gateway_ip = subnet.gateway_ip();
             iface.address(iface_ip);

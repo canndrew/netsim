@@ -14,7 +14,7 @@ where
     R: Send + 'static,
     F: FnOnce(Ipv4Addr) -> R + Send + 'static
 {
-    let mut iface = IfaceBuilder::new();
+    let mut iface = EtherIfaceBuilder::new();
     let iface_ip = subnet.random_client_addr();
     iface.address(iface_ip);
     iface.netmask(subnet.netmask());

@@ -17,7 +17,7 @@ where
     };
     let nat = nat.subnet(subnet);
 
-    let mut iface = IfaceBuilder::new();
+    let mut iface = EtherIfaceBuilder::new();
     iface.address(subnet.random_client_addr());
     iface.netmask(subnet.netmask());
     iface.route(RouteV4::new(SubnetV4::global(), Some(subnet.gateway_ip())));

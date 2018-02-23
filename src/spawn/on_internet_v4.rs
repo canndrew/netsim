@@ -10,7 +10,7 @@ where
     R: Send + 'static,
     F: FnOnce(Ipv4Addr) -> R + Send + 'static,
 {
-    let mut iface = IfaceBuilder::new();
+    let mut iface = EtherIfaceBuilder::new();
     let iface_ip = Ipv4Addr::random_global();
     iface.address(iface_ip);
     let route = RouteV4::new(SubnetV4::new(iface_ip, 0), None);
