@@ -47,20 +47,13 @@ where
         libc::CLONE_NEWUTS |
         libc::CLONE_NEWUSER;
 
-    //type CbData<R: Send + 'static> = (Box<FnBox<R> + Send>, Arc<JoinHandleInner<R>>);
-    //type CbData = (Box<FnBox<R> + Send>, Arc<JoinHandleInner<R>>);
-    /*
-    struct CbData<R: Send + 'static> {
-        func: Box<FnBox<R> + Send + 'static>,
-        inner: Arc<JoinHandleInner<R>>,
-    }
-    */
-
     struct CbData<R: Send + 'static> {
         func: Box<FnBox<R> + Send + 'static>,
         joiner_tx: mpsc::Sender<JoinHandle<R>>,
         stack_base: *mut u8,
         stack_size: usize,
+        uid: u32,
+        gid: u32,
     }
     
     extern "C" fn clone_cb<R: Send + 'static>(arg: *mut c_void) -> c_int {
@@ -71,7 +64,7 @@ where
             //let data: *mut CbData = arg as *mut _;
             //let data: Box<CbData> = unsafe { Box::from_raw(data) };
             let data = *data;
-            let CbData { func, joiner_tx, stack_base, stack_size } = data;
+            let CbData { func, joiner_tx, stack_base, stack_size, uid, gid } = data;
 
             struct StackBase(*mut u8);
             unsafe impl Send for StackBase {}
@@ -90,7 +83,20 @@ where
             let tid = unsafe {
                 sys::syscall(sys::SYS_gettid as libc::c_long)
             };
+
+            let mut f = unwrap!(File::create("/proc/self/uid_map"));
+            let s = format!("0 {} 1", uid);
+            unwrap!(f.write(s.as_bytes()));
+
+            // TODO: set gids correctly in the namespace
+            let _gid = gid;
+            //let mut f = unwrap!(File::create("/proc/self/gid_map"));
+            //let s = format!("0 {} 1", gid);
+            //unwrap!(f.write(s.as_bytes()));
+
             let joiner = thread::spawn(move || {
+                thread::sleep(Duration::from_secs(1));
+
                 let ret = func.call_box();
 
                 // This will unblock when the clone_cb thread drops the drop_tx. This should be
@@ -128,10 +134,12 @@ where
         0
     }
 
+    let uid = unsafe { sys::geteuid() };
+    let gid = unsafe { sys::getegid() };
     let (joiner_tx, joiner_rx) = mpsc::channel();
     let stack_head = ((stack_base as usize + stack_size + STACK_ALIGN) & !(STACK_ALIGN - 1)) as *mut c_void;
     let func = Box::new(func);
-    let arg: Box<CbData<R>> = Box::new(CbData { func, joiner_tx, stack_base, stack_size });
+    let arg: Box<CbData<R>> = Box::new(CbData { func, joiner_tx, stack_base, stack_size, uid, gid });
     let arg = Box::into_raw(arg) as *mut c_void;
     
     let res = unsafe {

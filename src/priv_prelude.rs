@@ -3,6 +3,7 @@ pub use std::thread::JoinHandle;
 pub use std::collections::{hash_map, HashMap, HashSet, BTreeMap, BTreeSet, VecDeque};
 pub use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 pub use std::io::{Read, Write};
+pub use std::fs::File;
 pub use bytes::{Bytes, BytesMut};
 pub use byteorder::{ByteOrder, NetworkEndian};
 pub use void::{Void, ResultVoidExt};
