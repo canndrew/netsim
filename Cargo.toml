@@ -6,7 +6,7 @@ description = "Network simulator"
 repository = "https://github.com/canndrew/netsim"
 license = "GPL-2.0"
 keywords = ["network", "ip", "testing"]
-categories = ["Development tools", "Network programming", "Simulation"]
+categories = ["development-tools:testing", "network-programming", "simulation"]
 
 [dependencies]
 libc = "0.2.36"
