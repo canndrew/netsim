@@ -17,7 +17,7 @@ pub fn data(mut data: &[u8]) -> u16 {
         let mut d = &data[..CHUNK_SIZE];
         // ... take by 2 bytes and sum them.
         while d.len() >= 2 {
-            accum += NetworkEndian::read_u16(d) as u32;
+            accum += u32::from(NetworkEndian::read_u16(d));
             d = &d[2..];
         }
 
@@ -27,13 +27,13 @@ pub fn data(mut data: &[u8]) -> u16 {
     // Sum the rest that does not fit the last 32-byte chunk,
     // taking by 2 bytes.
     while data.len() >= 2 {
-        accum += NetworkEndian::read_u16(data) as u32;
+        accum += u32::from(NetworkEndian::read_u16(data));
         data = &data[2..];
     }
 
     // Add the last remaining odd byte, if any.
     if let Some(&value) = data.first() {
-        accum += (value as u32) << 8;
+        accum += u32::from(value) << 8;
     }
 
     propagate_carries(accum)
@@ -43,7 +43,7 @@ pub fn data(mut data: &[u8]) -> u16 {
 pub fn combine(checksums: &[u16]) -> u16 {
     let mut accum: u32 = 0;
     for &word in checksums {
-        accum += word as u32;
+        accum += u32::from(word);
     }
     propagate_carries(accum)
 }
@@ -56,7 +56,7 @@ pub fn pseudo_header_ipv4(
     length: u32,
 ) -> u16 {
     let mut proto_len = [0u8; 4];
-    proto_len[1] = protocol.into();
+    proto_len[1] = protocol;
     NetworkEndian::write_u16(&mut proto_len[2..4], length as u16);
 
     combine(&[
@@ -74,7 +74,7 @@ pub fn pseudo_header_ipv6(
     length: u32,
 ) -> u16 {
     let mut proto_len = [0u8; 8];
-    proto_len[7] = protocol.into();
+    proto_len[7] = protocol;
     NetworkEndian::write_u32(&mut proto_len[0..4], length);
     combine(&[
         data(&source_ip.octets()),

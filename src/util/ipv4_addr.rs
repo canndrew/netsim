@@ -33,7 +33,7 @@ impl Ipv4AddrExt for Ipv4Addr {
     }
 
     fn is_reserved(&self) -> bool {
-        u32::from(*self) & 0xf0000000 == 0xf0000000
+        u32::from(*self) & 0xf000_0000 == 0xf000_0000
     }
 }
 

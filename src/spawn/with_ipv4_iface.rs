@@ -187,9 +187,11 @@ fn test() {
 
         let iface_ip = Ipv4Addr::random_global();
 
-        let mut iface = Ipv4IfaceBuilder::new();
-        iface.address(iface_ip);
-        iface.route(RouteV4::new(SubnetV4::global(), None));
+        let iface = {
+            Ipv4IfaceBuilder::new()
+            .address(iface_ip)
+            .route(RouteV4::new(SubnetV4::global(), None))
+        };
 
         let (join_handle, ipv4_plug) = with_ipv4_iface(&handle, iface, move || {
             let buffer_out = rand::random::<[u8; 8]>();

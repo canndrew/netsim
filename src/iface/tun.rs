@@ -170,7 +170,7 @@ impl Sink for Ipv4Iface {
         }
         */
 
-        match self.fd.write(&item.as_bytes()) {
+        match self.fd.write(item.as_bytes()) {
             Ok(n) => {
                 trace!("wrote {} bytes of TUN data to interface", n);
                 assert_eq!(n, item.as_bytes().len());

@@ -114,7 +114,7 @@ impl Ipv4Packet {
 
         match *payload {
             Ipv4Payload::Udp(ref udp) => buffer[20..].clone_from_slice(udp.as_bytes()),
-            Ipv4Payload::Unknown { ref payload, .. } => buffer[20..].clone_from_slice(&payload),
+            Ipv4Payload::Unknown { ref payload, .. } => buffer[20..].clone_from_slice(payload),
         }
 
         Ipv4Packet {

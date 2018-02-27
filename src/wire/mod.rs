@@ -1,5 +1,7 @@
 //! Types for describing ethernet/IP packets.
 
+#![cfg_attr(feature="clippy", allow(needless_pass_by_value))]
+
 mod arp;
 mod checksum;
 mod ether;

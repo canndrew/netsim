@@ -32,7 +32,7 @@ where
         let private_subnet = {
             self.nat_builder
             .get_subnet()
-            .unwrap_or_else(|| SubnetV4::random_local())
+            .unwrap_or_else(SubnetV4::random_local)
         };
         let nat_builder = self.nat_builder.subnet(private_subnet);
         let (join_handle, client_plug) = self.node.build(handle, private_subnet);

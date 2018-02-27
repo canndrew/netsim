@@ -179,15 +179,17 @@ mod test {
         let res = core.run(future::lazy(|| {
             trace!("starting");
             let subnet = SubnetV4::random_local();
-            let mut iface = EtherIfaceBuilder::new();
             let iface_ip = subnet.random_client_addr();
             let gateway_ip = subnet.gateway_ip();
-            iface.address(iface_ip);
-            iface.netmask(subnet.netmask());
-            iface.route(RouteV4::new(
-                SubnetV4::new(ipv4!("0.0.0.0"), 0),
-                Some(gateway_ip),
-            ));
+            let iface = {
+                EtherIfaceBuilder::new()
+                .address(iface_ip)
+                .netmask(subnet.netmask())
+                .route(RouteV4::new(
+                    SubnetV4::new(ipv4!("0.0.0.0"), 0),
+                    Some(gateway_ip),
+                ))
+            };
 
             let payload: [u8; 8] = rand::random();
             let target_ip = Ipv4Addr::random_global();

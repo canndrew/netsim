@@ -178,7 +178,7 @@ impl Future for EtherAdaptorV4 {
                                 self.ipv4_addr, self.mac_addr, frame, packet
                             );
                             let _ = self.ether_plug.tx.unbounded_send(frame);
-                            self.arp_pending.entry(dest_ip).or_insert(Vec::new()).push(packet);
+                            self.arp_pending.entry(dest_ip).or_insert_with(Vec::new).push(packet);
                             continue;
                         },
                     };

@@ -106,7 +106,7 @@ impl EtherFrame {
         buffer[14..].clone_from_slice(match payload {
             EtherPayload::Arp(ref arp) => arp.as_bytes(),
             EtherPayload::Ipv4(ref ipv4) => ipv4.as_bytes(),
-            EtherPayload::Unknown { ref payload, .. } => &payload,
+            EtherPayload::Unknown { ref payload, .. } => payload,
         });
 
         EtherFrame {

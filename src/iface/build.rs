@@ -235,7 +235,7 @@ pub fn build(builder: IfaceBuilder, is_tap: bool) -> Result<AsyncFd, IfaceBuildE
 
         req.ifr_ifru.ifru_flags |= (sys::IFF_UP as u32 | sys::IFF_RUNNING as u32) as i16;
 
-        if ioctl::siocsifflags(fd, &mut req) < 0 {
+        if ioctl::siocsifflags(fd, &req) < 0 {
             let _ = sys::close(fd);
             panic!("unexpected error from SIOCSIFFLAGS ioctl: {}", io::Error::last_os_error());
         }
@@ -244,7 +244,7 @@ pub fn build(builder: IfaceBuilder, is_tap: bool) -> Result<AsyncFd, IfaceBuildE
 
     for route in builder.routes {
         trace!("adding route {:?} to {}", route, real_name);
-        match route.add(&real_name) {
+        match route.add_to_routing_table(&real_name) {
             Ok(()) => (),
             Err(AddRouteError::ProcessFileDescriptorLimit(e)) => {
                 return Err(IfaceBuildError::ProcessFileDescriptorLimit(e));

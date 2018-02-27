@@ -49,7 +49,7 @@ impl RouteV4 {
     }
 
     /// Add the route to the routing table of the current network namespace.
-    pub fn add(self, iface_name: &str) -> Result<(), AddRouteError> {
+    pub fn add_to_routing_table(self, iface_name: &str) -> Result<(), AddRouteError> {
         add_route(self.destination, self.gateway, iface_name)
     }
 }
@@ -115,7 +115,7 @@ pub fn add_route(
     route.rt_dev = name.as_ptr() as *mut _;
 
     let res = unsafe {
-        sys::ioctl(fd, sys::SIOCADDRT as u64, &route)
+        sys::ioctl(fd, u64::from(sys::SIOCADDRT), &route)
     };
     if res != 0 {
         let os_err = io::Error::last_os_error();

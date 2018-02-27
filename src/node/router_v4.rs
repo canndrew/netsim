@@ -29,7 +29,7 @@ macro_rules! tuple_impl {
                             let mut n_reversed = 0;
                             for i in 0..32 {
                                 if n & (1 << i) != 0 {
-                                    n_reversed |= 0x80000000u32 >> i;
+                                    n_reversed |= 0x8000_0000u32 >> i;
                                 }
                             }
                             let base_addr = u32::from(subnet.base_addr());

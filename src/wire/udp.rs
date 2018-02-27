@@ -20,7 +20,7 @@ impl fmt::Debug for UdpPacket {
 
 /// Represents the header fields of a UDP packet. Also includes IP addresses as these are needed to
 /// calculate/verify the packet checksum.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum UdpFields {
     /// A UDP packet stored in an Ipv4 packet.
     V4 {
@@ -55,7 +55,7 @@ fn set_fields(buffer: &mut [u8], fields: UdpFields) {
                     *source_addr.ip(),
                     *dest_addr.ip(),
                     17,
-                    len as u32,
+                    u32::from(len),
                 ),
                 checksum::data(&buffer[..]),
             ]);
@@ -77,7 +77,7 @@ fn set_fields(buffer: &mut [u8], fields: UdpFields) {
                     *source_addr.ip(),
                     *dest_addr.ip(),
                     17,
-                    len as u32,
+                    u32::from(len),
                 ),
                 checksum::data(&buffer[..]),
             ]);
@@ -155,7 +155,7 @@ impl UdpPacket {
     ) -> bool {
         let len = NetworkEndian::read_u16(&self.buffer[4..6]);
         !0 == checksum::combine(&[
-            checksum::pseudo_header_ipv4(source_ip, dest_ip, 17, len as u32),
+            checksum::pseudo_header_ipv4(source_ip, dest_ip, 17, u32::from(len)),
             checksum::data(&self.buffer[..]),
         ])
     }

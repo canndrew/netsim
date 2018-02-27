@@ -95,7 +95,7 @@ impl NatV4Builder {
         private_plug: Ipv4Plug,
         public_ip: Ipv4Addr,
     ) -> NatV4 {
-        let subnet = self.subnet.unwrap_or(SubnetV4::random_local());
+        let subnet = self.subnet.unwrap_or_else(SubnetV4::random_local);
         let ret = NatV4 {
             private_plug: private_plug,
             public_plug: public_plug,

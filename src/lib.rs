@@ -170,6 +170,9 @@
 #![cfg_attr(feature="clippy", plugin(clippy))]
 
 #![deny(missing_docs)]
+#![cfg_attr(feature="clippy", allow(redundant_field_names))]
+#![cfg_attr(feature="clippy", allow(single_match))]
+#![cfg_attr(feature="clippy", allow(match_same_arms))]
 
 extern crate libc;
 extern crate rand;
@@ -205,6 +208,7 @@ extern crate statrs;
 /// Convert a variable-length slice to a fixed-length array
 macro_rules! slice_assert_len {
     ($len:tt, $slice:expr) => {{
+
         use std::ptr;
 
         union MaybeUninit<T: Copy> {
@@ -212,12 +216,12 @@ macro_rules! slice_assert_len {
             uninit: (),
         }
         
+        assert_eq!($slice.len(), $len);
         let mut array: MaybeUninit<[_; $len]> = MaybeUninit { uninit: () };
         let slice: &[_] = $slice;
-        for i in 0..$len {
-            let x = slice[i];
+        for (i, x) in slice.iter().enumerate() {
             unsafe {
-                ptr::write(&mut array.init[i], x)
+                ptr::write(&mut array.init[i], *x)
             }
         }
 

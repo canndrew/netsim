@@ -17,8 +17,9 @@ impl SubnetV4 {
     ///
     /// Create the subnet 192.168.0.0/24 with `SubnetV4::new(ipv4!("192.168.0.0"), 24)`
     pub fn new(addr: Ipv4Addr, bits: u8) -> SubnetV4 {
+        let mask = !(0xffff_ffffu32.checked_shr(u32::from(bits)).unwrap_or(0));
         SubnetV4 {
-            addr: Ipv4Addr::from(u32::from(addr) & !(0xffffffffu32.checked_shr(bits as u32).unwrap_or(0))),
+            addr: Ipv4Addr::from(u32::from(addr) & mask),
             bits: bits,
         }
     }
@@ -79,7 +80,7 @@ impl SubnetV4 {
 
     /// Get the netmask as an IP address
     pub fn netmask(&self) -> Ipv4Addr {
-        Ipv4Addr::from(!(0xffffffffu32.checked_shr(self.bits as u32).unwrap_or(0)))
+        Ipv4Addr::from(!(0xffff_ffffu32.checked_shr(u32::from(self.bits)).unwrap_or(0)))
     }
 
     /// Get the number of netmask bits
@@ -101,7 +102,7 @@ impl SubnetV4 {
     /// Get a random IP address from the subnet which is not the base address or the default
     /// for the gateway address.
     pub fn random_client_addr(&self) -> Ipv4Addr {
-        let mask = 0xffffffff >> self.bits;
+        let mask = 0xffff_ffff >> self.bits;
         assert!(mask > 1);
 
         let addr = loop {
@@ -118,7 +119,7 @@ impl SubnetV4 {
     pub fn contains(&self, ip: Ipv4Addr) -> bool {
         let base_addr = u32::from(self.addr);
         let test_addr = u32::from(ip);
-        (base_addr ^ test_addr).leading_zeros() >= self.bits as u32
+        (base_addr ^ test_addr).leading_zeros() >= u32::from(self.bits)
     }
 }
 

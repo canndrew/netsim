@@ -15,6 +15,7 @@ impl<F, R> FnBox<R> for F
 where
     F: FnOnce() -> R
 {
+    #[cfg_attr(feature="clippy", allow(boxed_local))]
     fn call_box(self: Box<Self>) -> R {
         (*self)()
     }
@@ -81,7 +82,7 @@ where
             // our own `JoinHandle` though.
 
             let tid = unsafe {
-                sys::syscall(sys::SYS_gettid as libc::c_long)
+                sys::syscall(libc::c_long::from(sys::SYS_gettid))
             };
 
             let mut f = unwrap!(File::create("/proc/self/uid_map"));
@@ -115,7 +116,7 @@ where
                 // TODO: Figure out a non-racy way of implementing this.
                 for _ in 0..100 {
                     let res = unsafe {
-                        sys::syscall(sys::SYS_tkill as libc::c_long, tid, 0)
+                        sys::syscall(libc::c_long::from(sys::SYS_tkill), tid, 0)
                     };
                     if res == 0 {
                         break;
