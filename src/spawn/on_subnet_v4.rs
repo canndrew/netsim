@@ -13,11 +13,13 @@ where
     R: Send + 'static,
     F: FnOnce(Ipv4Addr) -> R + Send + 'static
 {
-    let mut iface = Ipv4IfaceBuilder::new();
     let iface_ip = subnet.random_client_addr();
-    iface.address(iface_ip);
-    iface.netmask(subnet.netmask());
-    iface.route(RouteV4::new(subnet, None));
+    let iface = {
+        Ipv4IfaceBuilder::new()
+        .address(iface_ip)
+        .netmask(subnet.netmask())
+        .route(RouteV4::new(subnet, None))
+    };
 
     let (join_handle, ipv4_plug) = spawn::with_ipv4_iface(handle, iface, move || func(iface_ip));
 

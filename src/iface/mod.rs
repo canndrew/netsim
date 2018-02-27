@@ -1,3 +1,5 @@
+//! Contains utilities for creating virtual TUN/TAP network interfaces.
+
 mod tap;
 mod tun;
 mod build;

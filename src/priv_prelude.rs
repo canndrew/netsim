@@ -29,7 +29,7 @@ pub use util::duration::DurationExt;
 pub use wire::*;
 pub use route::{RouteV4, AddRouteError};
 pub use subnet::{SubnetV4, SubnetV6};
-pub use tuntap::{IfaceBuildError, EtherIface, EtherIfaceBuilder, Ipv4Iface, Ipv4IfaceBuilder};
+pub use iface::{IfaceBuildError, EtherIface, EtherIfaceBuilder, Ipv4Iface, Ipv4IfaceBuilder};
 pub use device::{EtherAdaptorV4, NatV4Builder, LatencyV4, HopV4, RouterV4Builder};
 pub use node::Ipv4Node;
 

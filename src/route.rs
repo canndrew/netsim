@@ -38,10 +38,12 @@ impl RouteV4 {
         }
     }
 
+    /// Get the destination subnet of the route.
     pub fn destination(&self) -> SubnetV4 {
         self.destination
     }
 
+    /// Get the route's gateway (if any).
     pub fn gateway(&self) -> Option<Ipv4Addr> {
         self.gateway
     }

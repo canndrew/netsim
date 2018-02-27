@@ -18,10 +18,12 @@ where
     };
     let nat = nat.subnet(subnet);
 
-    let mut iface = Ipv4IfaceBuilder::new();
-    iface.address(subnet.random_client_addr());
-    iface.netmask(subnet.netmask());
-    iface.route(RouteV4::new(SubnetV4::global(), Some(subnet.gateway_ip())));
+    let iface = {
+        Ipv4IfaceBuilder::new()
+        .address(subnet.random_client_addr())
+        .netmask(subnet.netmask())
+        .route(RouteV4::new(SubnetV4::global(), Some(subnet.gateway_ip())))
+    };
 
     let (join_handle, ipv4_plug) = spawn::with_ipv4_iface(handle, iface, func);
 

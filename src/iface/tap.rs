@@ -2,7 +2,7 @@
 
 use priv_prelude::*;
 use sys;
-use tuntap::build::{IfaceBuilder, build};
+use iface::build::{IfaceBuilder, build};
 
 /// This object can be used to set the configuration options for a `EtherIface` before creating the
 /// `EtherIface`
@@ -32,24 +32,25 @@ impl EtherIfaceBuilder {
     }
 
     /// Set the interface name.
-    pub fn name<S: Into<String>>(&mut self, name: S) -> &mut Self {
+    pub fn name<S: Into<String>>(mut self, name: S) -> Self {
         self.builder.name = name.into();
         self
     }
 
-    /// Set the interface address and netmask.
-    pub fn address(&mut self, address: Ipv4Addr) -> &mut Self {
+    /// Set the interface address.
+    pub fn address(mut self, address: Ipv4Addr) -> Self {
         self.builder.address = address;
         self
     }
 
-    pub fn netmask(&mut self, netmask: Ipv4Addr) -> &mut Self {
+    /// Set the interface netmask.
+    pub fn netmask(mut self, netmask: Ipv4Addr) -> Self {
         self.builder.netmask = netmask;
         self
     }
 
     /// Add a route to the set of routes that will be created and directed through this interface.
-    pub fn route(&mut self, route: RouteV4) -> &mut Self {
+    pub fn route(mut self, route: RouteV4) -> Self {
         self.builder.routes.push(route);
         self
     }
