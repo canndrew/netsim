@@ -1,8 +1,11 @@
 use priv_prelude::*;
 
+/// A set of clients that can be attached to a router node.
 pub trait RouterClientsV4 {
+    /// The output of the nodes attached to the router.
     type Output: Send + 'static;
 
+    /// Build the set of nodes.
     fn build(self, handle: &Handle, subnet: SubnetV4) -> (JoinHandle<Self::Output>, Ipv4Plug);
 }
 

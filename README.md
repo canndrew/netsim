@@ -1,8 +1,8 @@
 # netsim - A Rust library for network simulation and testing (currently linux-only).
 
 `netsim` is a crate for simulating networks for the sake of testing network-oriented Rust
-software. You can use it to run Rust functions in network-isolated containers, and assemble
-virtual network for these functions to communicate over.
+code. You can use it to run Rust functions in network-isolated containers, and assemble
+virtual networks for these functions to communicate over.
 
 ### Spawning threads into isolated network namespaces
 
@@ -36,7 +36,7 @@ environment. However an environment with no network interfaces is pretty useless
 
 ### Creating virtual interfaces
 
-We can create virtual IP and Ethernet interfaces using the type in the `iface` module. For
+We can create virtual IP and Ethernet interfaces using the types in the `iface` module. For
 example, `Ipv4Iface` lets you create a new IP (TUN) interface and implements `futures::{Stream,
 Sink}` so that you can read/write raw packets to it.
 

@@ -1,6 +1,6 @@
 //! `netsim` is a crate for simulating networks for the sake of testing network-oriented Rust
-//! software. You can use it to run Rust functions in network-isolated containers, and assemble
-//! virtual network for these functions to communicate over.
+//! code. You can use it to run Rust functions in network-isolated containers, and assemble
+//! virtual networks for these functions to communicate over.
 //!
 //! # Spawning threads into isolated network namespaces
 //!
@@ -34,7 +34,7 @@
 //!
 //! # Creating virtual interfaces
 //!
-//! We can create virtual IP and Ethernet interfaces using the type in the `iface` module. For
+//! We can create virtual IP and Ethernet interfaces using the types in the `iface` module. For
 //! example, `Ipv4Iface` lets you create a new IP (TUN) interface and implements `futures::{Stream,
 //! Sink}` so that you can read/write raw packets to it.
 //!
@@ -164,7 +164,7 @@
 //! It's possible to set up more complicated (non-hierarchal) network topologies, ethernet
 //! networks, namespaces with multiple interfaces etc. by directly using the primitives in this
 //! library. Have an explore of the API, and if anything needs clarification or could be designed
-//! better then drop a message on the bugtracker.
+//! better then drop a message on the bug tracker :)
 
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
@@ -244,5 +244,5 @@ pub mod wire;
 pub mod spawn;
 
 pub use subnet::SubnetV4;
-pub use route::RouteV4;
+pub use route::{RouteV4, AddRouteError};
 

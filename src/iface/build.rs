@@ -4,7 +4,7 @@ use libc;
 use get_if_addrs;
 
 quick_error! {
-    /// Error returned by `EtherIfaceBuilder::build`
+    /// Error raised when `netsim` fails to build an interface.
     #[allow(missing_docs)]
     #[derive(Debug)]
     pub enum IfaceBuildError {
