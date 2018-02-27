@@ -3,6 +3,10 @@ name = "netsim"
 version = "0.1.0"
 authors = ["Andrew Cann <shum@canndrew.org>"]
 description = "Network simulator"
+repository = "https://github.com/canndrew/netsim"
+license = "GPL-2.0"
+keywords = ["network", "ip", "testing"]
+categories = ["Development tools", "Network programming", "Simulation"]
 
 [dependencies]
 libc = "0.2.36"
@@ -25,7 +29,7 @@ env_logger = "0.4.0"
 capabilities = "0.3.0"
 byteorder = "1.2.1"
 statrs = "0.9.0"
-clippy = { version = "*", optional = true }
+clippy = { version = "0.0.187", optional = true }
 
 [build-dependencies]
 bindgen = "0.30.0"
