@@ -1,12 +1,13 @@
 [package]
 name = "netsim"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Andrew Cann <shum@canndrew.org>"]
 description = "Network simulator"
 repository = "https://github.com/canndrew/netsim"
 license = "GPL-2.0"
 keywords = ["network", "ip", "testing"]
-categories = ["development-tools:testing", "network-programming", "simulation"]
+categories = ["development-tools::testing", "network-programming", "simulation"]
+readme = "README.md"
 
 [dependencies]
 libc = "0.2.36"
