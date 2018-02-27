@@ -166,5 +166,5 @@ separate thread. A future version of this library may clean this situation up.
 It's possible to set up more complicated (non-hierarchal) network topologies, ethernet
 networks, namespaces with multiple interfaces etc. by directly using the primitives in this
 library. Have an explore of the API, and if anything needs clarification or could be designed
-better then drop a message on the bugtracker.
+better then drop a message on the bug tracker :)
 
