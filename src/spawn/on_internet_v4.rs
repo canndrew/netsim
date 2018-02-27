@@ -1,7 +1,7 @@
 use priv_prelude::*;
 use spawn;
 
-// TODO: this should use a TUN interface rather than a TAP and adding an extra hop.
+/// Spawn a thread with a single network interface with a global IP address.
 pub fn on_internet_v4<F, R>(
     handle: &Handle,
     func: F,

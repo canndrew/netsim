@@ -203,7 +203,6 @@ fn test() {
             assert_eq!(n, 8);
             assert_eq!(recv_addr, SocketAddr::V4(remote_addr));
             assert_eq!(buffer_out, buffer_in);
-            trace!("spawned namespace exiting");
         });
 
         let Ipv4Plug { tx: plug_tx, rx: plug_rx } = ipv4_plug;
@@ -227,7 +226,7 @@ fn test() {
                 Ipv4Fields {
                     source_ip: remote_ip,
                     dest_ip: iface_ip,
-                    ttl: 64,
+                    ttl: 12,
                 },
                 Ipv4PayloadFields::Udp {
                     fields: UdpFields::V4 {

@@ -1,6 +1,8 @@
 use priv_prelude::*;
 
 #[derive(Debug)]
+/// Adapts between an Ipv4 network and a raw ethernet network. This can, for instance, act as a
+/// gateway between an ethernet network and the Ipv4 internet.
 pub struct EtherAdaptorV4 {
     ether_plug: EtherPlug,
     ipv4_plug: Ipv4Plug,
@@ -11,6 +13,7 @@ pub struct EtherAdaptorV4 {
 }
 
 impl EtherAdaptorV4 {
+    /// Create a new adaptor with the given IP address which connects the two given networks.
     pub fn new(addr: Ipv4Addr, ether: EtherPlug, ipv4: Ipv4Plug) -> EtherAdaptorV4 {
         let mac_addr = MacAddr::random();
         let ret = EtherAdaptorV4 {
@@ -25,10 +28,12 @@ impl EtherAdaptorV4 {
         ret
     }
 
+    /// Get the MAC address of the adaptor
     pub fn mac_addr(&self) -> MacAddr {
         self.mac_addr
     }
 
+    /// Create a new adaptor and spawn it directly onto the tokio event loop.
     pub fn spawn(
         handle: &Handle,
         addr: Ipv4Addr,

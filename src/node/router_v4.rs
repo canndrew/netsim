@@ -10,7 +10,7 @@ macro_rules! tuple_impl {
     ($($ty:ident,)*) => {
         impl<$($ty),*> RouterClientsV4 for ($($ty,)*)
         where
-            $($ty: Node,)*
+            $($ty: Ipv4Node,)*
         {
             type Output = ($($ty::Output,)*);
             
@@ -101,11 +101,12 @@ pub struct ImplNode<C> {
     clients: C,
 }
 
+/// Spawns a bunch of sub-nodes and routes packets between them.
 pub fn router_v4<C: RouterClientsV4>(clients: C) -> ImplNode<C> {
     ImplNode { clients }
 }
 
-impl<C> Node for ImplNode<C>
+impl<C> Ipv4Node for ImplNode<C>
 where
     C: RouterClientsV4,
 {

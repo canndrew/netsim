@@ -5,9 +5,10 @@ pub struct ImplNode<N> {
     node: N,
 }
 
+/// Create a node for an Ipv4 NAT.
 pub fn nat_v4<N>(nat_builder: NatV4Builder, node: N) -> ImplNode<N>
 where
-    N: Node,
+    N: Ipv4Node,
 {
     ImplNode {
         nat_builder,
@@ -15,9 +16,9 @@ where
     }
 }
 
-impl<N> Node for ImplNode<N>
+impl<N> Ipv4Node for ImplNode<N>
 where
-    N: Node,
+    N: Ipv4Node,
 {
     type Output = N::Output;
 

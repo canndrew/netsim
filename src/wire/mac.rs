@@ -1,6 +1,7 @@
 use priv_prelude::*;
 use rand;
 
+/// An ethernet hardware MAC address.
 #[derive(Clone, Copy, PartialEq)]
 pub struct MacAddr {
     bytes: [u8; 6],
@@ -26,10 +27,12 @@ impl fmt::Display for MacAddr {
 }
 
 impl MacAddr {
+    /// The broadcast ethernet address.
     pub const BROADCAST: MacAddr = MacAddr {
         bytes: [0xff, 0xff, 0xff, 0xff, 0xff, 0xff],
     };
 
+    /// Create a `MacAddr` from the given 6-byte buffer.
     pub fn from_bytes(bytes: &[u8]) -> MacAddr {
         let mut b = [0u8; 6];
         b[..].clone_from_slice(bytes);
@@ -38,10 +41,12 @@ impl MacAddr {
         }
     }
 
+    /// Get the address as a slice of bytes.
     pub fn as_bytes(&self) -> &[u8] {
         &self.bytes[..]
     }
 
+    /// Generate a random MAC address.
     pub fn random() -> MacAddr {
         let mut b: [u8; 6] = rand::random();
         b[0] &= 0xfc;
@@ -50,6 +55,7 @@ impl MacAddr {
         }
     }
 
+    /// Checks weather this is the broadcast address.
     pub fn is_broadcast(&self) -> bool {
         *self == MacAddr::BROADCAST
     }

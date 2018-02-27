@@ -1,11 +1,13 @@
 use priv_prelude::*;
 
+/// Builder for creating a `RouterV4`.
 pub struct RouterV4Builder {
     ipv4_addr: Ipv4Addr,
     connections: Vec<(Ipv4Plug, Vec<RouteV4>)>,
 }
 
 impl RouterV4Builder {
+    /// Start creating a new `RouterV4` with the given IP address.
     pub fn new(ipv4_addr: Ipv4Addr) -> RouterV4Builder {
         RouterV4Builder {
             ipv4_addr: ipv4_addr,
@@ -13,20 +15,27 @@ impl RouterV4Builder {
         }
     }
 
+    /// Connect another client to the router. `routes` indicates what packets from other clients
+    /// should be routed down this connection. When determining where to route a packet, the
+    /// `RouterV4` will examine each connection and set of routes in the order they were added
+    /// using this function.
     pub fn connect(mut self, plug: Ipv4Plug, routes: Vec<RouteV4>) -> RouterV4Builder {
         self.connections.push((plug, routes));
         self
     }
 
+    /// Build the `RouterV4`
     pub fn build(self) -> RouterV4 {
         RouterV4::new(self.ipv4_addr, self.connections)
     }
 
+    /// Build the `RouterV4`, spawning it directly onto the tokio event loop.
     pub fn spawn(self, handle: &Handle) {
         RouterV4::spawn(handle, self.ipv4_addr, self.connections)
     }
 }
 
+/// Connects a bunch of Ipv4 networks and routes packets between them.
 pub struct RouterV4 {
     rxs: Vec<UnboundedReceiver<Ipv4Packet>>,
     txs: Vec<(UnboundedSender<Ipv4Packet>, Vec<RouteV4>)>,
@@ -34,6 +43,8 @@ pub struct RouterV4 {
 }
 
 impl RouterV4 {
+    /// Create a new router with the given connections. You can also use `RouterV4Builder` to add
+    /// connections individually.
     pub fn new(ipv4_addr: Ipv4Addr, connections: Vec<(Ipv4Plug, Vec<RouteV4>)>) -> RouterV4 {
         let mut rxs = Vec::with_capacity(connections.len());
         let mut txs = Vec::with_capacity(connections.len());
@@ -45,6 +56,7 @@ impl RouterV4 {
         RouterV4 { rxs, txs, ipv4_addr }
     }
 
+    /// Create a new `RouterV4`, spawning it directly onto the tokio event loop.
     pub fn spawn(
         handle: &Handle,
         ipv4_addr: Ipv4Addr,

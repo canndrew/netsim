@@ -1,6 +1,7 @@
 use priv_prelude::*;
 
 #[derive(Debug)]
+/// An Ipv4 NAT.
 pub struct NatV4 {
     private_plug: Ipv4Plug,
     public_plug: Ipv4Plug,
@@ -13,6 +14,7 @@ pub struct NatV4 {
 }
 
 impl NatV4 {
+    /// Create a new Ipv4 NAT
     pub fn new(
         public_plug: Ipv4Plug,
         private_plug: Ipv4Plug,
@@ -33,6 +35,7 @@ impl NatV4 {
         ret
     }
 
+    /// Create a new Ipv4 NAT, spawning it directly onto the tokio event loop.
     pub fn spawn(
         handle: &Handle,
         public_plug: Ipv4Plug,
@@ -46,6 +49,7 @@ impl NatV4 {
 }
 
 #[derive(Default)]
+/// A builder for `NatV4`
 pub struct NatV4Builder {
     subnet: Option<SubnetV4>,
     hair_pinning: bool,
@@ -54,30 +58,37 @@ pub struct NatV4Builder {
 }
 
 impl NatV4Builder {
+    /// Start building an Ipv4 NAT
     pub fn new() -> NatV4Builder {
         NatV4Builder::default()
     }
 
+    /// Set the subnet used on the local side of the NAT. If left unset, a random subnet will be
+    /// chosen.
     pub fn subnet(mut self, subnet: SubnetV4) -> NatV4Builder {
         self.subnet = Some(subnet);
         self
     }
 
+    /// Get the subnet set by the last call to `subnet` (if any).
     pub fn get_subnet(&self) -> Option<SubnetV4> {
         self.subnet
     }
 
+    /// Enable/disable hair-pinning.
     pub fn hair_pinning(mut self, hair_pinning: bool) -> NatV4Builder {
         self.hair_pinning = hair_pinning;
         self
     }
 
+    /// Manually forward a UDP port.
     pub fn forward_udp_port(mut self, port: u16, local_addr: SocketAddrV4) -> NatV4Builder {
         self.udp_map_out.insert(local_addr, port);
         self.udp_map_in.insert(port, local_addr);
         self
     }
 
+    /// Build the NAT
     pub fn build(
         self, 
         public_plug: Ipv4Plug,
@@ -99,6 +110,7 @@ impl NatV4Builder {
         ret
     }
 
+    /// Build the NAT, spawning it directly onto the tokio event loop.
     pub fn spawn(
         self,
         handle: &Handle,

@@ -170,7 +170,10 @@ impl Sink for Ipv4Iface {
         */
 
         match self.fd.write(&item.as_bytes()) {
-            Ok(n) => assert_eq!(n, item.as_bytes().len()),
+            Ok(n) => {
+                trace!("wrote {} bytes of TUN data to interface", n);
+                assert_eq!(n, item.as_bytes().len());
+            },
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 self.fd.need_write();
                 return Ok(AsyncSink::NotReady(item));

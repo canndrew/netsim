@@ -2,6 +2,7 @@ use priv_prelude::*;
 use future_utils;
 
 #[derive(Clone, PartialEq)]
+/// Represents an ethernet frame.
 pub struct EtherFrame {
     buffer: Bytes,
 }
@@ -23,33 +24,50 @@ impl fmt::Debug for EtherFrame {
     }
 }
 
+/// The header fields of an ethernet packet.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct EtherFields {
+    /// The frame's source MAC address.
     pub source_mac: MacAddr,
+    /// The frame's destination MAC address.
     pub dest_mac: MacAddr,
 }
 
 #[derive(Clone, Debug)]
+/// The payload of an ethernet frame.
 pub enum EtherPayload {
+    /// An ARP packet
     Arp(ArpPacket),
+    /// An Ipv4 packet
     Ipv4(Ipv4Packet),
+    /// A packet with an unrecognised protocol.
     Unknown {
+        /// The ethertype of the protocol.
         ethertype: u16, 
+        /// The packet's payload data.
         payload: Bytes,
     },
 }
 
+/// The fields of the payload of an ethernet frame. Can be used along with `EtherFields` to
+/// describe/construct an ethernet frame and its contents.
 pub enum EtherPayloadFields {
+    /// An ARP packet
     Arp {
+        /// The ARP packet's fields.
         fields: ArpFields,
     },
+    /// An Ipv4 packet
     Ipv4 {
+        /// The Ipv4 packet's header fields.
         fields: Ipv4Fields,
+        /// The Ipv4 packet's payload
         payload_fields: Ipv4PayloadFields,
     },
 }
 
 impl EtherPayloadFields {
+    /// The total length of an ethernet frame with this payload
     pub fn total_frame_len(&self) -> usize {
         14 + match *self {
             EtherPayloadFields::Arp { .. } => 28,
@@ -66,6 +84,8 @@ fn set_fields(buffer: &mut [u8], fields: EtherFields) {
 }
 
 impl EtherFrame {
+    /// Construct a new `EthernetFrame`. Using `new_from_fields_recursive` can avoid an extra
+    /// allocation if you are also constructing the frame's payload.
     pub fn new_from_fields(
         fields: EtherFields,
         payload: EtherPayload,
@@ -94,6 +114,7 @@ impl EtherFrame {
         }
     }
 
+    /// Construct a new `EthernetFrame`.
     pub fn new_from_fields_recursive(
         fields: EtherFields,
         payload_fields: EtherPayloadFields,
@@ -107,6 +128,7 @@ impl EtherFrame {
         }
     }
 
+    /// Create a new ethernet frame, writing it to the given buffer.
     pub fn write_to_buffer(
         buffer: &mut [u8],
         fields: EtherFields,
@@ -130,6 +152,7 @@ impl EtherFrame {
         }
     }
 
+    /// Get the fields of this ethernet frame.
     pub fn fields(&self) -> EtherFields {
         EtherFields {
             source_mac: self.source_mac(),
@@ -137,6 +160,7 @@ impl EtherFrame {
         }
     }
 
+    /// Set the fields of this ethernet frame.
     pub fn set_fields(&mut self, fields: EtherFields) {
         let buffer = mem::replace(&mut self.buffer, Bytes::new());
         let mut buffer = BytesMut::from(buffer);
@@ -144,20 +168,24 @@ impl EtherFrame {
         self.buffer = buffer.freeze();
     }
 
+    /// Construct a new ethernet frame from the given buffer.
     pub fn from_bytes(buffer: Bytes) -> EtherFrame {
         EtherFrame {
             buffer,
         }
     }
 
+    /// Get the frame's sender MAC address.
     pub fn source_mac(&self) -> MacAddr {
         MacAddr::from_bytes(&self.buffer[6..12])
     }
 
+    /// Get the frame's destination MAC address.
     pub fn dest_mac(&self) -> MacAddr {
         MacAddr::from_bytes(&self.buffer[0..6])
     }
 
+    /// Get the frame's payload
     pub fn payload(&self) -> EtherPayload {
         match NetworkEndian::read_u16(&self.buffer[12..14]) {
             0x0806 => EtherPayload::Arp(ArpPacket::from_bytes(self.buffer.slice_from(14))),
@@ -169,18 +197,23 @@ impl EtherFrame {
         }
     }
 
+    /// Returns the underlying buffer.
     pub fn as_bytes(&self) -> &Bytes {
         &self.buffer
     }
 }
 
+/// An ethernet connection, used to send/receive ethernet frames to/from the plug at the other end.
 #[derive(Debug)]
 pub struct EtherPlug {
+    /// The sender.
     pub tx: UnboundedSender<EtherFrame>,
+    /// The receiver.
     pub rx: UnboundedReceiver<EtherFrame>,
 }
 
 impl EtherPlug {
+    /// Construct an ethernet 'wire' connection the two given plugs.
     pub fn new_wire() -> (EtherPlug, EtherPlug) {
         let (a_tx, b_rx) = future_utils::mpsc::unbounded();
         let (b_tx, a_rx) = future_utils::mpsc::unbounded();

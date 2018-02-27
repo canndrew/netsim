@@ -1,11 +1,14 @@
 use priv_prelude::*;
 
+/// Connects two `Ipv4Plug`s and adds a hop between them. This causes the TTL value of all packets
+/// to be decremented while travelling along the connection (and dropped if the TLL reaches zero).
 pub struct HopV4 {
     plug_a: Ipv4Plug,
     plug_b: Ipv4Plug,
 }
 
 impl HopV4 {
+    /// Create a new hop by connecting the two given plugs.
     pub fn new(
         plug_a: Ipv4Plug,
         plug_b: Ipv4Plug,
@@ -16,6 +19,8 @@ impl HopV4 {
         }
     }
 
+    /// Create a new hop by connecting the two given plugs. Spawn the `Hopv4` directly onto the
+    /// tokio event loop.
     pub fn spawn(
         handle: &Handle,
         plug_a: Ipv4Plug,

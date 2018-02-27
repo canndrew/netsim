@@ -2,6 +2,7 @@ use priv_prelude::*;
 use super::*;
 use future_utils;
 
+/// An Ipv4 packet.
 #[derive(Clone, PartialEq)]
 pub struct Ipv4Packet {
     buffer: Bytes,
@@ -11,44 +12,63 @@ impl fmt::Debug for Ipv4Packet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let payload = self.payload();
 
-        f
-        .debug_struct("Ipv4Packet")
-        .field("source_ip", &self.source_ip())
-        .field("dest_ip", &self.dest_ip())
-        .field("ttl", &self.ttl())
-        .field("payload", match payload {
-            Ipv4Payload::Udp(ref udp) => udp,
-            Ipv4Payload::Unknown { .. } => &payload,
-        })
-        .finish()
+        if self.verify_checksum() {
+            f
+            .debug_struct("Ipv4Packet")
+            .field("source_ip", &self.source_ip())
+            .field("dest_ip", &self.dest_ip())
+            .field("ttl", &self.ttl())
+            .field("payload", match payload {
+                Ipv4Payload::Udp(ref udp) => udp,
+                Ipv4Payload::Unknown { .. } => &payload,
+            })
+            .finish()
+        } else {
+            write!(f, "INVALID Ipv4Packet")
+        }
     }
 }
 
+/// The header fields of an Ipv4 packet.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Ipv4Fields {
+    /// IP address of the sender.
     pub source_ip: Ipv4Addr,
+    /// IP address of the destination.
     pub dest_ip: Ipv4Addr,
+    /// Packet's time-to-live field. ie. hop count.
     pub ttl: u8,
 }
 
+/// The payload of an Ipv4 packet
 #[derive(Debug, Clone)]
 pub enum Ipv4Payload {
+    /// A UDP payload
     Udp(UdpPacket),
+    /// Payload of some unrecognised protocol.
     Unknown {
+        /// The payload's protocol number.
         protocol: u8,
+        /// The payload data.
         payload: Bytes,
     },
 }
 
+/// The payload of an Ipv4 packet. Can be used to construct an Ipv4 packet and its contents
+/// simultaneously.
 #[derive(Debug, Clone)]
 pub enum Ipv4PayloadFields {
+    /// A UDP packet
     Udp {
+        /// The header fields of the UDP packet
         fields: UdpFields,
+        /// The UDP payload data.
         payload: Bytes,
     },
 }
 
 impl Ipv4PayloadFields {
+    /// Calculate the total length of an Ipv4 packet with the given fields.
     pub fn total_packet_len(&self) -> usize {
         20 + match *self {
             Ipv4PayloadFields::Udp { ref payload, .. } => 8 + payload.len(),
@@ -68,11 +88,14 @@ fn set_fields(buffer: &mut [u8], fields: Ipv4Fields) {
     buffer[12..16].clone_from_slice(&fields.source_ip.octets());
     buffer[16..20].clone_from_slice(&fields.dest_ip.octets());
 
-    let checksum = checksum::data(&buffer[0..20]);
+    let checksum = !checksum::data(&buffer[0..20]);
     NetworkEndian::write_u16(&mut buffer[10..12], checksum);
 }
 
 impl Ipv4Packet {
+    /// Create a new `Ipv4Packet` with the given header fields and payload. If you are also
+    /// creating the packet's payload data it can be more efficient to use
+    /// `new_from_fields_recursive` and save an allocation/copy.
     pub fn new_from_fields(
         fields: Ipv4Fields,
         payload: &Ipv4Payload,
@@ -99,6 +122,7 @@ impl Ipv4Packet {
         }
     }
     
+    /// Create a new `Ipv4Packet` with the given header fields and payload fields.
     pub fn new_from_fields_recursive(
         fields: Ipv4Fields,
         payload_fields: Ipv4PayloadFields,
@@ -111,6 +135,7 @@ impl Ipv4Packet {
         }
     }
 
+    /// Create a new Ipv4 packet by writing it to the given empty buffer.
     pub fn write_to_buffer(
         buffer: &mut [u8],
         fields: Ipv4Fields,
@@ -129,13 +154,14 @@ impl Ipv4Packet {
         }
     }
 
-
+    /// Parse an Ipv4 packet from the given buffer.
     pub fn from_bytes(buffer: Bytes) -> Ipv4Packet {
         Ipv4Packet {
             buffer,
         }
     }
 
+    /// Get the header of fields of this packet.
     pub fn fields(&self) -> Ipv4Fields {
         Ipv4Fields {
             source_ip: self.source_ip(),
@@ -144,6 +170,7 @@ impl Ipv4Packet {
         }
     }
 
+    /// Set the packet's header fields.
     pub fn set_fields(&mut self, fields: Ipv4Fields) {
         let buffer = mem::replace(&mut self.buffer, Bytes::new());
         let mut buffer = BytesMut::from(buffer);
@@ -151,18 +178,22 @@ impl Ipv4Packet {
         self.buffer = buffer.freeze();
     }
 
+    /// Get the source Ipv4 address.
     pub fn source_ip(&self) -> Ipv4Addr {
         Ipv4Addr::from(slice_assert_len!(4, &self.buffer[12..16]))
     }
 
+    /// Get the destination Ipv4 address.
     pub fn dest_ip(&self) -> Ipv4Addr {
         Ipv4Addr::from(slice_assert_len!(4, &self.buffer[16..20]))
     }
 
+    /// Get the hop count/time-to-live of this packet.
     pub fn ttl(&self) -> u8 {
         self.buffer[8]
     }
 
+    /// Get the packet's payload
     pub fn payload(&self) -> Ipv4Payload {
         match self.buffer[9] {
             17 => Ipv4Payload::Udp(UdpPacket::from_bytes(self.buffer.slice_from(20))),
@@ -173,18 +204,38 @@ impl Ipv4Packet {
         }
     }
 
+    /// Returns the underlying packet data.
     pub fn as_bytes(&self) -> &Bytes {
         &self.buffer
     }
+
+    /// Check that this packet has a valid checksum.
+    pub fn verify_checksum(&self) -> bool {
+        if checksum::data(&self.buffer[..20]) != !0 {
+            return false;
+        }
+
+        /*
+        match self.payload() {
+            Ipv4Payload::Udp(ref udp) => udp.verify_checksum_v4(self.source_ip(), self.dest_ip()),
+            Ipv4Payload::Unknown { .. } => true,
+        }
+        */
+        true
+    }
 }
 
+/// One end of an Ipv4 connection that can be used to read/write packets to/from the other end.
 #[derive(Debug)]
 pub struct Ipv4Plug {
+    /// The sender
     pub tx: UnboundedSender<Ipv4Packet>,
+    /// The receiver.
     pub rx: UnboundedReceiver<Ipv4Packet>,
 }
 
 impl Ipv4Plug {
+    /// Create a new Ipv4 connection, connecting the two returned plugs.
     pub fn new_wire() -> (Ipv4Plug, Ipv4Plug) {
         let (a_tx, b_rx) = future_utils::mpsc::unbounded();
         let (b_tx, a_rx) = future_utils::mpsc::unbounded();
@@ -199,6 +250,12 @@ impl Ipv4Plug {
         (a, b)
     }
 
+    /// Add latency to the end of this connection.
+    ///
+    /// `min_latency` is the baseline for the amount of delay added to a packet travelling on this
+    /// connection. `mean_additional_latency` controls the amount of extra, random latency added to
+    /// any given packet on this connection. A non-zero `mean_additional_latency` can cause packets
+    /// to be re-ordered.
     pub fn with_latency(
         self, 
         handle: &Handle,
@@ -210,6 +267,8 @@ impl Ipv4Plug {
         plug_1
     }
 
+    /// Add extra hops to the end of this connection. Packets travelling through this plug will
+    /// have their TTL decremented by the amount of hops given.
     pub fn with_hops(
         self,
         handle: &Handle,

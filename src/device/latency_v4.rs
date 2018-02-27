@@ -18,6 +18,7 @@ impl Future for InTransit {
     }
 }
 
+/// Links two `Ipv4Plug`s and adds delay to packets travelling between them.
 pub struct LatencyV4 {
     handle: Handle,
     plug_a: Ipv4Plug,
@@ -29,6 +30,12 @@ pub struct LatencyV4 {
 }
 
 impl LatencyV4 {
+    /// Connect the two given plugs with latency added to the connection.
+    ///
+    /// `min_latency` is the baseline for the amount of delay added to packets travelling along
+    /// this connection. `mean_additional_latency` controls the amount of random, additional
+    /// latency added to any given packet. A non-zero `mean_additional_latency` can cause packets
+    /// to be re-ordered.
     pub fn spawn(
         handle: &Handle,
         min_latency: Duration,

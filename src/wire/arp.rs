@@ -1,5 +1,6 @@
 use priv_prelude::*;
 
+/// An ARP packet
 #[derive(Clone, PartialEq)]
 pub struct ArpPacket {
     buffer: Bytes,
@@ -30,17 +31,27 @@ impl fmt::Debug for ArpPacket {
     }
 }
 
+/// The fields of an ARP packet.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ArpFields {
+    /// An ARP request
     Request {
+        /// The MAC address of the sender.
         source_mac: MacAddr,
+        /// The Ipv4 address of the sender.
         source_ip: Ipv4Addr,
+        /// The Ipv4 address of the peer whose MAC address we are requesting.
         dest_ip: Ipv4Addr,
     },
+    /// An ARP response
     Response {
+        /// The MAC address of the sender. 
         source_mac: MacAddr,
+        /// The Ipv4 address of the sender.
         source_ip: Ipv4Addr,
+        /// The MAC address of the receiver.
         dest_mac: MacAddr,
+        /// The Ipv4 address of the receiver.
         dest_ip: Ipv4Addr,
     },
 }
@@ -79,6 +90,7 @@ fn set_fields(buffer: &mut [u8], fields: ArpFields) {
 }
 
 impl ArpPacket {
+    /// Create a new `ArpPacket` given the description provided by `fields`.
     pub fn new_from_fields(fields: ArpFields) -> ArpPacket {
         let mut buffer = unsafe { BytesMut::uninit(28) };
         set_fields(&mut buffer, fields);
@@ -87,6 +99,7 @@ impl ArpPacket {
         }
     }
 
+    /// Write an ARP packet described by `fields` to the given buffer.
     pub fn write_to_buffer(
         buffer: &mut [u8],
         fields: ArpFields,
@@ -94,12 +107,14 @@ impl ArpPacket {
         set_fields(buffer, fields);
     }
 
+    /// Parse an ARP packet from the given buffer.
     pub fn from_bytes(buffer: Bytes) -> ArpPacket {
         ArpPacket {
             buffer,
         }
     }
 
+    /// Parse the ARP packet into an `ArpFields`.
     pub fn fields(&self) -> ArpFields {
         match NetworkEndian::read_u16(&self.buffer[6..8]) {
             0x0001 => ArpFields::Request {
@@ -117,22 +132,27 @@ impl ArpPacket {
         }
     }
 
+    /// Get the MAC address of the sender.
     pub fn source_mac(&self) -> MacAddr {
         MacAddr::from_bytes(&self.buffer[8..14])
     }
 
+    /// Get the IP address of the sender.
     pub fn source_ip(&self) -> Ipv4Addr {
         Ipv4Addr::from(slice_assert_len!(4, &self.buffer[14..18]))
     }
 
+    /// Get the MAC address of the destination.
     pub fn dest_mac(&self) -> MacAddr {
         MacAddr::from_bytes(&self.buffer[18..24])
     }
 
+    /// Get the IP address of the destination.
     pub fn dest_ip(&self) -> Ipv4Addr {
         Ipv4Addr::from(slice_assert_len!(4, &self.buffer[24..28]))
     }
 
+    /// Return the underlying byte buffer of this packet.
     pub fn as_bytes(&self) -> &Bytes {
         &self.buffer
     }

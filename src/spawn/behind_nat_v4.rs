@@ -1,6 +1,7 @@
 use priv_prelude::*;
 use spawn;
 
+/// Spawn a thread with a single interface, operating a behind a NAT.
 pub fn behind_nat_v4<F, R>(
     handle: &Handle,
     nat: NatV4Builder,

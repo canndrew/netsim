@@ -1,6 +1,7 @@
 use priv_prelude::*;
 use super::*;
 
+/// A UDP packet
 #[derive(Clone, PartialEq)]
 pub struct UdpPacket {
     buffer: Bytes,
@@ -17,14 +18,22 @@ impl fmt::Debug for UdpPacket {
     }
 }
 
+/// Represents the header fields of a UDP packet. Also includes IP addresses as these are needed to
+/// calculate/verify the packet checksum.
 #[derive(Debug, Clone)]
 pub enum UdpFields {
+    /// A UDP packet stored in an Ipv4 packet.
     V4 {
+        /// Source IP and port of the packet.
         source_addr: SocketAddrV4,
+        /// Destination IP and port of the packet.
         dest_addr: SocketAddrV4,
     },
+    /// A UDP packet stored in an Ipv6 packet.
     V6 {
+        /// Source IP and port of the packet.
         source_addr: SocketAddrV6,
+        /// Destination IP and port of the packet.
         dest_addr: SocketAddrV6,
     },
 }
@@ -79,6 +88,7 @@ fn set_fields(buffer: &mut [u8], fields: UdpFields) {
 }
 
 impl UdpPacket {
+    /// Create a new UDP packet from the given header fields and payload.
     pub fn new_from_fields(
         fields: UdpFields,
         payload: Bytes,
@@ -91,6 +101,7 @@ impl UdpPacket {
         }
     }
 
+    /// Write a UDP packet to the given empty buffer.
     pub fn write_to_buffer(
         buffer: &mut [u8],
         fields: UdpFields,
@@ -100,12 +111,14 @@ impl UdpPacket {
         set_fields(buffer, fields);
     }
 
+    /// Parse a UDP packet from the given buffer.
     pub fn from_bytes(buffer: Bytes) -> UdpPacket {
         UdpPacket {
             buffer,
         }
     }
 
+    /// Set the header fields of this UDP packet.
     pub fn set_fields(&mut self, fields: UdpFields) {
         let buffer = mem::replace(&mut self.buffer, Bytes::new());
         let mut buffer = BytesMut::from(buffer);
@@ -113,20 +126,38 @@ impl UdpPacket {
         self.buffer = buffer.freeze();
     }
 
+    /// Get the packet's source port.
     pub fn source_port(&self) -> u16 {
         NetworkEndian::read_u16(&self.buffer[0..2])
     }
 
+    /// Get the packet's destination port.
     pub fn dest_port(&self) -> u16 {
         NetworkEndian::read_u16(&self.buffer[2..4])
     }
 
+    /// Get the packet's payload data.
     pub fn payload(&self) -> Bytes {
         self.buffer.slice_from(8)
     }
 
+    /// Get the entire packet as a raw byte buffer.
     pub fn as_bytes(&self) -> &Bytes {
         &self.buffer
+    }
+
+    /// Verify the checksum of the packet. The source/destination IP addresses of the packet are
+    /// needed to calculate the checksum.
+    pub fn verify_checksum_v4(
+        &self,
+        source_ip: Ipv4Addr,
+        dest_ip: Ipv4Addr,
+    ) -> bool {
+        let len = NetworkEndian::read_u16(&self.buffer[4..6]);
+        !0 == checksum::combine(&[
+            checksum::pseudo_header_ipv4(source_ip, dest_ip, 17, len as u32),
+            checksum::data(&self.buffer[..]),
+        ])
     }
 }
 

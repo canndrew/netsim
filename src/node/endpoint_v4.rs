@@ -5,6 +5,8 @@ pub struct ImplNode<F> {
     func: F,
 }
 
+/// Create a node for an Ipv4 endpoint. This node will run the given function in a network
+/// namespace with a single interface.
 pub fn endpoint_v4<R, F>(func: F) -> ImplNode<F>
 where
     R: Send + 'static,
@@ -13,7 +15,7 @@ where
     ImplNode { func }
 }
 
-impl<R, F> Node for ImplNode<F>
+impl<R, F> Ipv4Node for ImplNode<F>
 where
     R: Send + 'static,
     F: FnOnce(Ipv4Addr) -> R + Send + 'static,

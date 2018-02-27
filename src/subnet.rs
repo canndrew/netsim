@@ -170,3 +170,9 @@ quick_error! {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct SubnetV6 {
+    addr: Ipv6Addr,
+    bits: u8,
+}
+

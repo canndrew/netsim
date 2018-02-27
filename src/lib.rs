@@ -2,6 +2,11 @@
 //! software. You can use it to run Rust functions in network-isolated containers, and assemble
 //! virtual network for these functions to communicate over.
 
+#![cfg_attr(feature="clippy", feature(plugin))]
+#![cfg_attr(feature="clippy", plugin(clippy))]
+
+#![deny(missing_docs)]
+
 extern crate libc;
 extern crate rand;
 extern crate byteorder;

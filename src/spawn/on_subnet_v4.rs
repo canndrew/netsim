@@ -1,10 +1,9 @@
 use priv_prelude::*;
 use spawn;
 
-// TODO: this should use a TUN interface rather than a TAP and adding an extra hop.
 /// Spawn a function into a new network namespace with a single network interface with an address
 /// in `subnet`. Returns a `JoinHandle` which can be used to join the spawned thread, along with
-/// an `EtherBox` which can be used to read/write network activity from the spawned thread.
+/// an `Ipv4Plug` which can be used to read/write network activity from the spawned thread.
 pub fn on_subnet_v4<F, R>(
     handle: &Handle,
     subnet: SubnetV4,

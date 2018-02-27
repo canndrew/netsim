@@ -5,16 +5,18 @@ pub struct ImplNode<N> {
     num_hops: u32,
 }
 
+/// Add hops between nodes. The will cause the TTL of packets travelling on this connection to
+/// decrease by the given amount.
 pub fn hops_v4<N>(num_hops: u32, node: N) -> ImplNode<N>
 where
-    N: Node,
+    N: Ipv4Node,
 {
     ImplNode { node, num_hops }
 }
 
-impl<N> Node for ImplNode<N>
+impl<N> Ipv4Node for ImplNode<N>
 where
-    N: Node,
+    N: Ipv4Node,
 {
     type Output = N::Output;
 
