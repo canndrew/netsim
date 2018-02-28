@@ -146,7 +146,9 @@ where
     let res = unsafe {
         libc::clone(clone_cb::<R>, stack_head, flags, arg)
     };
-    assert!(res != -1);
+    if res == -1 {
+        panic!("failed to spawn thread: {}", io::Error::last_os_error());
+    }
 
     unwrap!(joiner_rx.recv())
 }

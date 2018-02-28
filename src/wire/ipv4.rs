@@ -20,6 +20,7 @@ impl fmt::Debug for Ipv4Packet {
             .field("ttl", &self.ttl())
             .field("payload", match payload {
                 Ipv4Payload::Udp(ref udp) => udp,
+                Ipv4Payload::Tcp(ref tcp) => tcp,
                 Ipv4Payload::Unknown { .. } => &payload,
             })
             .finish()
@@ -45,6 +46,8 @@ pub struct Ipv4Fields {
 pub enum Ipv4Payload {
     /// A UDP payload
     Udp(UdpPacket),
+    /// A TCP payload
+    Tcp(TcpPacket),
     /// Payload of some unrecognised protocol.
     Unknown {
         /// The payload's protocol number.
@@ -65,6 +68,13 @@ pub enum Ipv4PayloadFields {
         /// The UDP payload data.
         payload: Bytes,
     },
+    /// A TCP packet
+    Tcp {
+        /// The header fields of the TCP packet
+        fields: TcpFields,
+        /// The TCP payload data.
+        payload: Bytes,
+    },
 }
 
 impl Ipv4PayloadFields {
@@ -72,6 +82,9 @@ impl Ipv4PayloadFields {
     pub fn total_packet_len(&self) -> usize {
         20 + match *self {
             Ipv4PayloadFields::Udp { ref payload, .. } => 8 + payload.len(),
+            Ipv4PayloadFields::Tcp { ref payload, ref fields } => {
+                fields.header_len() + payload.len()
+            },
         }
     }
 }
@@ -102,11 +115,13 @@ impl Ipv4Packet {
     ) -> Ipv4Packet {
         let len = 20 + match *payload {
             Ipv4Payload::Udp(ref udp) => udp.as_bytes().len(),
+            Ipv4Payload::Tcp(ref tcp) => tcp.as_bytes().len(),
             Ipv4Payload::Unknown { ref payload, .. } => payload.len(),
         };
         let mut buffer = unsafe { BytesMut::uninit(len) };
         buffer[9] = match *payload {
             Ipv4Payload::Udp(..) => 17,
+            Ipv4Payload::Tcp(..) => 6,
             Ipv4Payload::Unknown { protocol, .. } => protocol,
         };
 
@@ -114,6 +129,7 @@ impl Ipv4Packet {
 
         match *payload {
             Ipv4Payload::Udp(ref udp) => buffer[20..].clone_from_slice(udp.as_bytes()),
+            Ipv4Payload::Tcp(ref tcp) => buffer[20..].clone_from_slice(tcp.as_bytes()),
             Ipv4Payload::Unknown { ref payload, .. } => buffer[20..].clone_from_slice(payload),
         }
 
@@ -143,6 +159,7 @@ impl Ipv4Packet {
     ) {
         buffer[9] = match payload_fields {
             Ipv4PayloadFields::Udp { .. } => 17,
+            Ipv4PayloadFields::Tcp { .. } => 6,
         };
 
         set_fields(buffer, fields);
@@ -150,6 +167,9 @@ impl Ipv4Packet {
         match payload_fields {
             Ipv4PayloadFields::Udp { fields, payload } => {
                 UdpPacket::write_to_buffer(&mut buffer[20..], fields, payload);
+            },
+            Ipv4PayloadFields::Tcp { fields, payload } => {
+                TcpPacket::write_to_buffer(&mut buffer[20..], fields, payload);
             },
         }
     }
@@ -197,6 +217,7 @@ impl Ipv4Packet {
     pub fn payload(&self) -> Ipv4Payload {
         match self.buffer[9] {
             17 => Ipv4Payload::Udp(UdpPacket::from_bytes(self.buffer.slice_from(20))),
+            6 => Ipv4Payload::Tcp(TcpPacket::from_bytes(self.buffer.slice_from(20))),
             p => Ipv4Payload::Unknown {
                 protocol: p,
                 payload: self.buffer.slice_from(20),
@@ -215,13 +236,11 @@ impl Ipv4Packet {
             return false;
         }
 
-        /*
         match self.payload() {
             Ipv4Payload::Udp(ref udp) => udp.verify_checksum_v4(self.source_ip(), self.dest_ip()),
+            Ipv4Payload::Tcp(ref tcp) => tcp.verify_checksum_v4(self.source_ip(), self.dest_ip()),
             Ipv4Payload::Unknown { .. } => true,
         }
-        */
-        true
     }
 }
 
