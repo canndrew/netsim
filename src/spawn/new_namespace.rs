@@ -162,9 +162,11 @@ where
                 "\
                 Failed to call clone(CLONE_NEWUSER | CLONE_NEWNET) (permission denied). \
                 Your kernel is probably too old. \
-                Version >= 3.8 is required, your version is {}\
+                Version >= 3.8 is required, your version is {}. \
+                uid and gid values must also be valid. \
+                Your uid == {}, gid == {}.\
                 ",
-                version,
+                version, uid, gid,
             );
         }
         panic!("failed to spawn thread: {}", err);
