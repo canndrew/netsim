@@ -147,7 +147,27 @@ where
         libc::clone(clone_cb::<R>, stack_head, flags, arg)
     };
     if res == -1 {
-        panic!("failed to spawn thread: {}", io::Error::last_os_error());
+        let err = io::Error::last_os_error();
+        if err.kind() == io::ErrorKind::PermissionDenied {
+            let mut utsname: sys::utsname = unsafe { mem::zeroed() };
+            let res = unsafe {
+                sys::uname(&mut utsname)
+            };
+            assert_eq!(res, 0);
+            let version = unsafe {
+                CStr::from_ptr(utsname.release.as_ptr())
+            };
+            let version = unwrap!(version.to_str());
+            panic!(
+                "\
+                Failed to call clone(CLONE_NEWUSER | CLONE_NEWNET) (permission denied). \
+                Your kernel is probably too old. \
+                Version >= 3.8 is required, your version is {}\
+                ",
+                version,
+            );
+        }
+        panic!("failed to spawn thread: {}", err);
     }
 
     unwrap!(joiner_rx.recv())

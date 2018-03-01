@@ -7,7 +7,7 @@ pub use std::fs::File;
 pub use bytes::{Bytes, BytesMut};
 pub use byteorder::{ByteOrder, NetworkEndian};
 pub use void::{Void, ResultVoidExt};
-pub use std::ffi::CString;
+pub use std::ffi::{CStr, CString};
 pub use futures::{future, stream, Future, Stream, Sink, Async, AsyncSink};
 pub use futures::stream::FuturesUnordered;
 pub use std::os::unix::io::{RawFd, AsRawFd, FromRawFd};
