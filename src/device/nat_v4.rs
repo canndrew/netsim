@@ -210,6 +210,7 @@ impl Future for NatV4 {
                     if self.hair_pinning && dest_ip == self.public_ip {
                         match packet.payload() {
                             Ipv4Payload::Udp(udp) => {
+                                let udp_fields = udp.fields();
                                 let dest_port = udp.dest_port();
                                 let private_dest_addr = match self.udp_map.get_inbound_addr(dest_port) {
                                     Some(addr) => addr,
@@ -223,9 +224,9 @@ impl Future for NatV4 {
                                         .. ipv4_fields
                                     },
                                     Ipv4PayloadFields::Udp {
-                                        fields: UdpFields::V4 {
-                                            source_addr: SocketAddrV4::new(packet.source_ip(), udp.source_port()),
-                                            dest_addr: private_dest_addr,
+                                        fields: UdpFields {
+                                            dest_port: private_dest_addr.port(),
+                                            .. udp_fields
                                         },
                                         payload: udp.payload(),
                                     }
@@ -234,7 +235,7 @@ impl Future for NatV4 {
                                 let _ = self.private_plug.tx.unbounded_send(bounced_packet);
                             },
                             Ipv4Payload::Tcp(tcp) => {
-                                let tcp_fields = tcp.fields_v4(packet.source_ip(), packet.dest_ip());
+                                let tcp_fields = tcp.fields();
                                 let dest_port = tcp.dest_port();
                                 let private_dest_addr = match self.tcp_map.get_inbound_addr(dest_port) {
                                     Some(addr) => addr,
@@ -249,10 +250,7 @@ impl Future for NatV4 {
                                     },
                                     Ipv4PayloadFields::Tcp {
                                         fields: TcpFields {
-                                            addrs: TcpAddrs::V4 {
-                                                source_addr: SocketAddrV4::new(packet.source_ip(), tcp.source_port()),
-                                                dest_addr: private_dest_addr,
-                                            },
+                                            dest_port: private_dest_addr.port(),
                                             .. tcp_fields
                                         },
                                         payload: tcp.payload(),
@@ -268,6 +266,7 @@ impl Future for NatV4 {
 
                     match packet.payload() {
                         Ipv4Payload::Udp(udp) => {
+                            let udp_fields = udp.fields();
                             let source_port = udp.source_port();
                             let source_addr = SocketAddrV4::new(source_ip, source_port);
                             let mapped_source_port = self.udp_map.map_port(source_addr);
@@ -278,9 +277,9 @@ impl Future for NatV4 {
                                     .. ipv4_fields
                                 },
                                 Ipv4PayloadFields::Udp {
-                                    fields: UdpFields::V4 {
-                                        source_addr: SocketAddrV4::new(self.public_ip, mapped_source_port),
-                                        dest_addr: SocketAddrV4::new(packet.dest_ip(), udp.dest_port()),
+                                    fields: UdpFields {
+                                        source_port: mapped_source_port,
+                                        .. udp_fields
                                     },
                                     payload: udp.payload(),
                                 }
@@ -294,7 +293,7 @@ impl Future for NatV4 {
                             let _ = self.public_plug.tx.unbounded_send(natted_packet);
                         },
                         Ipv4Payload::Tcp(tcp) => {
-                            let tcp_fields = tcp.fields_v4(packet.source_ip(), packet.dest_ip());
+                            let tcp_fields = tcp.fields();
                             let source_port = tcp.source_port();
                             let source_addr = SocketAddrV4::new(source_ip, source_port);
                             let mapped_source_port = self.tcp_map.map_port(source_addr);
@@ -306,10 +305,7 @@ impl Future for NatV4 {
                                 },
                                 Ipv4PayloadFields::Tcp {
                                     fields: TcpFields {
-                                        addrs: TcpAddrs::V4 {
-                                            source_addr: SocketAddrV4::new(self.public_ip, mapped_source_port),
-                                            dest_addr: SocketAddrV4::new(packet.dest_ip(), tcp.dest_port()),
-                                        },
+                                        source_port: mapped_source_port,
                                         .. tcp_fields
                                     },
                                     payload: tcp.payload(),
@@ -354,6 +350,7 @@ impl Future for NatV4 {
                     };
                     match packet.payload() {
                         Ipv4Payload::Udp(udp) => {
+                            let udp_fields = udp.fields();
                             let dest_port = udp.dest_port();
                             match self.udp_map.get_inbound_addr(dest_port) {
                                 Some(private_dest_addr) => {
@@ -364,9 +361,9 @@ impl Future for NatV4 {
                                             .. ipv4_fields
                                         },
                                         Ipv4PayloadFields::Udp {
-                                            fields: UdpFields::V4 {
-                                                source_addr: SocketAddrV4::new(packet.source_ip(), udp.source_port()),
-                                                dest_addr: private_dest_addr,
+                                            fields: UdpFields {
+                                                dest_port: private_dest_addr.port(),
+                                                .. udp_fields
                                             },
                                             payload: udp.payload(),
                                         }
@@ -383,7 +380,7 @@ impl Future for NatV4 {
                             }
                         },
                         Ipv4Payload::Tcp(tcp) => {
-                            let tcp_fields = tcp.fields_v4(packet.source_ip(), packet.dest_ip());
+                            let tcp_fields = tcp.fields();
                             let dest_port = tcp.dest_port();
                             match self.tcp_map.get_inbound_addr(dest_port) {
                                 Some(private_dest_addr) => {
@@ -395,10 +392,7 @@ impl Future for NatV4 {
                                         },
                                         Ipv4PayloadFields::Tcp {
                                             fields: TcpFields {
-                                                addrs: TcpAddrs::V4 {
-                                                    source_addr: SocketAddrV4::new(packet.source_ip(), tcp.source_port()),
-                                                    dest_addr: private_dest_addr,
-                                                },
+                                                dest_port: private_dest_addr.port(),
                                                 .. tcp_fields
                                             },
                                             payload: tcp.payload(),
@@ -465,9 +459,9 @@ fn test() {
                 ttl: initial_ttl,
             },
             Ipv4PayloadFields::Udp {
-                fields: UdpFields::V4 {
-                    source_addr: local_addr,
-                    dest_addr: remote_addr,
+                fields: UdpFields {
+                    source_port: local_addr.port(),
+                    dest_port: remote_addr.port(),
                 },
                 payload: payload.clone(),
             },
@@ -503,9 +497,9 @@ fn test() {
                         ttl: initial_ttl,
                     },
                     Ipv4PayloadFields::Udp {
-                        fields: UdpFields::V4 {
-                            source_addr: remote_addr,
-                            dest_addr: SocketAddrV4::new(public_ip, mapped_port),
+                        fields: UdpFields {
+                            source_port: remote_addr.port(),
+                            dest_port: mapped_port,
                         },
                         payload: payload.clone(),
                     },

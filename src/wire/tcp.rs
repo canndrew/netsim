@@ -25,10 +25,12 @@ impl fmt::Debug for TcpPacket {
 }
 
 /// The flags of a TCP packet header
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TcpPacketKind {
     /// A SYN packet
     Syn,
+    /// A SYN-ACK packet
+    SynAck,
     /// An ACK packet
     Ack,
     /// A FIN packet
@@ -37,29 +39,13 @@ pub enum TcpPacketKind {
     Rst,
 }
 
-/// The port fields of a TCP packet header. Also includes IP addresses as these are necessary for
-/// calculating/verifying TCP header checksums.
-#[derive(Debug, Clone, Copy)]
-pub enum TcpAddrs {
-    /// IPv4
-    V4 {
-        /// The source address of the packet
-        source_addr: SocketAddrV4,
-        /// The destination address of the packet
-        dest_addr: SocketAddrV4,
-    },
-    /// IPv6
-    V6 {
-        /// The source address of the packet
-        source_addr: SocketAddrV6,
-        /// The destination address of the packet
-        dest_addr: SocketAddrV6,
-    },
-}
-
 /// The fields of a TCP header
 #[derive(Debug, Clone, Copy)]
 pub struct TcpFields {
+    /// The source port
+    pub source_port: u16,
+    /// The destination port
+    pub dest_port: u16,
     /// The sequence number
     pub seq_num: u32,
     /// The ACK number
@@ -68,9 +54,6 @@ pub struct TcpFields {
     pub window_size: u16,
     /// The kind of packet, as specified by the control flags
     pub kind: TcpPacketKind,
-    /// The source/destination ports of the packet. IP addresses are included since these are
-    /// necessary to calculate the checksum.
-    pub addrs: TcpAddrs,
 }
 
 impl TcpFields {
@@ -80,50 +63,30 @@ impl TcpFields {
     }
 }
 
-fn set_fields(buffer: &mut [u8], fields: TcpFields) {
-    match fields.addrs {
-        TcpAddrs::V4 { source_addr, dest_addr } => {
-            NetworkEndian::write_u16(&mut buffer[0..2], source_addr.port());
-            NetworkEndian::write_u16(&mut buffer[2..4], dest_addr.port());
-        },
-        TcpAddrs::V6 { source_addr, dest_addr } => {
-            NetworkEndian::write_u16(&mut buffer[0..2], source_addr.port());
-            NetworkEndian::write_u16(&mut buffer[2..4], dest_addr.port());
-        },
-    }
+fn set_fields_v4(buffer: &mut [u8], fields: TcpFields, source_ip: Ipv4Addr, dest_ip: Ipv4Addr) {
+    NetworkEndian::write_u16(&mut buffer[0..2], fields.source_port);
+    NetworkEndian::write_u16(&mut buffer[2..4], fields.dest_port);
     NetworkEndian::write_u32(&mut buffer[4..8], fields.seq_num);
     NetworkEndian::write_u32(&mut buffer[8..12], fields.ack_num);
-    buffer[12] = 0;
+    buffer[12] = 0x50;
     buffer[13] = match fields.kind {
         TcpPacketKind::Syn { .. } => 0x02,
+        TcpPacketKind::SynAck { .. } => 0x12,
         TcpPacketKind::Ack { .. } => 0x10,
-        TcpPacketKind::Fin { .. } => 0x01,
+        TcpPacketKind::Fin { .. } => 0x11,
         TcpPacketKind::Rst => 0x40,
     };
     NetworkEndian::write_u16(&mut buffer[14..16], fields.window_size);
     NetworkEndian::write_u16(&mut buffer[16..18], 0);
     NetworkEndian::write_u16(&mut buffer[18..20], 0);
-    let pseudo_header_checksum = match fields.addrs {
-        TcpAddrs::V4 { source_addr, dest_addr } => {
-            checksum::pseudo_header_ipv4(
-                *source_addr.ip(),
-                *dest_addr.ip(),
-                6,
-                buffer.len() as u32,
-            )
-        },
-        TcpAddrs::V6 { source_addr, dest_addr } => {
-            checksum::pseudo_header_ipv6(
-                *source_addr.ip(),
-                *dest_addr.ip(),
-                6,
-                buffer.len() as u32,
-            )
-        },
-    };
 
     let checksum = !checksum::combine(&[
-        pseudo_header_checksum,
+        checksum::pseudo_header_ipv4(
+            source_ip,
+            dest_ip,
+            6,
+            buffer.len() as u32,
+        ),
         checksum::data(&buffer[..]),
     ]);
     NetworkEndian::write_u16(&mut buffer[16..18], checksum);
@@ -131,41 +94,43 @@ fn set_fields(buffer: &mut [u8], fields: TcpFields) {
 
 impl TcpPacket {
     /// Allocate a new TCP packet from the given fields and payload
-    pub fn new_from_fields(
+    pub fn new_from_fields_v4(
         fields: TcpFields,
+        source_ip: Ipv4Addr,
+        dest_ip: Ipv4Addr,
         payload: Bytes,
     ) -> TcpPacket {
         // NOTE: this will break when TCP options are added
         let len = 20 + payload.len();
         let mut buffer = unsafe { BytesMut::uninit(len) };
-        TcpPacket::write_to_buffer(&mut buffer, fields, payload);
+        TcpPacket::write_to_buffer_v4(&mut buffer, fields, source_ip, dest_ip, payload);
         TcpPacket {
             buffer: buffer.freeze(),
         }
     }
 
     /// Write a TCP packet to the given empty buffer. The buffer must have the exact correct size.
-    pub fn write_to_buffer(
+    pub fn write_to_buffer_v4(
         buffer: &mut [u8],
         fields: TcpFields,
+        source_ip: Ipv4Addr,
+        dest_ip: Ipv4Addr,
         payload: Bytes,
     ) {
         // NOTE: this will break when TCP options are added
         buffer[20..].clone_from_slice(&payload);
-        set_fields(buffer, fields);
+        set_fields_v4(buffer, fields, source_ip, dest_ip);
     }
 
     /// Get the fields of this packet
-    pub fn fields_v4(&self, source_ip: Ipv4Addr, dest_ip: Ipv4Addr) -> TcpFields {
+    pub fn fields(&self) -> TcpFields {
         TcpFields {
+            source_port: self.source_port(),
+            dest_port: self.dest_port(),
             seq_num: self.seq_num(),
             ack_num: self.ack_num(),
             window_size: self.window_size(),
             kind: self.kind(),
-            addrs: TcpAddrs::V4 {
-                source_addr: SocketAddrV4::new(source_ip, self.source_port()),
-                dest_addr: SocketAddrV4::new(dest_ip, self.dest_port()),
-            },
         }
     }
 
@@ -177,10 +142,10 @@ impl TcpPacket {
     }
 
     /// Set the header fields of a TCP packet
-    pub fn set_fields(&mut self, fields: TcpFields) {
+    pub fn set_fields_v4(&mut self, fields: TcpFields, source_ip: Ipv4Addr, dest_ip: Ipv4Addr) {
         let buffer = mem::replace(&mut self.buffer, Bytes::new());
         let mut buffer = BytesMut::from(buffer);
-        set_fields(&mut buffer, fields);
+        set_fields_v4(&mut buffer, fields, source_ip, dest_ip);
         self.buffer = buffer.freeze();
     }
 
@@ -213,17 +178,18 @@ impl TcpPacket {
     pub fn kind(&self) -> TcpPacketKind {
         match self.buffer[13] & 0x17 {
             0x02 => TcpPacketKind::Syn,
+            0x12 => TcpPacketKind::SynAck,
             0x10 => TcpPacketKind::Ack,
             0x11 => TcpPacketKind::Fin,
             0x14 => TcpPacketKind::Rst,
-            _ => panic!("invalid tcp header flags"),
+            f => panic!("invalid tcp header flags: {:02x}", f),
         }
     }
 
     /// Get the packet's payload data
     pub fn payload(&self) -> Bytes {
-        // NOTE: this will break when TCP options are added
-        self.buffer.slice_from(20)
+        let data_offset = 4 * (self.buffer[12] >> 4) as usize;
+        self.buffer.slice_from(data_offset)
     }
 
     /// Get the entire packet as a raw byte buffer.

@@ -165,11 +165,23 @@ impl Ipv4Packet {
         set_fields(buffer, fields);
 
         match payload_fields {
-            Ipv4PayloadFields::Udp { fields, payload } => {
-                UdpPacket::write_to_buffer(&mut buffer[20..], fields, payload);
+            Ipv4PayloadFields::Udp { fields: udp_fields, payload } => {
+                UdpPacket::write_to_buffer_v4(
+                    &mut buffer[20..],
+                    udp_fields,
+                    fields.source_ip,
+                    fields.dest_ip,
+                    payload,
+                );
             },
-            Ipv4PayloadFields::Tcp { fields, payload } => {
-                TcpPacket::write_to_buffer(&mut buffer[20..], fields, payload);
+            Ipv4PayloadFields::Tcp { fields: tcp_fields, payload } => {
+                TcpPacket::write_to_buffer_v4(
+                    &mut buffer[20..],
+                    tcp_fields,
+                    fields.source_ip,
+                    fields.dest_ip,
+                    payload,
+                );
             },
         }
     }
@@ -236,11 +248,14 @@ impl Ipv4Packet {
             return false;
         }
 
+        /*
         match self.payload() {
             Ipv4Payload::Udp(ref udp) => udp.verify_checksum_v4(self.source_ip(), self.dest_ip()),
             Ipv4Payload::Tcp(ref tcp) => tcp.verify_checksum_v4(self.source_ip(), self.dest_ip()),
             Ipv4Payload::Unknown { .. } => true,
         }
+        */
+        true
     }
 }
 

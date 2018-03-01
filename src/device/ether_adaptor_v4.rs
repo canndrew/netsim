@@ -234,9 +234,9 @@ fn test() {
                 ttl: rand::random(),
             },
             Ipv4PayloadFields::Udp {
-                fields: UdpFields::V4 {
-                    source_addr: SocketAddrV4::new(source_ip, rand::random()),
-                    dest_addr: SocketAddrV4::new(dest_ip, rand::random()),
+                fields: UdpFields {
+                    source_port: rand::random(),
+                    dest_port: rand::random(),
                 },
                 payload: Bytes::from(&rand::random::<[u8; 8]>()[..]),
             },
@@ -311,9 +311,9 @@ fn test() {
                                 ttl: rand::random(),
                             },
                             Ipv4PayloadFields::Udp {
-                                fields: UdpFields::V4 {
-                                    source_addr: SocketAddrV4::new(source_ip, rand::random()),
-                                    dest_addr: SocketAddrV4::new(dest_ip, rand::random()),
+                                fields: UdpFields {
+                                    source_port: rand::random(),
+                                    dest_port: rand::random(),
                                 },
                                 payload: Bytes::from(&rand::random::<[u8; 8]>()[..]),
                             },
