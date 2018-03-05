@@ -7,7 +7,15 @@ pub struct Icmpv4Packet {
     buffer: Bytes,
 }
 
+impl fmt::Debug for Icmpv4Packet {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Icmpv4Packet::")?;
+        self.kind().fmt(f)
+    }
+}
+
 /// Description of an ICMPv4 packet
+#[derive(Debug, Clone)]
 pub enum Icmpv4PacketKind {
     /// Unknown ICMP packet type/code.
     Unknown {
@@ -136,10 +144,55 @@ impl Icmpv4Packet {
     ) -> Icmpv4Packet {
         let len = kind.buffer_len();
         let mut buffer = unsafe { BytesMut::uninit(len) };
-        set(&mut buffer, kind, source_ip, dest_ip);
+        Icmpv4Packet::write_to_buffer(&mut buffer, kind, source_ip, dest_ip);
         Icmpv4Packet {
             buffer: buffer.freeze(),
         }
+    }
+
+    /// Write the ICMP data to the given buffer.
+    pub fn write_to_buffer(
+        buffer: &mut [u8],
+        kind: Icmpv4PacketKind,
+        source_ip: Ipv4Addr,
+        dest_ip: Ipv4Addr,
+    ) {
+        set(buffer, kind, source_ip, dest_ip);
+    }
+
+    /// Return a parsed version of the ICMP packet
+    pub fn kind(&self) -> Icmpv4PacketKind {
+        match (self.buffer[0], self.buffer[1]) {
+            (0, 0) => {
+                let id = NetworkEndian::read_u16(&self.buffer[4..6]);
+                let seq_num = NetworkEndian::read_u16(&self.buffer[6..8]);
+                let payload = self.buffer.slice_from(8);
+                Icmpv4PacketKind::EchoReply {
+                    id, seq_num, payload,
+                }
+            },
+            (8, 0) => {
+                let id = NetworkEndian::read_u16(&self.buffer[4..6]);
+                let seq_num = NetworkEndian::read_u16(&self.buffer[6..8]);
+                let payload = self.buffer.slice_from(8);
+                Icmpv4PacketKind::EchoRequest {
+                    id, seq_num, payload,
+                }
+            },
+            (ty, code) => {
+                let mut rest_of_header = [0u8; 4];
+                rest_of_header.clone_from_slice(&self.buffer[4..8]);
+                let payload = self.buffer.slice_from(8);
+                Icmpv4PacketKind::Unknown {
+                    ty, code, rest_of_header, payload,
+                }
+            },
+        }
+    }
+
+    /// Get the underlying byte buffer of this packet
+    pub fn as_bytes(&self) -> &Bytes {
+        &self.buffer
     }
 }
 
