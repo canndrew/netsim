@@ -316,5 +316,18 @@ impl Ipv4Plug {
         }
         plug
     }
+
+    /// Add packet loss to the connection. Loss happens in burst, rather than on an individual
+    /// packet basis. `mean_loss_duration` controls the burstiness of the loss.
+    pub fn with_packet_loss(
+        self,
+        handle: &Handle,
+        loss_rate: f64,
+        mean_loss_duration: Duration,
+    ) -> Ipv4Plug {
+        let (plug_0, plug_1) = Ipv4Plug::new_wire();
+        PacketLossV4::spawn(handle, loss_rate, mean_loss_duration, self, plug_0);
+        plug_1
+    }
 }
 
