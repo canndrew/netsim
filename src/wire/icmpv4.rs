@@ -57,14 +57,19 @@ pub enum Icmpv4PacketKind {
         /// The sequence number of the TCP packet which expired
         seq_num: u32,
     },
-    /*
+    /// TTL expired error for a UDP packet
     TtlExpiredUdp {
+        /// The IPv4 header of the UDP packet which expired
         ipv4_header: Ipv4Fields,
+        /// The source port of the UDP packet which expired
         source_port: u16,
+        /// The destination port of the UDP packet which expired
         dest_port: u16,
+        /// The length field of the UDP packet which expired
         len: u16,
+        /// The checksum of the UDP packet which expired
+        checksum: u16,
     },
-    */
 }
 
 fn set(
@@ -104,6 +109,18 @@ fn set(
             NetworkEndian::write_u16(&mut buffer[(header_end + 2)..(header_end + 4)], dest_port);
             NetworkEndian::write_u32(&mut buffer[(header_end + 4)..(header_end + 8)], seq_num);
         },
+        Icmpv4PacketKind::TtlExpiredUdp { ipv4_header, source_port, dest_port, len, checksum } => {
+            buffer[0] = 11;
+            buffer[1] = 0;
+            buffer[4..8].clone_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+            buffer[17] = 17;
+            let header_end = buffer.len() - 8;
+            ipv4::set_fields(&mut buffer[8..header_end], ipv4_header);
+            NetworkEndian::write_u16(&mut buffer[header_end..(header_end + 2)], source_port);
+            NetworkEndian::write_u16(&mut buffer[(header_end + 2)..(header_end + 4)], dest_port);
+            NetworkEndian::write_u16(&mut buffer[(header_end + 4)..(header_end + 6)], len);
+            NetworkEndian::write_u16(&mut buffer[(header_end + 6)..(header_end + 8)], checksum);
+        },
     }
     
     let checksum = !checksum::data(&buffer);
@@ -119,7 +136,8 @@ impl Icmpv4PacketKind {
             Icmpv4PacketKind::EchoReply { ref payload, .. } => {
                 payload.len() + 8
             }
-            Icmpv4PacketKind::TtlExpiredTcp { .. } => 36,
+            Icmpv4PacketKind::TtlExpiredTcp { .. } |
+            Icmpv4PacketKind::TtlExpiredUdp { .. } => 36,
         }
     }
 }
@@ -179,6 +197,16 @@ impl Icmpv4Packet {
                 let seq_num = NetworkEndian::read_u32(&self.buffer[32..36]);
                 Icmpv4PacketKind::TtlExpiredTcp {
                     ipv4_header, source_port, dest_port, seq_num,
+                }
+            },
+            (11, 0) if self.buffer[17] == 17 => {
+                let ipv4_header = Ipv4Fields::from_bytes(&self.buffer[8..]);
+                let source_port = NetworkEndian::read_u16(&self.buffer[28..30]);
+                let dest_port = NetworkEndian::read_u16(&self.buffer[30..32]);
+                let len = NetworkEndian::read_u16(&self.buffer[30..32]);
+                let checksum = NetworkEndian::read_u16(&self.buffer[32..34]);
+                Icmpv4PacketKind::TtlExpiredUdp {
+                    ipv4_header, source_port, dest_port, len, checksum,
                 }
             },
             (ty, code) => {
