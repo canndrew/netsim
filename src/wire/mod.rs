@@ -13,7 +13,7 @@ mod icmpv4;
 
 pub use self::arp::*;
 pub use self::ether::*;
-pub use self::ipv4::*;
+pub use self::ipv4::{Ipv4Packet, Ipv4Fields, Ipv4Payload, Ipv4PayloadFields, Ipv4Plug};
 pub use self::mac::*;
 pub use self::udp::*;
 pub use self::tcp::*;

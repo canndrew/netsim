@@ -42,6 +42,14 @@ pub struct Ipv4Fields {
     pub ttl: u8,
 }
 
+impl Ipv4Fields {
+    /// Parse an IPv4 header from a byte buffer
+    pub fn from_bytes(buffer: &[u8]) -> Ipv4Fields {
+        let packet = Ipv4Packet { buffer: Bytes::from(&buffer[..20]) };
+        packet.fields()
+    }
+}
+
 /// The payload of an Ipv4 packet
 #[derive(Debug, Clone)]
 pub enum Ipv4Payload {
@@ -98,7 +106,7 @@ impl Ipv4PayloadFields {
     }
 }
 
-fn set_fields(buffer: &mut [u8], fields: Ipv4Fields) {
+pub fn set_fields(buffer: &mut [u8], fields: Ipv4Fields) {
     buffer[0] = 0x45;
     buffer[1] = 0x00;
     let len = buffer.len() as u16;
@@ -200,8 +208,6 @@ impl Ipv4Packet {
                 Icmpv4Packet::write_to_buffer(
                     &mut buffer[20..],
                     kind,
-                    fields.source_ip,
-                    fields.dest_ip,
                 );
             },
         }
@@ -270,15 +276,12 @@ impl Ipv4Packet {
             return false;
         }
 
-        /*
         match self.payload() {
             Ipv4Payload::Udp(ref udp) => udp.verify_checksum_v4(self.source_ip(), self.dest_ip()),
             Ipv4Payload::Tcp(ref tcp) => tcp.verify_checksum_v4(self.source_ip(), self.dest_ip()),
-            Ipv4Payload::Icmp(ref icmp) => icmp.verify_checksum(self.source_ip(), self.dest_ip()),
+            Ipv4Payload::Icmp(ref icmp) => icmp.verify_checksum(),
             Ipv4Payload::Unknown { .. } => true,
         }
-        */
-        true
     }
 }
 

@@ -479,4 +479,79 @@ mod test {
         }));
         res.void_unwrap()
     }
+
+    #[test]
+    fn test_ping_reply() {
+        let  _ = env_logger::init();
+
+        let mut core = unwrap!(Core::new());
+        let handle = core.handle();
+
+        let res = core.run(future::lazy(move || {
+            let (done_tx, done_rx) = std::sync::mpsc::channel();
+
+            let client_ip = Ipv4Addr::random_global();
+            let iface_ip = Ipv4Addr::random_global();
+
+            let iface = {
+                Ipv4IfaceBuilder::new()
+                .address(iface_ip)
+                .route(RouteV4::new(SubnetV4::global(), None))
+            };
+
+            let (join_handle, ipv4_plug) = with_ipv4_iface(&handle, iface, move || {
+                unwrap!(done_rx.recv());
+            });
+
+            let Ipv4Plug { tx, rx } = ipv4_plug;
+
+            let id = rand::random();
+            let seq_num = rand::random();
+            let payload = Bytes::from(&rand::random::<[u8; 8]>()[..]);
+            let ping = Ipv4Packet::new_from_fields_recursive(
+                Ipv4Fields {
+                    source_ip: client_ip,
+                    dest_ip: iface_ip,
+                    ttl: 16,
+                },
+                Ipv4PayloadFields::Icmp {
+                    kind: Icmpv4PacketKind::EchoRequest {
+                        id, seq_num,
+                        payload: payload.clone(),
+                    },
+                },
+            );
+
+            tx
+            .send(ping)
+            .map_err(|_e| panic!("interface hung up!"))
+            .and_then(move |_tx| {
+                rx
+                .into_future()
+                .map_err(|(v, _rx)| void::unreachable(v))
+                .and_then(move |(packet_opt, _rx)| {
+                    let packet = unwrap!(packet_opt);
+                    let icmp = match packet.payload() {
+                        Ipv4Payload::Icmp(icmp) => icmp,
+                        payload => panic!("unexpected ipv4 payload kind in reply: {:?}", payload),
+                    };
+                    match icmp.kind() {
+                        Icmpv4PacketKind::EchoReply { 
+                            id: reply_id,
+                            seq_num: reply_seq_num,
+                            payload: reply_payload,
+                        } => {
+                            assert_eq!(id, reply_id);
+                            assert_eq!(seq_num, reply_seq_num);
+                            assert_eq!(payload, reply_payload);
+                        },
+                        kind => panic!("unexpected ICMP reply kind: {:?}", kind),
+                    }
+                    unwrap!(done_tx.send(()));
+                    future_utils::thread_future(|| unwrap!(join_handle.join()))
+                })
+            })
+        }));
+        res.void_unwrap()
+    }
 }
