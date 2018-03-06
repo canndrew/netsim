@@ -212,6 +212,7 @@ mod test {
                     .address(Ipv4Addr::random_global())
                     .name("hello")
                 };
+                trace!("build_tap_duplicate_name: building first interface");
                 let _tap = unwrap!(tap_builder.build_unbound());
                 
                 let tap_builder = {
@@ -219,10 +220,12 @@ mod test {
                     .address(Ipv4Addr::random_global())
                     .name("hello")
                 };
+                trace!("build_tap_duplicate_name: building second interface");
                 match tap_builder.build_unbound() {
                     Err(IfaceBuildError::InterfaceAlreadyExists) => (),
                     res => panic!("unexpected result: {:?}", res),
                 }
+                trace!("build_tap_duplicate_name: done");
             });
             unwrap!(join_handle.join());
         });

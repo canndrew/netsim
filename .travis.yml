@@ -1,6 +1,8 @@
 env:
   global:
     - RUST_BACKTRACE=1
+    - RUST_LOG=netsim=trace
+    - RUST_TEST_THREADS=1
 before_install:
   - sudo apt-get -qq update
   - sudo apt-get install -y libcap-dev
@@ -10,4 +12,6 @@ rust:
     - beta
     - nightly
 cache: cargo
+script:
+    - cargo test -- --nocapture
 
