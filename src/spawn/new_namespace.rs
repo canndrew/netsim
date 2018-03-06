@@ -104,6 +104,8 @@ where
 
                 let ret = func.call_box();
 
+                trace!("new_namespace: spawned thread finished callback");
+
                 // This will unblock when the clone_cb thread drops the drop_tx. This should be
                 // the last thing that happens before the thread ends, meaning it's now safe to
                 // free it's stack.
@@ -111,6 +113,8 @@ where
                     Ok(v) => void::unreachable(v),
                     Err(_) => (),
                 };
+
+                trace!("new_namespace: spawned thread received exit notification");
 
                 // Try to make sure the clone_cb thread has exited before freeing its stack. It's
                 // possible the tid could get reused, so we put a recursion limit on this to avoid
@@ -127,10 +131,13 @@ where
                     }
                     thread::yield_now();
                 }
+                
+                trace!("new_namespace: spawned thread decided to exit");
 
                 // Free the stack.
                 let StackBase(stack_base) = stack_base;
                 let _stack = unsafe { Vec::from_raw_parts(stack_base, 0, stack_size + STACK_ALIGN) };
+                trace!("new_namespace: spawned thread exiting");
                 ret
             });
             let _ = joiner_tx.send(joiner);
