@@ -180,6 +180,7 @@ where
     }
 
     let ret = unwrap!(joiner_rx.recv());
+    thread::sleep(Duration::from_millis(200));
     trace!("new_namespace: received joiner");
     ret
 }
