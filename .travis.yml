@@ -13,5 +13,5 @@ rust:
     - nightly
 cache: cargo
 script:
-    - cargo test -- --nocapture
+    - cargo test -- duplicate_name --nocapture
 
