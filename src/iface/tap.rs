@@ -205,7 +205,7 @@ mod test {
 
     #[test]
     fn build_tap_duplicate_name() {
-        run_test(3, || {
+        run_test(6, || {
             let join_handle = spawn::new_namespace(|| {
                 let tap_builder = {
                     EtherIfaceBuilder::new()
@@ -227,6 +227,7 @@ mod test {
                 }
                 trace!("build_tap_duplicate_name: done");
             });
+            thread::sleep(Duration::from_secs(3));
             unwrap!(join_handle.join());
         });
     }
