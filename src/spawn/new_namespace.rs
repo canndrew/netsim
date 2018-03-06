@@ -134,6 +134,8 @@ where
                 ret
             });
             let _ = joiner_tx.send(joiner);
+            trace!("new_namespace: waiting for more output...");
+            thread::sleep(Duration::from_secs(1));
         }
         drop(drop_tx);
         trace!("new_namespace: exiting clone_cb");
