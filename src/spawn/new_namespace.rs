@@ -96,7 +96,7 @@ where
             //unwrap!(f.write(s.as_bytes()));
 
             let joiner = thread::spawn(move || {
-                thread::sleep(Duration::from_secs(1));
+                trace!("entered the new_namespace spawned thread");
 
                 let ret = func.call_box();
 
