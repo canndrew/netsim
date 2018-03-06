@@ -206,7 +206,7 @@ mod test {
     #[test]
     fn build_tap_duplicate_name() {
         trace!("build_tap_duplicate_name: starting");
-        run_test(6, || {
+        run_test(10, || {
             trace!("build_tap_duplicate_name: in run_test");
             let join_handle = spawn::new_namespace(|| {
                 trace!("build_tap_duplicate_name: inside the namespace");
@@ -231,7 +231,9 @@ mod test {
                 trace!("build_tap_duplicate_name: done");
             });
             thread::sleep(Duration::from_secs(3));
+            trace!("build_tap_duplicate_name: joining new_namespace thread");
             unwrap!(join_handle.join());
+            trace!("build_tap_duplicate_name: exiting");
         });
     }
 
