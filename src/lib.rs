@@ -242,6 +242,8 @@ pub mod node;
 pub mod device;
 pub mod wire;
 pub mod spawn;
+#[cfg(test)]
+mod test;
 
 pub use subnet::SubnetV4;
 pub use route::{RouteV4, AddRouteError};

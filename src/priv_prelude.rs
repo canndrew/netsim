@@ -33,3 +33,6 @@ pub use iface::{IfaceBuildError, EtherIface, EtherIfaceBuilder, Ipv4Iface, Ipv4I
 pub use device::{EtherAdaptorV4, NatV4Builder, LatencyV4, HopV4, RouterV4Builder, PacketLossV4};
 pub use node::Ipv4Node;
 
+#[cfg(test)]
+pub use test::run_test;
+

@@ -182,19 +182,21 @@ mod test {
 
     #[test]
     fn respects_thread_local_storage() {
-        thread_local! {
-            static TEST: Cell<u32> = Cell::new(0);
-        };
+        run_test(3, || {
+            thread_local! {
+                static TEST: Cell<u32> = Cell::new(0);
+            };
 
-        TEST.with(|v| v.set(123));
-        let join_handle = new_namespace(|| {
-            TEST.with(|v| {
-                assert_eq!(v.get(), 0);
-                v.set(456);
+            TEST.with(|v| v.set(123));
+            let join_handle = new_namespace(|| {
+                TEST.with(|v| {
+                    assert_eq!(v.get(), 0);
+                    v.set(456);
+                });
             });
-        });
-        unwrap!(join_handle.join());
-        TEST.with(|v| assert_eq!(v.get(), 123));
+            unwrap!(join_handle.join());
+            TEST.with(|v| assert_eq!(v.get(), 123));
+        })
     }
 }
 

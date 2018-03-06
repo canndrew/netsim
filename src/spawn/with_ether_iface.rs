@@ -166,111 +166,111 @@ impl Future for TapTask {
 mod test {
     use priv_prelude::*;
     use super::*;
-    use env_logger;
     use rand;
     use std;
     use void;
 
     #[test]
     fn one_interface_send_udp() {
-        let _ = env_logger::init();
-        let mut core = unwrap!(Core::new());
-        let handle = core.handle();
-        let res = core.run(future::lazy(|| {
-            trace!("starting");
-            let subnet = SubnetV4::random_local();
-            let iface_ip = subnet.random_client_addr();
-            let gateway_ip = subnet.gateway_ip();
-            let iface = {
-                EtherIfaceBuilder::new()
-                .address(iface_ip)
-                .netmask(subnet.netmask())
-                .route(RouteV4::new(
-                    SubnetV4::new(ipv4!("0.0.0.0"), 0),
-                    Some(gateway_ip),
-                ))
-            };
-
-            let payload: [u8; 8] = rand::random();
-            let target_ip = Ipv4Addr::random_global();
-            let target_port = rand::random::<u16>() / 2 + 1000;
-            let target_addr = SocketAddrV4::new(target_ip, target_port);
-
-            trace!("spawning thread");
-            let (join_handle, EtherPlug { tx, rx }) = with_ether_iface(
-                &handle,
-                iface,
-                move || {
-                    let socket = unwrap!(std::net::UdpSocket::bind(addr!("0.0.0.0:0")));
-                    unwrap!(socket.send_to(&payload[..], SocketAddr::V4(target_addr)));
-                    trace!("sent udp packet");
-                },
-            );
-
-            let gateway_mac = MacAddr::random();
-
-            rx
-            .into_future()
-            .map_err(|(v, _rx)| void::unreachable(v))
-            .and_then(move |(frame_opt, rx)| {
-                let frame = unwrap!(frame_opt);
-                trace!("got frame from iface: {:?}", frame);
-                let iface_mac = frame.source_mac();
-                let arp = match frame.payload() {
-                    EtherPayload::Arp(arp) => arp,
-                    payload => panic!("unexpected payload: {:?}", payload),
+        run_test(3, || {
+            let mut core = unwrap!(Core::new());
+            let handle = core.handle();
+            let res = core.run(future::lazy(|| {
+                trace!("starting");
+                let subnet = SubnetV4::random_local();
+                let iface_ip = subnet.random_client_addr();
+                let gateway_ip = subnet.gateway_ip();
+                let iface = {
+                    EtherIfaceBuilder::new()
+                    .address(iface_ip)
+                    .netmask(subnet.netmask())
+                    .route(RouteV4::new(
+                        SubnetV4::new(ipv4!("0.0.0.0"), 0),
+                        Some(gateway_ip),
+                    ))
                 };
-                assert_eq!(arp.fields(), ArpFields::Request {
-                    source_mac: iface_mac,
-                    source_ip: iface_ip,
-                    dest_ip: gateway_ip,
-                });
-                let frame = EtherFrame::new_from_fields_recursive(
-                    EtherFields {
-                        source_mac: gateway_mac,
-                        dest_mac: iface_mac,
-                    },
-                    EtherPayloadFields::Arp {
-                        fields: ArpFields::Response {
-                            source_mac: gateway_mac,
-                            source_ip: gateway_ip,
-                            dest_mac: iface_mac,
-                            dest_ip: iface_ip,
-                        },
+
+                let payload: [u8; 8] = rand::random();
+                let target_ip = Ipv4Addr::random_global();
+                let target_port = rand::random::<u16>() / 2 + 1000;
+                let target_addr = SocketAddrV4::new(target_ip, target_port);
+
+                trace!("spawning thread");
+                let (join_handle, EtherPlug { tx, rx }) = with_ether_iface(
+                    &handle,
+                    iface,
+                    move || {
+                        let socket = unwrap!(std::net::UdpSocket::bind(addr!("0.0.0.0:0")));
+                        unwrap!(socket.send_to(&payload[..], SocketAddr::V4(target_addr)));
+                        trace!("sent udp packet");
                     },
                 );
 
-                tx
-                .send(frame)
-                .map_err(|_e| panic!("channel hung up!"))
-                .and_then(|_tx| {
-                    rx
-                    .into_future()
-                    .map_err(|(v, _rx)| void::unreachable(v))
-                })
-                .map(move |(frame_opt, _rx)| {
+                let gateway_mac = MacAddr::random();
+
+                rx
+                .into_future()
+                .map_err(|(v, _rx)| void::unreachable(v))
+                .and_then(move |(frame_opt, rx)| {
                     let frame = unwrap!(frame_opt);
-                    assert_eq!(frame.fields(), EtherFields {
+                    trace!("got frame from iface: {:?}", frame);
+                    let iface_mac = frame.source_mac();
+                    let arp = match frame.payload() {
+                        EtherPayload::Arp(arp) => arp,
+                        payload => panic!("unexpected payload: {:?}", payload),
+                    };
+                    assert_eq!(arp.fields(), ArpFields::Request {
                         source_mac: iface_mac,
-                        dest_mac: gateway_mac,
+                        source_ip: iface_ip,
+                        dest_ip: gateway_ip,
                     });
-                    let ipv4 = match frame.payload() {
-                        EtherPayload::Ipv4(ipv4) => ipv4,
-                        payload => panic!("unexpected payload: {:?}", payload),
-                    };
-                    assert_eq!(ipv4.source_ip(), iface_ip);
-                    assert_eq!(ipv4.dest_ip(), target_ip);
-                    let udp = match ipv4.payload() {
-                        Ipv4Payload::Udp(udp) => udp,
-                        payload => panic!("unexpected payload: {:?}", payload),
-                    };
-                    assert_eq!(udp.dest_port(), target_port);
-                    assert_eq!(&udp.payload(), &payload[..]);
-                    unwrap!(join_handle.join())
+                    let frame = EtherFrame::new_from_fields_recursive(
+                        EtherFields {
+                            source_mac: gateway_mac,
+                            dest_mac: iface_mac,
+                        },
+                        EtherPayloadFields::Arp {
+                            fields: ArpFields::Response {
+                                source_mac: gateway_mac,
+                                source_ip: gateway_ip,
+                                dest_mac: iface_mac,
+                                dest_ip: iface_ip,
+                            },
+                        },
+                    );
+
+                    tx
+                    .send(frame)
+                    .map_err(|_e| panic!("channel hung up!"))
+                    .and_then(|_tx| {
+                        rx
+                        .into_future()
+                        .map_err(|(v, _rx)| void::unreachable(v))
+                    })
+                    .map(move |(frame_opt, _rx)| {
+                        let frame = unwrap!(frame_opt);
+                        assert_eq!(frame.fields(), EtherFields {
+                            source_mac: iface_mac,
+                            dest_mac: gateway_mac,
+                        });
+                        let ipv4 = match frame.payload() {
+                            EtherPayload::Ipv4(ipv4) => ipv4,
+                            payload => panic!("unexpected payload: {:?}", payload),
+                        };
+                        assert_eq!(ipv4.source_ip(), iface_ip);
+                        assert_eq!(ipv4.dest_ip(), target_ip);
+                        let udp = match ipv4.payload() {
+                            Ipv4Payload::Udp(udp) => udp,
+                            payload => panic!("unexpected payload: {:?}", payload),
+                        };
+                        assert_eq!(udp.dest_port(), target_port);
+                        assert_eq!(&udp.payload(), &payload[..]);
+                        unwrap!(join_handle.join())
+                    })
                 })
-            })
-        }));
-        res.void_unwrap()
+            }));
+            res.void_unwrap()
+        })
     }
 }
 
