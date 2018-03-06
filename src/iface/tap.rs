@@ -205,8 +205,11 @@ mod test {
 
     #[test]
     fn build_tap_duplicate_name() {
+        trace!("build_tap_duplicate_name: starting");
         run_test(6, || {
+            trace!("build_tap_duplicate_name: in run_test");
             let join_handle = spawn::new_namespace(|| {
+                trace!("build_tap_duplicate_name: inside the namespace");
                 let tap_builder = {
                     EtherIfaceBuilder::new()
                     .address(Ipv4Addr::random_global())

@@ -30,6 +30,8 @@ where
     F: Send + 'static,
     R: Send + 'static,
 {
+    trace!("new_namespace: entering");
+
     let stack_size = unsafe { sys::getpagesize() } as usize;
     let stack_size = cmp::max(stack_size, 4096);
 
@@ -60,6 +62,8 @@ where
     extern "C" fn clone_cb<R: Send + 'static>(arg: *mut c_void) -> c_int {
         let (drop_tx, drop_rx) = mpsc::channel::<Void>();
         {
+            trace!("new_namespace: entered clone_cb");
+
             let data: *mut CbData<R> = arg as *mut _;
             let data: Box<CbData<R>> = unsafe { Box::from_raw(data) };
             //let data: *mut CbData = arg as *mut _;
@@ -96,7 +100,7 @@ where
             //unwrap!(f.write(s.as_bytes()));
 
             let joiner = thread::spawn(move || {
-                trace!("entered the new_namespace spawned thread");
+                trace!("new_namespace: entered spawned thread");
 
                 let ret = func.call_box();
 
@@ -132,6 +136,7 @@ where
             let _ = joiner_tx.send(joiner);
         }
         drop(drop_tx);
+        trace!("new_namespace: exiting clone_cb");
         0
     }
 
@@ -172,7 +177,9 @@ where
         panic!("failed to spawn thread: {}", err);
     }
 
-    unwrap!(joiner_rx.recv())
+    let ret = unwrap!(joiner_rx.recv());
+    trace!("new_namespace: received joiner");
+    ret
 }
 
 #[cfg(test)]
