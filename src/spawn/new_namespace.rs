@@ -48,7 +48,7 @@ where
 
     struct CbData<R: Send + 'static> {
         func: Box<FnBox<R> + Send + 'static>,
-        ret_tx: oneshot::Sender<R>,
+        ret_tx: oneshot::Sender<thread::Result<R>>,
         uid: u32,
         gid: u32,
     }
@@ -81,7 +81,11 @@ where
         //unwrap!(f.write(s.as_bytes()));
 
         let _joiner = thread::spawn(move || {
-            let ret = func.call_box();
+            let func = panic::AssertUnwindSafe(func);
+            let ret = panic::catch_unwind(|| {
+                let panic::AssertUnwindSafe(func) = func;
+                func.call_box()
+            });
             let _ = ret_tx.send(ret);
         });
         0
@@ -150,12 +154,15 @@ where
         panic!("unexpected error from waitpid(): {}", err);
     }
 
-    let joiner = thread::spawn(|| {
+    thread::spawn(|| {
         let mut core = unwrap!(Core::new());
-        unwrap!(core.run(ret_rx))
-    });
-
-    joiner
+        unwrap!(core.run({
+            ret_rx
+            .map_err(|_e| panic!("thread did not send reply!"))
+            .and_then(|res| res)
+        }))
+    })
+    //spawn_complete::from_receiver(ret_rx)
 }
 
 #[cfg(test)]

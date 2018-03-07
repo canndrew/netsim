@@ -1,4 +1,4 @@
-pub use std::{mem, str, fmt, cmp, io, thread, ptr, slice, f64};
+pub use std::{mem, str, fmt, cmp, io, thread, ptr, slice, f64, panic};
 pub use std::any::Any;
 pub use std::thread::JoinHandle;
 pub use std::collections::{hash_map, HashMap, HashSet, BTreeMap, BTreeSet, VecDeque};
