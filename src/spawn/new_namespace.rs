@@ -54,6 +54,7 @@ where
     }
     
     extern "C" fn clone_cb<R: Send + 'static>(arg: *mut c_void) -> c_int {
+        trace!("new_namespace: clone_cb: entering");
         let data: *mut CbData<R> = arg as *mut _;
         let data: Box<CbData<R>> = unsafe { Box::from_raw(data) };
         //let data: *mut CbData = arg as *mut _;
@@ -81,9 +82,12 @@ where
         //unwrap!(f.write(s.as_bytes()));
 
         let _joiner = thread::spawn(move || {
+            trace!("new_namespace: spawned_thread: entered");
             let ret = func.call_box();
             let _ = ret_tx.send(ret);
+            trace!("new_namespace: spawned_thread: exiting");
         });
+        trace!("new_namespace: clone_cb: exiting");
         0
     }
 
@@ -151,8 +155,11 @@ where
     }
 
     let joiner = thread::spawn(|| {
+        trace!("new_namespace: blocking_thread: entering");
         let mut core = unwrap!(Core::new());
-        unwrap!(core.run(ret_rx))
+        let ret = unwrap!(core.run(ret_rx));
+        trace!("new_namespace: blocking_thread: exiting");
+        ret
     });
 
     joiner
