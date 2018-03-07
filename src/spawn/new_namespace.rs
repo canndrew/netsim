@@ -81,12 +81,19 @@ where
         //let s = format!("0 {} 1", gid);
         //unwrap!(f.write(s.as_bytes()));
 
-        let _joiner = thread::spawn(move || {
+        let joiner = thread::spawn(move || {
             trace!("new_namespace: spawned_thread: entered");
             let ret = func.call_box();
             let _ = ret_tx.send(ret);
             trace!("new_namespace: spawned_thread: exiting");
         });
+
+
+        // without this I don't see any output from the above thread on travis.
+        thread::sleep(Duration::from_millis(500));
+        drop(joiner);
+
+
         trace!("new_namespace: clone_cb: exiting");
         0
     }
