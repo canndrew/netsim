@@ -7,7 +7,7 @@ pub fn behind_nat_v4<F, R>(
     nat: NatV4Builder,
     public_ip: Ipv4Addr,
     func: F,
-) -> (JoinHandle<R>, Ipv4Plug)
+) -> (SpawnComplete<R>, Ipv4Plug)
 where
     R: Send + 'static,
     F: FnOnce() -> R + Send + 'static,
@@ -25,11 +25,11 @@ where
         .route(RouteV4::new(SubnetV4::global(), Some(subnet.gateway_ip())))
     };
 
-    let (join_handle, ipv4_plug) = spawn::with_ipv4_iface(handle, iface, func);
+    let (spawn_complete, ipv4_plug) = spawn::with_ipv4_iface(handle, iface, func);
 
     let (ipv4_plug_0, ipv4_plug_1) = Ipv4Plug::new_wire();
     nat.spawn(handle, ipv4_plug_1, ipv4_plug, public_ip);
 
-    (join_handle, ipv4_plug_0)
+    (spawn_complete, ipv4_plug_0)
 }
 

@@ -24,10 +24,10 @@ where
         self,
         handle: &Handle,
         subnet: SubnetV4,
-    ) -> (JoinHandle<N::Output>, Ipv4Plug) {
-        let (join_handle, plug) = self.node.build(handle, subnet);
+    ) -> (SpawnComplete<N::Output>, Ipv4Plug) {
+        let (spawn_complete, plug) = self.node.build(handle, subnet);
         let plug = plug.with_hops(handle, self.num_hops);
-        (join_handle, plug)
+        (spawn_complete, plug)
     }
 }
 

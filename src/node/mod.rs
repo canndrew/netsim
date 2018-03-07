@@ -26,14 +26,14 @@ pub trait Ipv4Node: Sized {
     /// The type returned by the thread spawned by this node.
     type Output: Send + 'static;
 
-    /// Consume the `Ipv4Node` and build the network it describes. Returns a `JoinHandle` that can
+    /// Consume the `Ipv4Node` and build the network it describes. Returns a `SpawnComplete` that can
     /// be used to join the spawned thread and an `Ipv4Plug` that can be used to read-write packets to
     /// the head node of the network.
     fn build(
         self,
         handle: &Handle,
         subnet: SubnetV4,
-    ) -> (JoinHandle<Self::Output>, Ipv4Plug);
+    ) -> (SpawnComplete<Self::Output>, Ipv4Plug);
 
     /// Chain some extra hops onto the node, causing TTL values of packets to decrease by
     /// `num_hops` on their way to/from the node.
@@ -71,7 +71,7 @@ pub trait EtherNode: Sized {
     /// The type returned by the thread spawned by this node.
     type Output: Send + 'static;
 
-    /// Consume the `EtherNode` and build the network it describes. Returns a `JoinHandle` that can
+    /// Consume the `EtherNode` and build the network it describes. Returns a `SpawnComplete` that can
     /// be used to join the spawned thread and an `EtherPlug` that can be used to read-write frames to
     /// the head node of the network.
     fn build(
@@ -79,6 +79,6 @@ pub trait EtherNode: Sized {
         handle: &Handle,
         subnet_v4: Option<SubnetV4>,
         subnet_v6: Option<SubnetV6>,
-    ) -> (JoinHandle<Self::Output>, EtherPlug);
+    ) -> (SpawnComplete<Self::Output>, EtherPlug);
 }
 

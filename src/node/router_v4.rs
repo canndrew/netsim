@@ -1,4 +1,5 @@
 use priv_prelude::*;
+use spawn_complete;
 
 /// A set of clients that can be attached to a router node.
 pub trait RouterClientsV4 {
@@ -6,7 +7,7 @@ pub trait RouterClientsV4 {
     type Output: Send + 'static;
 
     /// Build the set of nodes.
-    fn build(self, handle: &Handle, subnet: SubnetV4) -> (JoinHandle<Self::Output>, Ipv4Plug);
+    fn build(self, handle: &Handle, subnet: SubnetV4) -> (SpawnComplete<Self::Output>, Ipv4Plug);
 }
 
 macro_rules! tuple_impl {
@@ -17,7 +18,7 @@ macro_rules! tuple_impl {
         {
             type Output = ($($ty::Output,)*);
             
-            fn build(self, handle: &Handle, subnet: SubnetV4) -> (JoinHandle<Self::Output>, Ipv4Plug) {
+            fn build(self, handle: &Handle, subnet: SubnetV4) -> (SpawnComplete<Self::Output>, Ipv4Plug) {
                 #![allow(non_snake_case)]
                 #![allow(unused_assignments)]
                 #![allow(unused_mut)]
@@ -72,11 +73,24 @@ macro_rules! tuple_impl {
                 let router = router.connect(plug_1, vec![RouteV4::new(SubnetV4::global(), None)]);
                 router.spawn(handle);
 
+                // TODO: fix this silly bullshit
+                let (ret_tx, ret_rx) = oneshot::channel();
                 let join_handle = thread::spawn(move || {
-                    ($(unwrap!($ty.join()),)*)
+                    let doit = move || {
+                        $(
+                            let $ty = {
+                                let mut core = unwrap!(Core::new());
+                                core.run($ty)?
+                            };
+                        )*
+                        Ok(($($ty,)*))
+                    };
+                    let _ = ret_tx.send(doit());
                 });
 
-                (join_handle, plug_0)
+                let spawn_complete = spawn_complete::from_receiver(ret_rx);
+
+                (spawn_complete, plug_0)
             }
         }
     }
@@ -119,7 +133,7 @@ where
         self,
         handle: &Handle,
         subnet: SubnetV4,
-    ) -> (JoinHandle<C::Output>, Ipv4Plug) {
+    ) -> (SpawnComplete<C::Output>, Ipv4Plug) {
         self.clients.build(handle, subnet)
     }
 }

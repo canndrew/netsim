@@ -2,13 +2,13 @@ use priv_prelude::*;
 use spawn;
 
 /// Spawn a function into a new network namespace with a single network interface with an address
-/// in `subnet`. Returns a `JoinHandle` which can be used to join the spawned thread, along with
+/// in `subnet`. Returns a `SpawnComplete` which can be used to join the spawned thread, along with
 /// an `Ipv4Plug` which can be used to read/write network activity from the spawned thread.
 pub fn on_subnet_v4<F, R>(
     handle: &Handle,
     subnet: SubnetV4,
     func: F,
-) -> (JoinHandle<R>, Ipv4Plug)
+) -> (SpawnComplete<R>, Ipv4Plug)
 where
     R: Send + 'static,
     F: FnOnce(Ipv4Addr) -> R + Send + 'static
@@ -21,8 +21,8 @@ where
         .route(RouteV4::new(subnet, None))
     };
 
-    let (join_handle, ipv4_plug) = spawn::with_ipv4_iface(handle, iface, move || func(iface_ip));
+    let (spawn_complete, ipv4_plug) = spawn::with_ipv4_iface(handle, iface, move || func(iface_ip));
 
-    (join_handle, ipv4_plug)
+    (spawn_complete, ipv4_plug)
 }
 

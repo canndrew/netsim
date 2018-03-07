@@ -6,7 +6,7 @@ pub fn network_v4<N: Ipv4Node>(
     handle: &Handle,
     subnet: SubnetV4,
     node: N,
-) -> (JoinHandle<N::Output>, Ipv4Plug) {
+) -> (SpawnComplete<N::Output>, Ipv4Plug) {
     node.build(handle, subnet)
 }
 

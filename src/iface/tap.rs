@@ -206,7 +206,7 @@ mod test {
     #[test]
     fn build_tap_duplicate_name() {
         run_test(3, || {
-            let join_handle = spawn::new_namespace(|| {
+            let spawn_complete = spawn::new_namespace(|| {
                 let tap_builder = {
                     EtherIfaceBuilder::new()
                     .address(Ipv4Addr::random_global())
@@ -227,14 +227,15 @@ mod test {
                 }
                 trace!("build_tap_duplicate_name: done");
             });
-            unwrap!(join_handle.join());
+            let mut core = unwrap!(Core::new());
+            unwrap!(core.run(spawn_complete))
         });
     }
 
     #[test]
     fn build_tap_permission_denied() {
         run_test(3, || {
-            let join_handle = spawn::new_namespace(|| {
+            let spawn_complete = spawn::new_namespace(|| {
                 unwrap!(unwrap!(capabilities::Capabilities::new()).apply());
 
                 let tap_builder = EtherIfaceBuilder::new();
@@ -243,7 +244,8 @@ mod test {
                     res => panic!("unexpected result: {:?}", res),
                 }
             });
-            unwrap!(join_handle.join());
+            let mut core = unwrap!(Core::new());
+            unwrap!(core.run(spawn_complete))
         })
     }
 }

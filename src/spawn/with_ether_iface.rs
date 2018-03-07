@@ -4,19 +4,19 @@ use future_utils;
 use spawn;
 
 /// Spawn a function into a new network namespace with a network interface described by `iface`.
-/// Returns a `JoinHandle` which can be used to join the spawned thread, along with a channel which
+/// Returns a `SpawnComplete` which can be used to join the spawned thread, along with a channel which
 /// can be used to read/write ethernet frames to the spawned thread's interface.
 pub fn with_ether_iface<F, R>(
     handle: &Handle,
     iface: EtherIfaceBuilder,
     func: F,
-) -> (JoinHandle<R>, EtherPlug)
+) -> (SpawnComplete<R>, EtherPlug)
 where
     R: Send + 'static,
     F: FnOnce() -> R + Send + 'static,
 {
     let (tx, rx) = std::sync::mpsc::channel();
-    let join_handle = spawn::new_namespace(move || {
+    let spawn_complete = spawn::new_namespace(move || {
         trace!("building tap {:?}", iface);
         let (drop_tx, drop_rx) = future_utils::drop_notify();
         let tap_unbound = unwrap!(iface.build_unbound());
@@ -44,7 +44,7 @@ where
 
     handle.spawn(task.infallible());
 
-    (join_handle, plug_b)
+    (spawn_complete, plug_b)
 }
 
 struct TapTask {
@@ -196,7 +196,7 @@ mod test {
                 let target_addr = SocketAddrV4::new(target_ip, target_port);
 
                 trace!("spawning thread");
-                let (join_handle, EtherPlug { tx, rx }) = with_ether_iface(
+                let (spawn_complete, EtherPlug { tx, rx }) = with_ether_iface(
                     &handle,
                     iface,
                     move || {
@@ -247,7 +247,7 @@ mod test {
                         .into_future()
                         .map_err(|(v, _rx)| void::unreachable(v))
                     })
-                    .map(move |(frame_opt, _rx)| {
+                    .and_then(move |(frame_opt, _rx)| {
                         let frame = unwrap!(frame_opt);
                         assert_eq!(frame.fields(), EtherFields {
                             source_mac: iface_mac,
@@ -265,7 +265,9 @@ mod test {
                         };
                         assert_eq!(udp.dest_port(), target_port);
                         assert_eq!(&udp.payload(), &payload[..]);
-                        unwrap!(join_handle.join())
+
+                        spawn_complete
+                        .map_err(|e| panic::resume_unwind(e))
                     })
                 })
             }));

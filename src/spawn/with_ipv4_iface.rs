@@ -4,19 +4,19 @@ use future_utils;
 use spawn;
 
 /// Spawn a function into a new network namespace with a network interface described by `iface`.
-/// Returns a `JoinHandle` which can be used to join the spawned thread, along with a channel which
+/// Returns a `SpawnComplete` which can be used to join the spawned thread, along with a channel which
 /// can be used to read/write IPv4 packets to the spawned thread's interface.
 pub fn with_ipv4_iface<F, R>(
     handle: &Handle,
     iface: Ipv4IfaceBuilder,
     func: F,
-) -> (JoinHandle<R>, Ipv4Plug)
+) -> (SpawnComplete<R>, Ipv4Plug)
 where
     R: Send + 'static,
     F: FnOnce() -> R + Send + 'static,
 {
     let (tx, rx) = std::sync::mpsc::channel();
-    let join_handle = spawn::new_namespace(move || {
+    let spawn_complete = spawn::new_namespace(move || {
         trace!("building tun {:?}", iface);
         let (drop_tx, drop_rx) = future_utils::drop_notify();
         let tun_unbound = unwrap!(iface.build_unbound());
@@ -44,7 +44,7 @@ where
 
     handle.spawn(task.infallible());
 
-    (join_handle, plug_b)
+    (spawn_complete, plug_b)
 }
 
 struct TunTask {
@@ -195,7 +195,7 @@ mod test {
                     .route(RouteV4::new(SubnetV4::global(), None))
                 };
 
-                let (join_handle, ipv4_plug) = with_ipv4_iface(&handle, iface, move || {
+                let (spawn_complete, ipv4_plug) = with_ipv4_iface(&handle, iface, move || {
                     let buffer_out = rand::random::<[u8; 8]>();
                     let socket = unwrap!(std::net::UdpSocket::bind(addr!("0.0.0.0:0")));
                     let n = unwrap!(socket.send_to(&buffer_out, &SocketAddr::V4(remote_addr)));
@@ -246,7 +246,8 @@ mod test {
                     .send(reply_packet)
                     .map_err(|_e| panic!("plug hung up!"))
                     .and_then(move |_plug_tx| {
-                        future_utils::thread_future(|| unwrap!(join_handle.join()))
+                        spawn_complete
+                        .map_err(|e| panic::resume_unwind(e))
                     })
                 })
             }));
@@ -273,7 +274,7 @@ mod test {
                     .route(RouteV4::new(SubnetV4::global(), None))
                 };
 
-                let (join_handle, ipv4_plug) = with_ipv4_iface(&handle, iface, move || {
+                let (spawn_complete, ipv4_plug) = with_ipv4_iface(&handle, iface, move || {
                     let buffer_out = rand::random::<[u8; 8]>();
                     let mut stream = unwrap!(std::net::TcpStream::connect(&remote_addr));
                     let n = unwrap!(stream.write(&buffer_out));
@@ -467,7 +468,8 @@ mod test {
                                         assert_eq!(tcp.source_port(), iface_port);
                                         assert_eq!(tcp.kind(), TcpPacketKind::Ack);
 
-                                        future_utils::thread_future(|| unwrap!(join_handle.join()))
+                                        spawn_complete
+                                        .map_err(|e| panic::resume_unwind(e))
                                     })
                                 })
                             })
@@ -497,7 +499,7 @@ mod test {
                     .route(RouteV4::new(SubnetV4::global(), None))
                 };
 
-                let (join_handle, ipv4_plug) = with_ipv4_iface(&handle, iface, move || {
+                let (spawn_complete, ipv4_plug) = with_ipv4_iface(&handle, iface, move || {
                     unwrap!(done_rx.recv());
                 });
 
@@ -546,7 +548,9 @@ mod test {
                             kind => panic!("unexpected ICMP reply kind: {:?}", kind),
                         }
                         unwrap!(done_tx.send(()));
-                        future_utils::thread_future(|| unwrap!(join_handle.join()))
+
+                        spawn_complete
+                        .map_err(|e| panic::resume_unwind(e))
                     })
                 })
             }));

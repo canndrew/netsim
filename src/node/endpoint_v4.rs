@@ -26,7 +26,7 @@ where
         self,
         handle: &Handle,
         subnet: SubnetV4,
-    ) -> (JoinHandle<R>, Ipv4Plug) {
+    ) -> (SpawnComplete<R>, Ipv4Plug) {
         let address = subnet.random_client_addr();
         let iface = {
             Ipv4IfaceBuilder::new()
@@ -34,11 +34,11 @@ where
             .netmask(subnet.netmask())
             .route(RouteV4::new(SubnetV4::global(), None))
         };
-        let (join_handle, ipv4_plug) = spawn::with_ipv4_iface(
+        let (spawn_complete, ipv4_plug) = spawn::with_ipv4_iface(
             handle,
             iface, move || (self.func)(address),
         );
-        (join_handle, ipv4_plug)
+        (spawn_complete, ipv4_plug)
     }
 }
 

@@ -1,8 +1,8 @@
 use priv_prelude::*;
 use sys;
 use libc;
-use std::thread::JoinHandle;
 use libc::{c_int, c_void};
+use spawn_complete;
 
 const STACK_ALIGN: usize = 16;
 
@@ -23,7 +23,7 @@ where
 /// Run the function `func` in its own network namespace. This namespace will not have any network
 /// interfaces. You can create virtual interfaces using `Tap`, or use one of the other functions in
 /// the `spawn` module which do this for you.
-pub fn new_namespace<F, R>(func: F) -> JoinHandle<R>
+pub fn new_namespace<F, R>(func: F) -> SpawnComplete<R>
 where
     F: FnOnce() -> R,
     F: Send + 'static,
@@ -154,15 +154,7 @@ where
         panic!("unexpected error from waitpid(): {}", err);
     }
 
-    thread::spawn(|| {
-        let mut core = unwrap!(Core::new());
-        unwrap!(core.run({
-            ret_rx
-            .map_err(|_e| panic!("thread did not send reply!"))
-            .and_then(|res| res)
-        }))
-    })
-    //spawn_complete::from_receiver(ret_rx)
+    spawn_complete::from_receiver(ret_rx)
 }
 
 #[cfg(test)]
@@ -178,13 +170,14 @@ mod test {
             };
 
             TEST.with(|v| v.set(123));
-            let join_handle = new_namespace(|| {
+            let spawn_complete = new_namespace(|| {
                 TEST.with(|v| {
                     assert_eq!(v.get(), 0);
                     v.set(456);
                 });
             });
-            unwrap!(join_handle.join());
+            let mut core = unwrap!(Core::new());
+            unwrap!(core.run(spawn_complete));
             TEST.with(|v| assert_eq!(v.get(), 123));
         })
     }

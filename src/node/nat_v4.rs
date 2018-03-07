@@ -26,7 +26,7 @@ where
         self,
         handle: &Handle,
         subnet: SubnetV4,
-    ) -> (JoinHandle<N::Output>, Ipv4Plug) {
+    ) -> (SpawnComplete<N::Output>, Ipv4Plug) {
         let ip = subnet.random_client_addr();
 
         let private_subnet = {
@@ -35,10 +35,10 @@ where
             .unwrap_or_else(SubnetV4::random_local)
         };
         let nat_builder = self.nat_builder.subnet(private_subnet);
-        let (join_handle, client_plug) = self.node.build(handle, private_subnet);
+        let (spawn_complete, client_plug) = self.node.build(handle, private_subnet);
         let (public_plug_0, public_plug_1) = Ipv4Plug::new_wire();
         nat_builder.spawn(handle, public_plug_1, client_plug, ip);
-        (join_handle, public_plug_0)
+        (spawn_complete, public_plug_0)
     }
 }
 

@@ -5,7 +5,7 @@ use spawn;
 pub fn on_internet_v4<F, R>(
     handle: &Handle,
     func: F,
-) -> (JoinHandle<R>, Ipv4Plug)
+) -> (SpawnComplete<R>, Ipv4Plug)
 where
     R: Send + 'static,
     F: FnOnce(Ipv4Addr) -> R + Send + 'static,
@@ -18,8 +18,8 @@ where
         .route(route)
     };
 
-    let (join_handle, ipv4_plug) = spawn::with_ipv4_iface(handle, iface, move || func(iface_ip));
+    let (spawn_complete, ipv4_plug) = spawn::with_ipv4_iface(handle, iface, move || func(iface_ip));
 
-    (join_handle, ipv4_plug)
+    (spawn_complete, ipv4_plug)
 }
 
