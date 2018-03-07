@@ -111,15 +111,31 @@ where
                 CStr::from_ptr(utsname.release.as_ptr())
             };
             let version = unwrap!(version.to_str());
+            let passwd = unsafe {
+                sys::getpwuid(uid)
+            };
+            let user_name = unsafe {
+                CStr::from_ptr((*passwd).pw_name)
+            };
+            let user_name = unwrap!(user_name.to_str());
+            let group = unsafe {
+                sys::getgrgid(gid)
+            };
+            let group_name = unsafe {
+                CStr::from_ptr((*group).gr_name)
+            };
+            let group_name = unwrap!(group_name.to_str());
+
             panic!(
                 "\
                 Failed to call clone(CLONE_NEWUSER | CLONE_NEWNET) (permission denied). \
-                Your kernel is probably too old. \
+                Your kernel may be too old. \
                 Version >= 3.8 is required, your version is {}. \
-                uid and gid values must also be valid. \
-                Your uid == {}, gid == {}.\
+                Your user/group must also be valid (not nobody). \
+                Your user == {}, group == {}. \
+                You cannot use netsim in a chroot.\
                 ",
-                version, uid, gid,
+                version, user_name, group_name,
             );
         }
         panic!("failed to spawn thread: {}", err);
