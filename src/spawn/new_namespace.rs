@@ -1,7 +1,6 @@
 use priv_prelude::*;
 use sys;
 use libc;
-use std::sync::mpsc;
 use std::thread::JoinHandle;
 use libc::{c_int, c_void};
 
@@ -49,7 +48,7 @@ where
 
     struct CbData<R: Send + 'static> {
         func: Box<FnBox<R> + Send + 'static>,
-        joiner_tx: mpsc::Sender<JoinHandle<R>>,
+        ret_tx: oneshot::Sender<R>,
         uid: u32,
         gid: u32,
     }
@@ -60,7 +59,7 @@ where
         //let data: *mut CbData = arg as *mut _;
         //let data: Box<CbData> = unsafe { Box::from_raw(data) };
         let data = *data;
-        let CbData { func, joiner_tx, uid, gid } = data;
+        let CbData { func, ret_tx, uid, gid } = data;
 
         // WARNING: HACKERY
         // 
@@ -81,19 +80,19 @@ where
         //let s = format!("0 {} 1", gid);
         //unwrap!(f.write(s.as_bytes()));
 
-        let joiner = thread::spawn(move || {
-            func.call_box()
+        let _joiner = thread::spawn(move || {
+            let ret = func.call_box();
+            let _ = ret_tx.send(ret);
         });
-        let _ = joiner_tx.send(joiner);
         0
     }
 
     let uid = unsafe { sys::geteuid() };
     let gid = unsafe { sys::getegid() };
-    let (joiner_tx, joiner_rx) = mpsc::channel();
+    let (ret_tx, ret_rx) = oneshot::channel();
     let stack_head = ((stack_base as usize + stack_size + STACK_ALIGN) & !(STACK_ALIGN - 1)) as *mut c_void;
     let func = Box::new(func);
-    let arg: Box<CbData<R>> = Box::new(CbData { func, joiner_tx, uid, gid });
+    let arg: Box<CbData<R>> = Box::new(CbData { func, ret_tx, uid, gid });
     let arg = Box::into_raw(arg) as *mut c_void;
     
     let pid = unsafe {
@@ -151,7 +150,12 @@ where
         panic!("unexpected error from waitpid(): {}", err);
     }
 
-    unwrap!(joiner_rx.recv())
+    let joiner = thread::spawn(|| {
+        let mut core = unwrap!(Core::new());
+        unwrap!(core.run(ret_rx))
+    });
+
+    joiner
 }
 
 #[cfg(test)]

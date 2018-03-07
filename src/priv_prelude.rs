@@ -10,6 +10,7 @@ pub use void::{Void, ResultVoidExt};
 pub use std::ffi::{CStr, CString};
 pub use futures::{future, stream, Future, Stream, Sink, Async, AsyncSink};
 pub use futures::stream::FuturesUnordered;
+pub use futures::sync::oneshot;
 pub use std::os::unix::io::{RawFd, AsRawFd, FromRawFd};
 pub use tokio_io::{AsyncRead, AsyncWrite};
 pub use tokio_core::reactor::{Core, Handle, PollEvented};
