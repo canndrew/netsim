@@ -16,16 +16,17 @@ network interfaces using the [`get_if_addrs`](https://crates.io/crates/get_if_ad
 extern crate netsim;
 extern crate get_if_addrs;
 use netsim::spawn;
+use crate get_if_addrs::get_if_addrs;
 
 // First, check that there is more than one network interface. This will generally be true
 // since there will at least be the loopback interface.
-let interfaces = get_if_addrs::get_if_addrs().unwrap();
+let interfaces = get_if_addrs().unwrap();
 assert!(interfaces.len() > 0);
 
 // Now check how many network interfaces we can see inside a fresh network namespace. There
 // should be zero.
 let join_handle = spawn::new_namespace(|| {
-    get_if_addrs::get_if_addrs().unwrap()
+    get_if_addrs().unwrap()
 });
 let interfaces = join_handle.join().unwrap();
 assert!(interfaces.is_empty());
@@ -40,7 +41,7 @@ We can create virtual IP and Ethernet interfaces using the types in the `iface` 
 example, `Ipv4Iface` lets you create a new IP (TUN) interface and implements `futures::{Stream,
 Sink}` so that you can read/write raw packets to it.
 
-```rust,no_run
+```rust
 extern crate netsim;
 extern crate tokio_core;
 extern crate futures;
@@ -72,12 +73,12 @@ let packet = core.run({
 }).unwrap();
 ```
 
-However for simply testing network code, you don't need to create interfaces manually like
+However, for simply testing network code, you don't need to create interfaces manually like
 this.
 
 ### Sandboxing network code
 
-Rather than performing the above two steps individually you can use the functions in the
+Rather than performing the above two steps individually, you can use the functions in the
 `spawn` module to set up various network environments for you. For example,
 `spawn::on_subnet_v4` will spawn a thread with a single network interface configured to use the
 given subnet. It returns a `JoinHandle` to join the thread with and an `Ipv4Plug` to read/write
@@ -163,8 +164,7 @@ separate thread. A future version of this library may clean this situation up.
 
 ### All the rest
 
-It's possible to set up more complicated (non-hierarchal) network topologies, ethernet
+It's possible to set up more complicated (non-hierarchical) network topologies, ethernet
 networks, namespaces with multiple interfaces etc. by directly using the primitives in this
 library. Have an explore of the API, and if anything needs clarification or could be designed
 better then drop a message on the bug tracker :)
-
