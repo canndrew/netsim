@@ -189,7 +189,7 @@ mod test {
 
     #[test]
     fn build_tap_name_contains_nul() {
-        run_test(1, || {
+        run_test(10, || {
             let tap_builder = {
                 EtherIfaceBuilder::new()
                 .address(Ipv4Addr::random_global())
@@ -205,7 +205,7 @@ mod test {
 
     #[test]
     fn build_tap_duplicate_name() {
-        run_test(3, || {
+        run_test(30, || {
             let join_handle = spawn::new_namespace(|| {
                 let tap_builder = {
                     EtherIfaceBuilder::new()
@@ -233,7 +233,7 @@ mod test {
 
     #[test]
     fn build_tap_permission_denied() {
-        run_test(3, || {
+        run_test(30, || {
             let join_handle = spawn::new_namespace(|| {
                 unwrap!(unwrap!(capabilities::Capabilities::new()).apply());
 
