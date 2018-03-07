@@ -1,4 +1,5 @@
 pub use std::{mem, str, fmt, cmp, io, thread, ptr, slice, f64};
+pub use std::any::Any;
 pub use std::thread::JoinHandle;
 pub use std::collections::{hash_map, HashMap, HashSet, BTreeMap, BTreeSet, VecDeque};
 pub use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
@@ -33,6 +34,7 @@ pub use subnet::{SubnetV4, SubnetV6};
 pub use iface::{IfaceBuildError, EtherIface, EtherIfaceBuilder, Ipv4Iface, Ipv4IfaceBuilder};
 pub use device::{EtherAdaptorV4, NatV4Builder, LatencyV4, HopV4, RouterV4Builder, PacketLossV4};
 pub use node::Ipv4Node;
+pub use spawn_complete::SpawnComplete;
 
 #[cfg(test)]
 pub use test::run_test;

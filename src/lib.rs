@@ -237,6 +237,7 @@ mod sys;
 mod async_fd;
 mod route;
 mod subnet;
+mod spawn_complete;
 pub mod iface;
 pub mod node;
 pub mod device;
@@ -247,4 +248,5 @@ mod test;
 
 pub use subnet::SubnetV4;
 pub use route::{RouteV4, AddRouteError};
+pub use spawn_complete::SpawnComplete;
 
