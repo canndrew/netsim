@@ -17,11 +17,13 @@ where
 {
     let (tx, rx) = std::sync::mpsc::channel();
     let spawn_complete = spawn::new_namespace(move || {
-        trace!("building tun {:?}", iface);
+        let tid = unsafe { ::sys::syscall(::libc::c_long::from(::sys::SYS_gettid)) };
+        trace!("{} building tun {:?}", tid, iface);
         let (drop_tx, drop_rx) = future_utils::drop_notify();
         let tun_unbound = unwrap!(iface.build_unbound());
         unwrap!(tx.send((tun_unbound, drop_rx)));
         let ret = func();
+        trace!("{} dropping TUN handle", tid);
         drop(drop_tx);
         ret
     });

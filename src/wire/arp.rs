@@ -156,5 +156,10 @@ impl ArpPacket {
     pub fn as_bytes(&self) -> &Bytes {
         &self.buffer
     }
+
+    /// Consume the packet and return the underlying buffer
+    pub fn into_bytes(self) -> Bytes {
+        self.buffer
+    }
 }
 

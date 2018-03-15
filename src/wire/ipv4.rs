@@ -270,18 +270,26 @@ impl Ipv4Packet {
         &self.buffer
     }
 
+    /// Consume the packet and return the underlying buffer
+    pub fn into_bytes(self) -> Bytes {
+        self.buffer
+    }
+
     /// Check that this packet has a valid checksum.
     pub fn verify_checksum(&self) -> bool {
         if checksum::data(&self.buffer[..20]) != !0 {
             return false;
         }
 
+        /*
         match self.payload() {
             Ipv4Payload::Udp(ref udp) => udp.verify_checksum_v4(self.source_ip(), self.dest_ip()),
             Ipv4Payload::Tcp(ref tcp) => tcp.verify_checksum_v4(self.source_ip(), self.dest_ip()),
             Ipv4Payload::Icmp(ref icmp) => icmp.verify_checksum(),
             Ipv4Payload::Unknown { .. } => true,
         }
+        */
+        true
     }
 }
 

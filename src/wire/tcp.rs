@@ -197,6 +197,11 @@ impl TcpPacket {
         &self.buffer
     }
 
+    /// Consume the packet and return the underlying buffer
+    pub fn into_bytes(self) -> Bytes {
+        self.buffer
+    }
+
     /// Verify the checksum of the packet. The source/destination IP addresses of the packet are
     /// needed to calculate the checksum.
     pub fn verify_checksum_v4(

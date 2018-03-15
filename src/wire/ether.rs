@@ -201,6 +201,11 @@ impl EtherFrame {
     pub fn as_bytes(&self) -> &Bytes {
         &self.buffer
     }
+
+    /// Consume the frame and return the underlying buffer
+    pub fn into_bytes(self) -> Bytes {
+        self.buffer
+    }
 }
 
 /// An ethernet connection, used to send/receive ethernet frames to/from the plug at the other end.

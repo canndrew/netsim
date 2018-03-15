@@ -225,6 +225,11 @@ impl Icmpv4Packet {
         &self.buffer
     }
 
+    /// Consume the packet and return the underlying buffer
+    pub fn into_bytes(self) -> Bytes {
+        self.buffer
+    }
+
     /// Returns `true` if this ICMP packet has a valid checksum
     pub fn verify_checksum(&self) -> bool {
         checksum::data(&self.buffer) == !0
