@@ -12,12 +12,16 @@ mod latency_v4;
 mod packet_loss_v4;
 mod router_v4;
 
+mod endpoint_eth;
+
 pub use self::nat_v4::nat_v4;
 pub use self::endpoint_v4::endpoint_v4;
 pub use self::hops_v4::hops_v4;
 pub use self::latency_v4::latency_v4;
 pub use self::packet_loss_v4::packet_loss_v4;
 pub use self::router_v4::{router_v4, RouterClientsV4};
+
+pub use self::endpoint_eth::endpoint_eth;
 
 /// An `Ipv4Node` describes a recipe for constructing a network when given the subnet that the network
 /// should operate on. The functions in the `node` module return `Ipv4Node`s that you can then run as a
@@ -78,7 +82,6 @@ pub trait EtherNode: Sized {
         self,
         handle: &Handle,
         subnet_v4: Option<SubnetV4>,
-        subnet_v6: Option<SubnetV6>,
     ) -> (SpawnComplete<Self::Output>, EtherPlug);
 }
 

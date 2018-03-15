@@ -23,6 +23,7 @@ pub use future_utils::mpsc::{UnboundedSender, UnboundedReceiver};
 pub use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 pub use rand::Rng;
 pub use rand::distributions::IndependentSample;
+pub use std::marker::PhantomData;
 
 pub use async_fd::AsyncFd;
 pub use util::bytes_mut::BytesMutExt;
@@ -34,7 +35,7 @@ pub use route::{RouteV4, AddRouteError};
 pub use subnet::{SubnetV4, SubnetV6};
 pub use iface::{IfaceBuildError, EtherIface, EtherIfaceBuilder, Ipv4Iface, Ipv4IfaceBuilder};
 pub use device::{EtherAdaptorV4, NatV4Builder, LatencyV4, HopV4, RouterV4Builder, PacketLossV4};
-pub use node::Ipv4Node;
+pub use node::{Ipv4Node, EtherNode};
 pub use spawn_complete::SpawnComplete;
 
 #[cfg(test)]
