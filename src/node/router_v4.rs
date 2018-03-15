@@ -10,11 +10,16 @@ pub trait RouterClientsV4 {
     fn build(self, handle: &Handle, subnet: SubnetV4) -> (SpawnComplete<Self::Output>, Ipv4Plug);
 }
 
+struct JoinAll<X, T> {
+    phantoms: PhantomData<X>,
+    children: T,
+}
+
 macro_rules! tuple_impl {
     ($($ty:ident,)*) => {
         impl<$($ty),*> RouterClientsV4 for ($($ty,)*)
         where
-            $($ty: Ipv4Node,)*
+            $($ty: Ipv4Node + 'static,)*
         {
             type Output = ($($ty::Output,)*);
             
@@ -73,24 +78,52 @@ macro_rules! tuple_impl {
                 let router = router.connect(plug_1, vec![RouteV4::new(SubnetV4::global(), None)]);
                 router.spawn(handle);
 
-                // TODO: fix this silly bullshit
                 let (ret_tx, ret_rx) = oneshot::channel();
-                let join_handle = thread::spawn(move || {
-                    let doit = move || {
-                        $(
-                            let $ty = {
-                                let mut core = unwrap!(Core::new());
-                                core.run($ty)?
-                            };
-                        )*
-                        Ok(($($ty,)*))
-                    };
-                    let _ = ret_tx.send(doit());
+                handle.spawn({
+                    JoinAll { phantoms: PhantomData::<($($ty,)*)>, children: ($(($ty, None),)*) }
+                    .then(|result| {
+                        let _ = ret_tx.send(result);
+                        Ok(())
+                    })
                 });
 
                 let spawn_complete = spawn_complete::from_receiver(ret_rx);
 
                 (spawn_complete, plug_0)
+            }
+        }
+
+        impl<$($ty),*> Future for JoinAll<($($ty,)*), ($((SpawnComplete<$ty::Output>, Option<$ty::Output>),)*)>
+        where
+            $($ty: Ipv4Node + 'static,)*
+        {
+            type Item = ($($ty::Output,)*);
+            type Error = Box<Any + Send + 'static>;
+
+            fn poll(&mut self) -> thread::Result<Async<Self::Item>> {
+                #![allow(non_snake_case)]
+
+                let ($(ref mut $ty,)*) = self.children;
+                $({
+                    let (ref mut spawn_complete, ref mut result) = *$ty;
+                    if result.is_none() {
+                        match spawn_complete.poll()? {
+                            Async::Ready(val) => {
+                                *result = Some(val);
+                            },
+                            Async::NotReady => {
+                                return Ok(Async::NotReady);
+                            },
+                        }
+                    }
+                })*
+
+                $(
+                    let (_, ref mut result) = *$ty;
+                    let $ty = unwrap!(result.take());
+                )*
+
+                Ok(Async::Ready(($($ty,)*)))
             }
         }
     }
