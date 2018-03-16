@@ -82,7 +82,7 @@ where
 
         let _joiner = thread::spawn(move || {
             let func = panic::AssertUnwindSafe(func);
-            let ret = panic::catch_unwind(|| {
+            let ret = panic::catch_unwind(move || {
                 let panic::AssertUnwindSafe(func) = func;
                 func.call_box()
             });
