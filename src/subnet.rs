@@ -121,6 +121,45 @@ impl SubnetV4 {
         let test_addr = u32::from(ip);
         (base_addr ^ test_addr).leading_zeros() >= u32::from(self.bits)
     }
+
+    /// Split a subnet into `num` sub-subnets
+    ///
+    /// # Panics
+    ///
+    /// If the subnet is too small to be split up that much.
+    pub fn split(self, num: u32) -> Vec<SubnetV4> {
+        let mut ret = Vec::with_capacity(num as usize);
+        let mut n = 0u32;
+        loop {
+            let mut n_reversed = 0;
+            for i in 0..32 {
+                if n & (1 << i) != 0 {
+                    n_reversed |= 0x8000_0000u32 >> i;
+                }
+            }
+            let base_addr = u32::from(self.addr);
+            let ip = base_addr | (n_reversed >> self.bits);
+            let ip = Ipv4Addr::from(ip);
+            if !self.addr.is_private() && !Ipv4AddrExt::is_global(&ip) {
+                n += 1;
+                continue;
+            }
+            ret.push(SubnetV4 {
+                addr: ip,
+                bits: 0,
+            });
+            if ret.len() == num as usize {
+                break;
+            }
+            n += 1;
+        }
+        let extra_bits = (32 - n.leading_zeros()) as u8;
+        let bits = self.bits + extra_bits;
+        for subnet in &mut ret {
+            subnet.bits = bits;
+        }
+        ret
+    }
 }
 
 impl FromStr for SubnetV4 {

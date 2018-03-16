@@ -1,13 +1,13 @@
 use priv_prelude::*;
 use spawn_complete;
 
-/// A set of clients that can be attached to a router node.
-pub trait RouterClientsV4 {
-    /// The output of the nodes attached to the router.
+/// A set of clients that can be attached to a hub node.
+pub trait HubClients {
+    /// The output of the nodes attached to the hub.
     type Output: Send + 'static;
 
     /// Build the set of nodes.
-    fn build(self, handle: &Handle, subnet: SubnetV4) -> (SpawnComplete<Self::Output>, Ipv4Plug);
+    fn build(self, handle: &Handle, subnet: Option<SubnetV4>) -> (SpawnComplete<Self::Output>, EtherPlug);
 }
 
 struct JoinAll<X, T> {
@@ -17,43 +17,56 @@ struct JoinAll<X, T> {
 
 macro_rules! tuple_impl {
     ($($ty:ident,)*) => {
-        impl<$($ty),*> RouterClientsV4 for ($($ty,)*)
+        impl<$($ty),*> HubClients for ($($ty,)*)
         where
-            $($ty: Ipv4Node + 'static,)*
+            $($ty: EtherNode + 'static,)*
         {
             type Output = ($($ty::Output,)*);
-            
-            fn build(self, handle: &Handle, subnet: SubnetV4) -> (SpawnComplete<Self::Output>, Ipv4Plug) {
+
+            fn build(
+                self,
+                handle: &Handle, 
+                subnet: Option<SubnetV4>,
+            ) -> (SpawnComplete<Self::Output>, EtherPlug)
+            {
                 #![allow(non_snake_case)]
                 #![allow(unused_assignments)]
                 #![allow(unused_mut)]
                 #![allow(unused_variables)]
 
                 let ($($ty,)*) = self;
+                let hub = HubBuilder::new();
+                let (hub, join_all) = if let Some(subnet) = subnet {
+                    let mut i = 0;
+                    $(
+                        let $ty = $ty;
+                        i += 1;
+                    )*
+                    let subnets = subnet.split(i);
+                    let mut i = 0;
+                    $(
+                        let ($ty, plug) = $ty.build(handle, Some(subnets[i]));
+                        let hub = hub.connect(plug);
+                        i += 1;
+                    )*
+                    let join_all = JoinAll { phantoms: PhantomData::<($($ty,)*)>, children: ($(($ty, None),)*) };
+                    (hub, join_all)
+                } else {
+                    $(
+                        let ($ty, plug) = $ty.build(handle, None);
+                        let hub = hub.connect(plug);
+                    )*
+                    let join_all = JoinAll { phantoms: PhantomData::<($($ty,)*)>, children: ($(($ty, None),)*) };
+                    (hub, join_all)
+                };
 
-                let mut i = 0;
-                $(
-                    let $ty = $ty;
-                    i += 1;
-                )*
-                let subnets = subnet.split(i + 1);
-
-                let router = RouterV4Builder::new(subnets[0].base_addr());
-                let mut i = 1;
-                $(
-                    let ($ty, plug) = $ty.build(handle, subnets[i]);
-                    let router = router.connect(plug, vec![RouteV4::new(subnets[i], None)]);
-                    i += 1;
-                )*
-                
-                let (plug_0, plug_1) = Ipv4Plug::new_wire();
-                let router = router.connect(plug_1, vec![RouteV4::new(SubnetV4::global(), None)]);
-                router.spawn(handle);
+                let (plug_0, plug_1) = EtherPlug::new_wire();
+                let hub = hub.connect(plug_1);
+                hub.spawn(handle);
 
                 let (ret_tx, ret_rx) = oneshot::channel();
                 handle.spawn({
-                    JoinAll { phantoms: PhantomData::<($($ty,)*)>, children: ($(($ty, None),)*) }
-                    .then(|result| {
+                    Future::then(join_all, |result| {
                         let _ = ret_tx.send(result);
                         Ok(())
                     })
@@ -67,7 +80,7 @@ macro_rules! tuple_impl {
 
         impl<$($ty),*> Future for JoinAll<($($ty,)*), ($((SpawnComplete<$ty::Output>, Option<$ty::Output>),)*)>
         where
-            $($ty: Ipv4Node + 'static,)*
+            $($ty: EtherNode + 'static,)*
         {
             type Item = ($($ty::Output,)*);
             type Error = Box<Any + Send + 'static>;
@@ -123,22 +136,22 @@ pub struct ImplNode<C> {
     clients: C,
 }
 
-/// Spawns a bunch of sub-nodes and routes packets between them.
-pub fn router_v4<C: RouterClientsV4>(clients: C) -> ImplNode<C> {
+/// Create a node for an ethernet hub.
+pub fn hub_eth<C: HubClients>(clients: C) -> ImplNode<C> {
     ImplNode { clients }
 }
 
-impl<C> Ipv4Node for ImplNode<C>
+impl<C> EtherNode for ImplNode<C>
 where
-    C: RouterClientsV4,
+    C: HubClients,
 {
     type Output = C::Output;
 
     fn build(
         self,
         handle: &Handle,
-        subnet: SubnetV4,
-    ) -> (SpawnComplete<C::Output>, Ipv4Plug) {
+        subnet: Option<SubnetV4>,
+    ) -> (SpawnComplete<C::Output>, EtherPlug) {
         self.clients.build(handle, subnet)
     }
 }

@@ -11,8 +11,10 @@ mod hops_v4;
 mod latency_v4;
 mod packet_loss_v4;
 mod router_v4;
+mod ether_adaptor_v4;
 
 mod endpoint_eth;
+mod hub_eth;
 
 pub use self::nat_v4::nat_v4;
 pub use self::endpoint_v4::endpoint_v4;
@@ -20,8 +22,10 @@ pub use self::hops_v4::hops_v4;
 pub use self::latency_v4::latency_v4;
 pub use self::packet_loss_v4::packet_loss_v4;
 pub use self::router_v4::{router_v4, RouterClientsV4};
+pub use self::ether_adaptor_v4::ether_adaptor_v4;
 
 pub use self::endpoint_eth::endpoint_eth;
+pub use self::hub_eth::hub_eth;
 
 /// An `Ipv4Node` describes a recipe for constructing a network when given the subnet that the network
 /// should operate on. The functions in the `node` module return `Ipv4Node`s that you can then run as a
