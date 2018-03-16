@@ -1,6 +1,6 @@
 [package]
 name = "netsim"
-version = "0.1.5"
+version = "0.1.6"
 authors = ["Andrew Cann <shum@canndrew.org>"]
 description = "Network simulator"
 repository = "https://github.com/canndrew/netsim"
