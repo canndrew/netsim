@@ -9,6 +9,34 @@ pub struct TcpPacket {
 
 impl fmt::Debug for TcpPacket {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+
+        struct Kind(pub u8);
+        impl fmt::Debug for Kind {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                let Kind(b) = *self;
+                let s = match b & 0x17 {
+                    0x00    => "-",
+                    0x01    => "FIN",
+                    0x02    => "SYN",
+                    0x03    => "SYN | FIN",
+                    0x04    => "RST",
+                    0x05    => "RST | FIN",
+                    0x06    => "RST | SYN",
+                    0x07    => "RST | SYN | FIN",
+                    0x10    => "ACK",
+                    0x11    => "ACK | FIN",
+                    0x12    => "ACK | SYN",
+                    0x13    => "ACK | SYN | FIN",
+                    0x14    => "ACK | RST",
+                    0x15    => "ACK | RST | FIN",
+                    0x16    => "ACK | RST | SYN",
+                    0x17    => "ACK | RST | SYN | FIN",
+                    _ => unreachable!(),
+                };
+                write!(f, "{}", s)
+            }
+        }
+
         let payload = self.payload();
 
         f
@@ -18,25 +46,10 @@ impl fmt::Debug for TcpPacket {
         .field("seq_num", &self.seq_num())
         .field("ack_num", &self.ack_num())
         .field("window_size", &self.window_size())
-        .field("kind", &self.kind())
+        .field("kind", &Kind(self.buffer[13]))
         .field("payload", &payload)
         .finish()
     }
-}
-
-/// The flags of a TCP packet header
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TcpPacketKind {
-    /// A SYN packet
-    Syn,
-    /// A SYN-ACK packet
-    SynAck,
-    /// An ACK packet
-    Ack,
-    /// A FIN packet
-    Fin,
-    /// An RST packet
-    Rst,
 }
 
 /// The fields of a TCP header
@@ -52,8 +65,14 @@ pub struct TcpFields {
     pub ack_num: u32,
     /// The window size
     pub window_size: u16,
-    /// The kind of packet, as specified by the control flags
-    pub kind: TcpPacketKind,
+    /// Is this a SYN packet?
+    pub syn: bool,
+    /// Is this an ACK packet?
+    pub ack: bool,
+    /// Is this a FIN packet?
+    pub fin: bool,
+    /// Is this an RST packet?
+    pub rst: bool,
 }
 
 impl TcpFields {
@@ -69,12 +88,11 @@ fn set_fields_v4(buffer: &mut [u8], fields: TcpFields, source_ip: Ipv4Addr, dest
     NetworkEndian::write_u32(&mut buffer[4..8], fields.seq_num);
     NetworkEndian::write_u32(&mut buffer[8..12], fields.ack_num);
     buffer[12] = 0x50;
-    buffer[13] = match fields.kind {
-        TcpPacketKind::Syn { .. } => 0x02,
-        TcpPacketKind::SynAck { .. } => 0x12,
-        TcpPacketKind::Ack { .. } => 0x10,
-        TcpPacketKind::Fin { .. } => 0x11,
-        TcpPacketKind::Rst => 0x40,
+    buffer[13] = {
+        (if fields.syn { 0x02 } else { 0 }) |
+        (if fields.ack { 0x10 } else { 0 }) |
+        (if fields.fin { 0x01 } else { 0 }) |
+        (if fields.rst { 0x04 } else { 0 })
     };
     NetworkEndian::write_u16(&mut buffer[14..16], fields.window_size);
     NetworkEndian::write_u16(&mut buffer[16..18], 0);
@@ -130,7 +148,10 @@ impl TcpPacket {
             seq_num: self.seq_num(),
             ack_num: self.ack_num(),
             window_size: self.window_size(),
-            kind: self.kind(),
+            syn: self.is_syn(),
+            ack: self.is_ack(),
+            fin: self.is_fin(),
+            rst: self.is_rst(),
         }
     }
 
@@ -174,16 +195,24 @@ impl TcpPacket {
         NetworkEndian::read_u16(&self.buffer[14..16])
     }
 
-    /// What kind of TCP packet this is, according to the control bits.
-    pub fn kind(&self) -> TcpPacketKind {
-        match self.buffer[13] & 0x17 {
-            0x02 => TcpPacketKind::Syn,
-            0x12 => TcpPacketKind::SynAck,
-            0x10 => TcpPacketKind::Ack,
-            0x11 => TcpPacketKind::Fin,
-            0x14 => TcpPacketKind::Rst,
-            f => panic!("invalid tcp header flags: {:02x}", f),
-        }
+    /// Check whether this is a SYN packet
+    pub fn is_syn(&self) -> bool {
+        self.buffer[13] & 0x02 != 0
+    }
+
+    /// Check whether this is an ACK packet
+    pub fn is_ack(&self) -> bool {
+        self.buffer[13] & 0x10 != 0
+    }
+
+    /// Check whether this is a FIN packet
+    pub fn is_fin(&self) -> bool {
+        self.buffer[13] & 0x01 != 0
+    }
+
+    /// Check whether this is an RST packet
+    pub fn is_rst(&self) -> bool {
+        self.buffer[13] & 0x04 != 0
     }
 
     /// Get the packet's payload data
