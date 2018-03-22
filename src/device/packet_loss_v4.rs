@@ -61,7 +61,9 @@ impl Future for PacketLossV4 {
                 Async::NotReady => break false,
                 Async::Ready(None) => break true,
                 Async::Ready(Some(packet)) => {
-                    if !self.currently_losing {
+                    if self.currently_losing {
+                        trace!("packet loss randomly dropping packet: {:?}", packet);
+                    } else {
                         let _ = self.plug_b.tx.unbounded_send(packet);
                     }
                 },
@@ -73,7 +75,9 @@ impl Future for PacketLossV4 {
                 Async::NotReady => break false,
                 Async::Ready(None) => break true,
                 Async::Ready(Some(packet)) => {
-                    if !self.currently_losing {
+                    if self.currently_losing {
+                        trace!("packet loss randomly dropping packet: {:?}", packet);
+                    } else {
                         let _ = self.plug_a.tx.unbounded_send(packet);
                     }
                 },
