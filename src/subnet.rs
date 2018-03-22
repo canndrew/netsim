@@ -4,10 +4,16 @@ use std::net::AddrParseError;
 use std::num::ParseIntError;
 
 /// An Ipv4 subnet
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct SubnetV4 {
     addr: Ipv4Addr,
     bits: u8,
+}
+
+impl fmt::Debug for SubnetV4 {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}/{}", self.addr, self.bits)
+    }
 }
 
 impl SubnetV4 {
@@ -104,15 +110,23 @@ impl SubnetV4 {
     pub fn random_client_addr(&self) -> Ipv4Addr {
         let mask = 0xffff_ffff >> self.bits;
         assert!(mask > 1);
-
-        let addr = loop {
-            let x: u32 = rand::random();
-            if x & mask > 1 {
-                break x;
-            }
+        let class = if self.bits == 0 {
+            Ipv4AddrClass::Global
+        } else {
+            self.addr.class()
         };
-        let addr = u32::from(self.addr) | (addr & mask);
-        Ipv4Addr::from(addr)
+
+        loop {
+            let x = rand::random::<u32>() & mask;
+            if x < 2 {
+                continue
+            }
+            let addr = Ipv4Addr::from(u32::from(self.addr) | x);
+            if class != addr.class() {
+                continue
+            }
+            return addr;
+        };
     }
 
     /// Check whether this subnet contains the given IP address
@@ -130,6 +144,11 @@ impl SubnetV4 {
     pub fn split(self, num: u32) -> Vec<SubnetV4> {
         let mut ret = Vec::with_capacity(num as usize);
         let mut n = 0u32;
+        let class = if self.bits == 0 {
+            Ipv4AddrClass::Global
+        } else {
+            self.addr.class()
+        };
         loop {
             let mut n_reversed = 0;
             for i in 0..32 {
@@ -140,7 +159,7 @@ impl SubnetV4 {
             let base_addr = u32::from(self.addr);
             let ip = base_addr | (n_reversed >> self.bits);
             let ip = Ipv4Addr::from(ip);
-            if !self.addr.is_private() && !Ipv4AddrExt::is_global(&ip) {
+            if class != ip.class() {
                 n += 1;
                 continue;
             }

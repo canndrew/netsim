@@ -27,7 +27,7 @@ pub use std::marker::PhantomData;
 
 pub use async_fd::AsyncFd;
 pub use util::bytes_mut::BytesMutExt;
-pub use util::ipv4_addr::Ipv4AddrExt;
+pub use util::ipv4_addr::{Ipv4AddrClass, Ipv4AddrExt};
 pub use util::ipv6_addr::Ipv6AddrExt;
 pub use util::duration::DurationExt;
 pub use wire::*;
