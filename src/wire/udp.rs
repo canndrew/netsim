@@ -43,7 +43,7 @@ fn set_fields_v4(buffer: &mut [u8], fields: UdpFields, source_ip: Ipv4Addr, dest
         ),
         checksum::data(&buffer[..]),
     ]);
-    let checksum = if checksum == 0x0000 { 0xffff } else { 0x0000 };
+    let checksum = if checksum == 0x0000 { 0xffff } else { checksum };
     NetworkEndian::write_u16(&mut buffer[6..8], checksum);
 }
 
