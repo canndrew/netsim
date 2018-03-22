@@ -19,8 +19,20 @@ impl fmt::Debug for Ipv4Packet {
             .field("dest_ip", &self.dest_ip())
             .field("ttl", &self.ttl())
             .field("payload", match payload {
-                Ipv4Payload::Udp(ref udp) => udp,
-                Ipv4Payload::Tcp(ref tcp) => tcp,
+                Ipv4Payload::Udp(ref udp) => {
+                    if udp.verify_checksum_v4(self.source_ip(), self.dest_ip()) {
+                        udp
+                    } else {
+                        &"INVALID UDP packet"
+                    }
+                },
+                Ipv4Payload::Tcp(ref tcp) => {
+                    if tcp.verify_checksum_v4(self.source_ip(), self.dest_ip()) {
+                        tcp
+                    } else {
+                        &"INVALID TCP packet"
+                    }
+                },
                 Ipv4Payload::Icmp(ref icmp) => icmp,
                 Ipv4Payload::Unknown { .. } => &payload,
             })
@@ -277,19 +289,7 @@ impl Ipv4Packet {
 
     /// Check that this packet has a valid checksum.
     pub fn verify_checksum(&self) -> bool {
-        if checksum::data(&self.buffer[..20]) != !0 {
-            return false;
-        }
-
-        /*
-        match self.payload() {
-            Ipv4Payload::Udp(ref udp) => udp.verify_checksum_v4(self.source_ip(), self.dest_ip()),
-            Ipv4Payload::Tcp(ref tcp) => tcp.verify_checksum_v4(self.source_ip(), self.dest_ip()),
-            Ipv4Payload::Icmp(ref icmp) => icmp.verify_checksum(),
-            Ipv4Payload::Unknown { .. } => true,
-        }
-        */
-        true
+        checksum::data(&self.buffer[..20]) == !0
     }
 }
 
