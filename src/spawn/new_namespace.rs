@@ -71,14 +71,15 @@ where
         // our own `JoinHandle` though.
 
         let mut f = unwrap!(File::create("/proc/self/uid_map"));
-        let s = format!("0 {} 1", uid);
+        let s = format!("0 {} 1\n", uid);
         unwrap!(f.write(s.as_bytes()));
 
-        // TODO: set gids correctly in the namespace
-        let _gid = gid;
-        //let mut f = unwrap!(File::create("/proc/self/gid_map"));
-        //let s = format!("0 {} 1", gid);
-        //unwrap!(f.write(s.as_bytes()));
+        let mut f = unwrap!(File::create("/proc/self/setgroups"));
+        unwrap!(f.write("deny\n".as_bytes()));
+
+        let mut f = unwrap!(File::create("/proc/self/gid_map"));
+        let s = format!("0 {} 1\n", gid);
+        unwrap!(f.write(s.as_bytes()));
 
         let _joiner = thread::spawn(move || {
             let func = panic::AssertUnwindSafe(func);
