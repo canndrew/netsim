@@ -10,6 +10,8 @@ pub struct NatV4 {
     hair_pinning: bool,
     udp_map: PortMap,
     tcp_map: PortMap,
+    blacklist_unrecognized_addrs: bool,
+    blacklisted_addrs: HashSet<SocketAddrV4>,
 }
 
 #[derive(Debug)]
@@ -79,6 +81,8 @@ impl NatV4 {
             hair_pinning: false,
             udp_map: PortMap::new(),
             tcp_map: PortMap::new(),
+            blacklist_unrecognized_addrs: false,
+            blacklisted_addrs: HashSet::new(),
         };
         debug!("building {:?}", ret);
         ret
@@ -104,6 +108,7 @@ pub struct NatV4Builder {
     hair_pinning: bool,
     udp_map: PortMap,
     tcp_map: PortMap,
+    blacklist_unrecognized_addrs: bool,
 }
 
 impl NatV4Builder {
@@ -142,6 +147,13 @@ impl NatV4Builder {
         self
     }
 
+    /// Causes the NAT to permanently block all traffic from an address A if it receives traffic
+    /// from A directed at an endpoint for which is doesn't have a mapping.
+    pub fn blacklist_unrecognized_addrs(mut self) -> NatV4Builder {
+        self.blacklist_unrecognized_addrs = true;
+        self
+    }
+
     /// Build the NAT
     pub fn build(
         self, 
@@ -158,6 +170,8 @@ impl NatV4Builder {
             hair_pinning: self.hair_pinning,
             udp_map: self.udp_map,
             tcp_map: self.tcp_map,
+            blacklist_unrecognized_addrs: false,
+            blacklisted_addrs: HashSet::new(),
         };
         debug!("building {:?}", ret);
         ret
@@ -331,6 +345,7 @@ impl Future for NatV4 {
                 Async::Ready(None) => break true,
                 Async::Ready(Some(packet)) => {
                     let ipv4_fields = packet.fields();
+                    let source_ip = packet.source_ip();
                     if packet.dest_ip() != self.public_ip {
                         info!(
                             "nat {} dropping inbound packet not directed at our public ip: {:?}",
@@ -351,6 +366,11 @@ impl Future for NatV4 {
                     match packet.payload() {
                         Ipv4Payload::Udp(udp) => {
                             let udp_fields = udp.fields();
+                            let source_port = udp.source_port();
+                            let source_addr = SocketAddrV4::new(source_ip, source_port);
+                            if self.blacklisted_addrs.contains(&source_addr) {
+                                continue;
+                            }
                             let dest_port = udp.dest_port();
                             match self.udp_map.get_inbound_addr(dest_port) {
                                 Some(private_dest_addr) => {
@@ -376,11 +396,20 @@ impl Future for NatV4 {
 
                                     let _ = self.private_plug.tx.unbounded_send(natted_packet);
                                 },
-                                None => (),
+                                None => {
+                                    if self.blacklist_unrecognized_addrs {
+                                        self.blacklisted_addrs.insert(source_addr);
+                                    }
+                                },
                             }
                         },
                         Ipv4Payload::Tcp(tcp) => {
                             let tcp_fields = tcp.fields();
+                            let source_port = tcp.source_port();
+                            let source_addr = SocketAddrV4::new(source_ip, source_port);
+                            if self.blacklisted_addrs.contains(&source_addr) {
+                                continue;
+                            }
                             let dest_port = tcp.dest_port();
                             match self.tcp_map.get_inbound_addr(dest_port) {
                                 Some(private_dest_addr) => {
@@ -406,7 +435,11 @@ impl Future for NatV4 {
 
                                     let _ = self.private_plug.tx.unbounded_send(natted_packet);
                                 },
-                                None => (),
+                                None => {
+                                    if self.blacklist_unrecognized_addrs {
+                                        self.blacklisted_addrs.insert(source_addr);
+                                    }
+                                },
                             }
                         },
                         _ => (),
