@@ -305,7 +305,7 @@ mod test {
                     };
                     assert_eq!(tcp.dest_port(), remote_port);
                     let iface_port = tcp.source_port();
-                    assert_eq!(tcp.kind(), TcpPacketKind::Syn);
+                    assert!(tcp.is_syn());
 
                     let init_seq_num_0 = tcp.seq_num();
                     let init_seq_num_1 = rand::random::<u32>();
@@ -324,7 +324,10 @@ mod test {
                                 seq_num: init_seq_num_1,
                                 ack_num: init_seq_num_0.wrapping_add(1),
                                 window_size: window_size,
-                                kind: TcpPacketKind::SynAck,
+                                syn: true,
+                                ack: true,
+                                fin: false,
+                                rst: false,
                             },
                             payload: Bytes::new(),
                         },
@@ -359,17 +362,13 @@ mod test {
                                 assert_eq!(tcp.ack_num(), seq_num_1);
                                 let next_seq_num_0 = seq_num_0.wrapping_add(tcp.payload().len() as u32);
                                 let next_seq_num_1 = seq_num_1.wrapping_add(tcp.payload().len() as u32);
-                                match tcp.kind() {
-                                    TcpPacketKind::Ack => (),
-                                    TcpPacketKind::Fin => {
-                                        return future::ok(Loop::Break((
-                                            plug_tx,
-                                            plug_rx,
-                                            next_seq_num_0,
-                                            next_seq_num_1,
-                                        ))).into_boxed();
-                                    },
-                                    kind => panic!("unexpected TCP packet kind: {:?}", kind),
+                                if tcp.is_fin() {
+                                    return future::ok(Loop::Break((
+                                        plug_tx,
+                                        plug_rx,
+                                        next_seq_num_0,
+                                        next_seq_num_1,
+                                    ))).into_boxed();
                                 }
                                 
                                 let ack_packet = Ipv4Packet::new_from_fields_recursive(
@@ -385,7 +384,10 @@ mod test {
                                             seq_num: seq_num_1,
                                             ack_num: next_seq_num_0,
                                             window_size: window_size,
-                                            kind: TcpPacketKind::Ack,
+                                            syn: false,
+                                            ack: true,
+                                            fin: false,
+                                            rst: false,
                                         },
                                         payload: tcp.payload(),
                                     },
@@ -421,7 +423,10 @@ mod test {
                                         seq_num: seq_num_1,
                                         ack_num: seq_num_0,
                                         window_size: window_size,
-                                        kind: TcpPacketKind::Ack,
+                                        syn: false,
+                                        ack: true,
+                                        fin: false,
+                                        rst: false,
                                     },
                                     payload: tcp.payload(),
                                 },
@@ -444,7 +449,10 @@ mod test {
                                             seq_num: seq_num_1,
                                             ack_num: seq_num_0,
                                             window_size: window_size,
-                                            kind: TcpPacketKind::Fin,
+                                            syn: false,
+                                            ack: true,
+                                            fin: true,
+                                            rst: false,
                                         },
                                         payload: tcp.payload(),
                                     },
@@ -468,7 +476,7 @@ mod test {
                                         };
                                         assert_eq!(tcp.dest_port(), remote_port);
                                         assert_eq!(tcp.source_port(), iface_port);
-                                        assert_eq!(tcp.kind(), TcpPacketKind::Ack);
+                                        assert!(tcp.is_ack());
 
                                         spawn_complete
                                         .map_err(|e| panic::resume_unwind(e))
