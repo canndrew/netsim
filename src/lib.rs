@@ -240,6 +240,7 @@ mod async_fd;
 mod route;
 mod subnet;
 mod spawn_complete;
+mod process_handle;
 mod pcap;
 pub mod iface;
 pub mod node;

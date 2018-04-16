@@ -1,7 +1,7 @@
 use priv_prelude::*;
 use sys;
 use libc;
-use libc::{c_int, c_void};
+use libc::{c_int, c_void, pid_t};
 use spawn_complete;
 
 const STACK_ALIGN: usize = 16;
@@ -36,6 +36,7 @@ where
     let stack_base = stack.as_mut_ptr();
 
     let flags = 
+        libc::CLONE_CHILD_CLEARTID |
         libc::CLONE_FILES |
         libc::CLONE_IO |
         libc::CLONE_SIGHAND |
@@ -67,8 +68,7 @@ where
         // thread (spawned by clone), but that thread doesn't respect rust's thread-local
         // storage for some reason. So we spawn a thread in a thread in order to get our own
         // local storage keys. There should be a way to do this which doesn't involve spawning
-        // two threads and letting one of them die. This would require going back to crafting
-        // our own `JoinHandle` though.
+        // two threads.
 
         let mut f = unwrap!(File::create("/proc/self/uid_map"));
         let s = format!("0 {} 1\n", uid);
@@ -81,7 +81,7 @@ where
         let s = format!("0 {} 1\n", gid);
         unwrap!(f.write(s.as_bytes()));
 
-        let _joiner = thread::spawn(move || {
+        let joiner = thread::spawn(move || {
             let func = panic::AssertUnwindSafe(func);
             let ret = panic::catch_unwind(move || {
                 let panic::AssertUnwindSafe(func) = func;
@@ -89,6 +89,7 @@ where
             });
             let _ = ret_tx.send(ret);
         });
+        let _ = joiner.join();
         0
     }
 
@@ -99,9 +100,18 @@ where
     let func = Box::new(func);
     let arg: Box<CbData<R>> = Box::new(CbData { func, ret_tx, uid, gid });
     let arg = Box::into_raw(arg) as *mut c_void;
+    let child_tid = Box::new(!0);
     
     let pid = unsafe {
-        libc::clone(clone_cb::<R>, stack_head, flags, arg)
+        libc::clone(
+            clone_cb::<R>,
+            stack_head,
+            flags,
+            arg,
+            ptr::null::<pid_t>(),
+            ptr::null::<c_void>(),
+            &*child_tid,
+        )
     };
     if pid == -1 {
         let err = io::Error::last_os_error();
@@ -144,18 +154,9 @@ where
         }
         panic!("failed to spawn thread: {}", err);
     }
-    let res = unsafe {
-        sys::waitpid(pid, ptr::null_mut(), 0)
-    };
-    if res != -1 {
-        panic!("unexpected result from waitpid(): {}", res);
-    }
-    let err = io::Error::last_os_error();
-    if err.raw_os_error() != Some(sys::ECHILD as i32) {
-        panic!("unexpected error from waitpid(): {}", err);
-    }
 
-    spawn_complete::from_receiver(ret_rx)
+    let process_handle = ProcessHandle::new(stack, child_tid);
+    spawn_complete::from_parts(ret_rx, process_handle)
 }
 
 #[cfg(test)]

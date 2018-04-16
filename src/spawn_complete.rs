@@ -4,6 +4,7 @@ use priv_prelude::*;
 /// the thread to complete.
 pub struct SpawnComplete<R> {
     ret_rx: oneshot::Receiver<thread::Result<R>>,
+    process_handle: Option<ProcessHandle>,
 }
 
 impl<R> Future for SpawnComplete<R> {
@@ -12,11 +13,25 @@ impl<R> Future for SpawnComplete<R> {
 
     fn poll(&mut self) -> thread::Result<Async<R>> {
         match self.ret_rx.poll() {
-            Ok(Async::Ready(Ok(r))) => Ok(Async::Ready(r)),
-            Ok(Async::Ready(Err(e))) => Err(e),
+            Ok(Async::Ready(res)) => {
+                if let Some(mut process_handle) = self.process_handle.take() {
+                    process_handle.busy_wait_for_exit();
+                }
+                res.map(Async::Ready)
+            },
             Ok(Async::NotReady) => Ok(Async::NotReady),
             Err(oneshot::Canceled) => panic!("thread destroyed without sending response!?"),
         }
+    }
+}
+
+pub fn from_parts<R>(
+    ret_rx: oneshot::Receiver<thread::Result<R>>,
+    process_handle: ProcessHandle,
+) -> SpawnComplete<R> {
+    SpawnComplete {
+        ret_rx: ret_rx,
+        process_handle: Some(process_handle),
     }
 }
 
@@ -24,7 +39,8 @@ pub fn from_receiver<R>(
     ret_rx: oneshot::Receiver<thread::Result<R>>,
 ) -> SpawnComplete<R> {
     SpawnComplete {
-        ret_rx,
+        ret_rx: ret_rx,
+        process_handle: None,
     }
 }
 
