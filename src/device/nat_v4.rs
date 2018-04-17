@@ -1,4 +1,5 @@
 use priv_prelude::*;
+use rand;
 
 #[derive(Debug)]
 /// An Ipv4 NAT.
@@ -18,7 +19,8 @@ pub struct NatV4 {
 struct PortMap {
     map_out: HashMap<SocketAddrV4, u16>,
     map_in: HashMap<u16, SocketAddrV4>,
-    next_port: u16,
+    allowed_endpoints: Option<HashMap<u16, HashSet<SocketAddrV4>>>,
+    next_sequential_port: Option<u16>,
 }
 
 impl Default for PortMap {
@@ -26,7 +28,8 @@ impl Default for PortMap {
         PortMap {
             map_out: HashMap::new(),
             map_in: HashMap::new(),
-            next_port: 1000,
+            allowed_endpoints: None,
+            next_sequential_port: Some(1000),
         }
     }
 }
@@ -41,27 +44,50 @@ impl PortMap {
         self.map_in.insert(port, local_addr);
     }
 
-    pub fn get_inbound_addr(&self, port: u16) -> Option<SocketAddrV4> {
+    pub fn get_inbound_addr(&self, remote_addr: SocketAddrV4, port: u16) -> Option<SocketAddrV4> {
+        if let Some(ref allowed_endpoints) = self.allowed_endpoints {
+            if !allowed_endpoints.get(&port).map(|set| set.contains(&remote_addr)).unwrap_or(false) {
+                return None;
+            }
+        }
         self.map_in.get(&port).map(|x| *x)
     }
 
-    pub fn map_port(&mut self, addr: SocketAddrV4) -> u16 {
-        match self.map_out.entry(addr) {
+    pub fn map_port(&mut self, remote_addr: SocketAddrV4, addr: SocketAddrV4) -> u16 {
+        let port = match self.map_out.entry(addr) {
             hash_map::Entry::Occupied(oe) => *oe.get(),
             hash_map::Entry::Vacant(ve) => {
                 let port = loop {
-                    if self.map_in.contains_key(&self.next_port) {
-                        self.next_port += 1;
+                    let port = match self.next_sequential_port {
+                        Some(ref mut next_port) => {
+                            let port = *next_port;
+                            *next_port = next_port.checked_add(1).unwrap_or(1000);
+                            port
+                        },
+                        None => {
+                            loop {
+                                let port = rand::random();
+                                if port >= 1000 {
+                                    break port;
+                                }
+                            }
+                        }
+                    };
+                    if self.map_in.contains_key(&port) {
                         continue;
                     }
-                    break self.next_port;
+                    break port;
                 };
+
                 ve.insert(port);
                 self.map_in.insert(port, addr);
-                self.next_port = port.checked_add(1).unwrap_or(1000);
                 port
             },
+        };
+        if let Some(ref mut allowed_endpoints) = self.allowed_endpoints {
+            allowed_endpoints.entry(port).or_insert_with(HashSet::new).insert(remote_addr);
         }
+        port
     }
 }
 
@@ -154,6 +180,21 @@ impl NatV4Builder {
         self
     }
 
+    /// Only allow incoming traffic on a port from remote addresses that we have already sent
+    /// data to from that port. Makes this a port-restricted NAT.
+    pub fn restrict_endpoints(mut self) -> NatV4Builder {
+        self.tcp_map.allowed_endpoints = Some(HashMap::new());
+        self.udp_map.allowed_endpoints = Some(HashMap::new());
+        self
+    }
+
+    /// Use random, rather than sequential (the default) port allocation.
+    pub fn randomize_port_allocation(mut self) -> NatV4Builder {
+        self.tcp_map.next_sequential_port = None;
+        self.udp_map.next_sequential_port = None;
+        self
+    }
+
     /// Build the NAT
     pub fn build(
         self, 
@@ -226,7 +267,16 @@ impl Future for NatV4 {
                             Ipv4Payload::Udp(udp) => {
                                 let udp_fields = udp.fields();
                                 let dest_port = udp.dest_port();
-                                let private_dest_addr = match self.udp_map.get_inbound_addr(dest_port) {
+                                let dest_addr = SocketAddrV4::new(self.public_ip, dest_port);
+                                let source_port = udp.source_port();
+                                let source_addr = SocketAddrV4::new(source_ip, source_port);
+                                let external_source_port = self.udp_map.map_port(dest_addr, source_addr);
+                                let external_source_addr = SocketAddrV4::new(
+                                    self.public_ip,
+                                    external_source_port,
+                                );
+
+                                let private_dest_addr = match self.udp_map.get_inbound_addr(external_source_addr, dest_port) {
                                     Some(addr) => addr,
                                     None => continue,
                                 };
@@ -251,7 +301,16 @@ impl Future for NatV4 {
                             Ipv4Payload::Tcp(tcp) => {
                                 let tcp_fields = tcp.fields();
                                 let dest_port = tcp.dest_port();
-                                let private_dest_addr = match self.tcp_map.get_inbound_addr(dest_port) {
+                                let dest_addr = SocketAddrV4::new(self.public_ip, dest_port);
+                                let source_port = tcp.source_port();
+                                let source_addr = SocketAddrV4::new(source_ip, source_port);
+                                let external_source_port = self.tcp_map.map_port(dest_addr, source_addr);
+                                let external_source_addr = SocketAddrV4::new(
+                                    self.public_ip,
+                                    external_source_port,
+                                );
+
+                                let private_dest_addr = match self.tcp_map.get_inbound_addr(external_source_addr, dest_port) {
                                     Some(addr) => addr,
                                     None => continue,
                                 };
@@ -281,9 +340,11 @@ impl Future for NatV4 {
                     match packet.payload() {
                         Ipv4Payload::Udp(udp) => {
                             let udp_fields = udp.fields();
+                            let dest_port = udp.dest_port();
+                            let dest_addr = SocketAddrV4::new(self.public_ip, dest_port);
                             let source_port = udp.source_port();
                             let source_addr = SocketAddrV4::new(source_ip, source_port);
-                            let mapped_source_port = self.udp_map.map_port(source_addr);
+                            let mapped_source_port = self.udp_map.map_port(dest_addr, source_addr);
                             let natted_packet = Ipv4Packet::new_from_fields_recursive(
                                 Ipv4Fields {
                                     source_ip: self.public_ip,
@@ -308,9 +369,11 @@ impl Future for NatV4 {
                         },
                         Ipv4Payload::Tcp(tcp) => {
                             let tcp_fields = tcp.fields();
+                            let dest_port = tcp.dest_port();
+                            let dest_addr = SocketAddrV4::new(self.public_ip, dest_port);
                             let source_port = tcp.source_port();
                             let source_addr = SocketAddrV4::new(source_ip, source_port);
-                            let mapped_source_port = self.tcp_map.map_port(source_addr);
+                            let mapped_source_port = self.tcp_map.map_port(dest_addr, source_addr);
                             let natted_packet = Ipv4Packet::new_from_fields_recursive(
                                 Ipv4Fields {
                                     source_ip: self.public_ip,
@@ -372,7 +435,7 @@ impl Future for NatV4 {
                                 continue;
                             }
                             let dest_port = udp.dest_port();
-                            match self.udp_map.get_inbound_addr(dest_port) {
+                            match self.udp_map.get_inbound_addr(source_addr, dest_port) {
                                 Some(private_dest_addr) => {
                                     let natted_packet = Ipv4Packet::new_from_fields_recursive(
                                         Ipv4Fields {
@@ -411,7 +474,7 @@ impl Future for NatV4 {
                                 continue;
                             }
                             let dest_port = tcp.dest_port();
-                            match self.tcp_map.get_inbound_addr(dest_port) {
+                            match self.tcp_map.get_inbound_addr(source_addr, dest_port) {
                                 Some(private_dest_addr) => {
                                     let natted_packet = Ipv4Packet::new_from_fields_recursive(
                                         Ipv4Fields {
