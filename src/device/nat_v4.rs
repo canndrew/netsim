@@ -16,11 +16,44 @@ pub struct NatV4 {
 }
 
 #[derive(Debug)]
+enum PortAllocator {
+    Sequential(u16),
+    Random,
+}
+
+impl PortAllocator {
+    pub fn next_port(&mut self) -> u16 {
+        match *self {
+            PortAllocator::Sequential(ref mut next_port) => {
+                let ret = *next_port;
+                *next_port = next_port.checked_add(1).unwrap_or(1000);
+                ret
+            },
+            PortAllocator::Random => {
+                loop {
+                    let port = rand::random();
+                    if port >= 1000 {
+                        break port;
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
 struct PortMap {
     map_out: HashMap<SocketAddrV4, u16>,
     map_in: HashMap<u16, SocketAddrV4>,
     allowed_endpoints: Option<HashMap<u16, HashSet<SocketAddrV4>>>,
-    next_sequential_port: Option<u16>,
+    symmetric_map: Option<SymmetricMap>,
+    port_allocator: PortAllocator,
+}
+
+#[derive(Debug, Default)]
+struct SymmetricMap {
+    map_out: HashMap<(SocketAddrV4, SocketAddrV4), u16>,
+    map_in: HashMap<u16, (SocketAddrV4, SocketAddrV4)>,
 }
 
 impl Default for PortMap {
@@ -29,7 +62,8 @@ impl Default for PortMap {
             map_out: HashMap::new(),
             map_in: HashMap::new(),
             allowed_endpoints: None,
-            next_sequential_port: Some(1000),
+            symmetric_map: None,
+            port_allocator: PortAllocator::Sequential(1000),
         }
     }
 }
@@ -50,38 +84,56 @@ impl PortMap {
                 return None;
             }
         }
-        self.map_in.get(&port).map(|x| *x)
+        if let Some(addr) = self.map_in.get(&port) {
+            return Some(*addr);
+        }
+        if let Some(ref symmetric_map) = self.symmetric_map {
+            if let Some(&(addr, allowed_remote_addr)) = symmetric_map.map_in.get(&port) {
+                if allowed_remote_addr == remote_addr {
+                    return Some(addr);
+                }
+            }
+        }
+        None
     }
 
     pub fn map_port(&mut self, remote_addr: SocketAddrV4, addr: SocketAddrV4) -> u16 {
         let port = match self.map_out.entry(addr) {
             hash_map::Entry::Occupied(oe) => *oe.get(),
             hash_map::Entry::Vacant(ve) => {
-                let port = loop {
-                    let port = match self.next_sequential_port {
-                        Some(ref mut next_port) => {
-                            let port = *next_port;
-                            *next_port = next_port.checked_add(1).unwrap_or(1000);
+                if let Some(ref mut symmetric_map) = self.symmetric_map {
+                    match symmetric_map.map_out.entry((addr, remote_addr)) {
+                        hash_map::Entry::Occupied(oe) => *oe.get(),
+                        hash_map::Entry::Vacant(ve) => {
+                            let port = loop {
+                                let port = self.port_allocator.next_port();
+                                if self.map_in.contains_key(&port) {
+                                    continue;
+                                }
+                                if symmetric_map.map_in.contains_key(&port) {
+                                    continue;
+                                }
+                                break port;
+                            };
+
+                            ve.insert(port);
+                            symmetric_map.map_in.insert(port, (addr, remote_addr));
                             port
                         },
-                        None => {
-                            loop {
-                                let port = rand::random();
-                                if port >= 1000 {
-                                    break port;
-                                }
-                            }
-                        }
-                    };
-                    if self.map_in.contains_key(&port) {
-                        continue;
                     }
-                    break port;
-                };
+                } else {
+                    let port = loop {
+                        let port = self.port_allocator.next_port();
+                        if self.map_in.contains_key(&port) {
+                            continue;
+                        }
+                        break port;
+                    };
 
-                ve.insert(port);
-                self.map_in.insert(port, addr);
-                port
+                    ve.insert(port);
+                    self.map_in.insert(port, addr);
+                    port
+                }
             },
         };
         if let Some(ref mut allowed_endpoints) = self.allowed_endpoints {
@@ -190,8 +242,16 @@ impl NatV4Builder {
 
     /// Use random, rather than sequential (the default) port allocation.
     pub fn randomize_port_allocation(mut self) -> NatV4Builder {
-        self.tcp_map.next_sequential_port = None;
-        self.udp_map.next_sequential_port = None;
+        self.tcp_map.port_allocator = PortAllocator::Random;
+        self.udp_map.port_allocator = PortAllocator::Random;
+        self
+    }
+
+    /// Makes this NAT a symmetric NAT, meaning packets sent to different remote addresses from the
+    /// same internal address will appear to originate from different external ports.
+    pub fn symmetric_nat(mut self) -> NatV4Builder {
+        self.tcp_map.symmetric_map = Some(SymmetricMap::default());
+        self.udp_map.symmetric_map = Some(SymmetricMap::default());
         self
     }
 
@@ -631,5 +691,53 @@ fn test() {
         }));
         res.void_unwrap()
     })
+}
+
+#[test]
+fn test_port_restriction() {
+    let mut unrestricted = PortMap::default();
+    let mut restricted = PortMap::default();
+    restricted.allowed_endpoints = Some(HashMap::new());
+
+    let subnet = SubnetV4::random_local();
+    let internal_addr = SocketAddrV4::new(subnet.random_client_addr(), rand::random());
+    let remote_addr = SocketAddrV4::new(Ipv4Addr::random_global(), rand::random());
+    let unknown_addr = SocketAddrV4::new(Ipv4Addr::random_global(), rand::random());
+
+    let mapped_port = unrestricted.map_port(remote_addr, internal_addr);
+    let inbound_addr = unrestricted.get_inbound_addr(unknown_addr, mapped_port);
+    assert_eq!(inbound_addr, Some(internal_addr));
+
+    let mapped_port = restricted.map_port(remote_addr, internal_addr);
+    let inbound_addr = restricted.get_inbound_addr(unknown_addr, mapped_port);
+    assert_eq!(inbound_addr, None);
+}
+
+#[test]
+fn test_symmetric_map() {
+    let mut asymmetric = PortMap::default();
+    let mut symmetric = PortMap::default();
+    symmetric.symmetric_map = Some(SymmetricMap::default());
+
+    let subnet = SubnetV4::random_local();
+    let internal_addr = SocketAddrV4::new(subnet.random_client_addr(), rand::random());
+    let remote_addr_0 = SocketAddrV4::new(Ipv4Addr::random_global(), rand::random());
+    let remote_addr_1 = SocketAddrV4::new(Ipv4Addr::random_global(), rand::random());
+
+    let external_port_0 = asymmetric.map_port(remote_addr_0, internal_addr);
+    let external_port_1 = asymmetric.map_port(remote_addr_1, internal_addr);
+    assert_eq!(external_port_0, external_port_1);
+    
+    let external_port_0 = symmetric.map_port(remote_addr_0, internal_addr);
+    let external_port_1 = symmetric.map_port(remote_addr_1, internal_addr);
+    assert!(external_port_0 != external_port_1);
+    let inbound_addr_00 = symmetric.get_inbound_addr(remote_addr_0, external_port_0);
+    let inbound_addr_01 = symmetric.get_inbound_addr(remote_addr_0, external_port_1);
+    let inbound_addr_10 = symmetric.get_inbound_addr(remote_addr_1, external_port_0);
+    let inbound_addr_11 = symmetric.get_inbound_addr(remote_addr_1, external_port_1);
+    assert_eq!(inbound_addr_00, Some(internal_addr));
+    assert_eq!(inbound_addr_01, None);
+    assert_eq!(inbound_addr_10, None);
+    assert_eq!(inbound_addr_11, Some(internal_addr));
 }
 
