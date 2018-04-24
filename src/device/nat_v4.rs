@@ -81,6 +81,7 @@ impl PortMap {
     pub fn get_inbound_addr(&self, remote_addr: SocketAddrV4, port: u16) -> Option<SocketAddrV4> {
         if let Some(ref allowed_endpoints) = self.allowed_endpoints {
             if !allowed_endpoints.get(&port).map(|set| set.contains(&remote_addr)).unwrap_or(false) {
+                trace!("NAT dropping packet from restricted address {}. allowed endpoints: {:?}", remote_addr, allowed_endpoints);
                 return None;
             }
         }
@@ -249,7 +250,7 @@ impl NatV4Builder {
 
     /// Makes this NAT a symmetric NAT, meaning packets sent to different remote addresses from the
     /// same internal address will appear to originate from different external ports.
-    pub fn symmetric_nat(mut self) -> NatV4Builder {
+    pub fn symmetric(mut self) -> NatV4Builder {
         self.tcp_map.symmetric_map = Some(SymmetricMap::default());
         self.udp_map.symmetric_map = Some(SymmetricMap::default());
         self
@@ -401,7 +402,7 @@ impl Future for NatV4 {
                         Ipv4Payload::Udp(udp) => {
                             let udp_fields = udp.fields();
                             let dest_port = udp.dest_port();
-                            let dest_addr = SocketAddrV4::new(self.public_ip, dest_port);
+                            let dest_addr = SocketAddrV4::new(dest_ip, dest_port);
                             let source_port = udp.source_port();
                             let source_addr = SocketAddrV4::new(source_ip, source_port);
                             let mapped_source_port = self.udp_map.map_port(dest_addr, source_addr);
@@ -430,7 +431,7 @@ impl Future for NatV4 {
                         Ipv4Payload::Tcp(tcp) => {
                             let tcp_fields = tcp.fields();
                             let dest_port = tcp.dest_port();
-                            let dest_addr = SocketAddrV4::new(self.public_ip, dest_port);
+                            let dest_addr = SocketAddrV4::new(dest_ip, dest_port);
                             let source_port = tcp.source_port();
                             let source_addr = SocketAddrV4::new(source_ip, source_port);
                             let mapped_source_port = self.tcp_map.map_port(dest_addr, source_addr);
@@ -705,10 +706,14 @@ fn test_port_restriction() {
     let unknown_addr = SocketAddrV4::new(Ipv4Addr::random_global(), rand::random());
 
     let mapped_port = unrestricted.map_port(remote_addr, internal_addr);
+    let inbound_addr = unrestricted.get_inbound_addr(remote_addr, mapped_port);
+    assert_eq!(inbound_addr, Some(internal_addr));
     let inbound_addr = unrestricted.get_inbound_addr(unknown_addr, mapped_port);
     assert_eq!(inbound_addr, Some(internal_addr));
 
     let mapped_port = restricted.map_port(remote_addr, internal_addr);
+    let inbound_addr = unrestricted.get_inbound_addr(remote_addr, mapped_port);
+    assert_eq!(inbound_addr, Some(internal_addr));
     let inbound_addr = restricted.get_inbound_addr(unknown_addr, mapped_port);
     assert_eq!(inbound_addr, None);
 }
