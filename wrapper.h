@@ -13,4 +13,5 @@
 #include <sys/wait.h>
 #include <pwd.h>
 #include <grp.h>
+#include <sys/prctl.h>
 

@@ -70,6 +70,11 @@ where
         // local storage keys. There should be a way to do this which doesn't involve spawning
         // two threads.
 
+        let res = unsafe {
+            sys::prctl(sys::PR_SET_PDEATHSIG as i32, sys::SIGTERM, 0, 0, 0)
+        };
+        assert_eq!(res, 0);
+
         let mut f = unwrap!(File::create("/proc/self/uid_map"));
         let s = format!("0 {} 1\n", uid);
         unwrap!(f.write(s.as_bytes()));
