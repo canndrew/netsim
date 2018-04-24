@@ -119,6 +119,47 @@ tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,);
 tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,);
 tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15,);
 
+impl<N> RouterClientsV4 for Vec<N>
+where
+    N: Ipv4Node + 'static,
+{
+    type Output = Vec<N::Output>;
+
+    fn build(
+        self,
+        handle: &Handle,
+        subnet: SubnetV4,
+    ) -> (SpawnComplete<Vec<N::Output>>, Ipv4Plug) {
+        let subnets = subnet.split(self.len() as u32 + 1);
+        let mut router = RouterV4Builder::new(subnets[0].base_addr());
+        let mut spawn_completes = FuturesOrdered::new();
+
+        for (i, node) in self.into_iter().enumerate() {
+            let (spawn_complete, plug) = node.build(handle, subnets[i + 1]);
+            router = router.connect(plug, vec![RouteV4::new(subnets[i + 1], None)]);
+            spawn_completes.push(spawn_complete);
+        }
+
+        let (plug_0, plug_1) = Ipv4Plug::new_wire();
+        let router = router.connect(plug_1, vec![RouteV4::new(SubnetV4::global(), None)]);
+        router.spawn(handle);
+
+        let (tx, rx) = oneshot::channel();
+        handle.spawn({
+            spawn_completes
+            .collect()
+            .then(|result| {
+                let _ = tx.send(result);
+                Ok(())
+            })
+        });
+
+        let spawn_complete = spawn_complete::from_receiver(rx);
+
+        (spawn_complete, plug_0)
+    }
+}
+
 pub struct ImplNode<C> {
     clients: C,
 }

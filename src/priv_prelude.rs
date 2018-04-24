@@ -10,7 +10,7 @@ pub use byteorder::{ByteOrder, NativeEndian, NetworkEndian, WriteBytesExt};
 pub use void::{Void, ResultVoidExt};
 pub use std::ffi::{CStr, CString};
 pub use futures::{future, stream, Future, Stream, Sink, Async, AsyncSink};
-pub use futures::stream::FuturesUnordered;
+pub use futures::stream::{FuturesOrdered, FuturesUnordered};
 pub use futures::sync::oneshot;
 pub use std::os::unix::io::{RawFd, AsRawFd, FromRawFd, IntoRawFd};
 pub use tokio_io::{AsyncRead, AsyncWrite};
