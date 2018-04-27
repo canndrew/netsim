@@ -13,8 +13,10 @@ functions is `new_namespace`, which is demonstrated below. In this example we li
 network interfaces using the [`get_if_addrs`](https://crates.io/crates/get_if_addrs) crate.
 
 ```rust
+extern crate tokio_core;
 extern crate netsim;
 extern crate get_if_addrs;
+use tokio_core::reactor::Core;
 use netsim::spawn;
 
 // First, check that there is more than one network interface. This will generally be true
@@ -24,10 +26,10 @@ assert!(interfaces.len() > 0);
 
 // Now check how many network interfaces we can see inside a fresh network namespace. There
 // should be zero.
-let join_handle = spawn::new_namespace(|| {
+let spawn_complete = spawn::new_namespace(|| {
     get_if_addrs::get_if_addrs().unwrap()
 });
-let interfaces = join_handle.join().unwrap();
+let interfaces = Core::new().unwrap().run(spawn_complete).unwrap();
 assert!(interfaces.is_empty());
 ```
 
@@ -98,7 +100,7 @@ let mut core = Core::new().unwrap();
 let handle = core.handle();
 
 let subnet = SubnetV4::local_10();
-let (join_handle, plug) = spawn::on_subnet_v4(&handle, subnet, |ip_addr| {
+let (spawn_complete, plug) = spawn::on_subnet_v4(&handle, subnet, |ip_addr| {
     let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
     socket.send_to(b"hello world", "10.1.2.3:4567").unwrap();
 });
@@ -151,10 +153,8 @@ let node_b = node::endpoint_v4(move |_ip_addr| {
 });
 
 let router_node = node::router_v4((node_a, node_b));
-let (join_handle, _plug) = spawn::network_v4(&handle, SubnetV4::global(), router_node);
-let (received, ()) = core.run(future_utils::thread_future(|| {
-    join_handle.join().unwrap()
-})).unwrap();
+let (spawn_complete, _plug) = spawn::network_v4(&handle, SubnetV4::global(), router_node);
+let (received, ()) = core.run(spawn_complete).unwrap();
 assert_eq!(&received[..], b"hello world");
 ```
 
