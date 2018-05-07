@@ -1,21 +1,22 @@
 use priv_prelude::*;
 use spawn;
 
-pub struct ImplNode<F> {
+/// A node representing an Ipv4 endpoint.
+pub struct EndpointV4Node<F> {
     func: F,
 }
 
 /// Create a node for an Ipv4 endpoint. This node will run the given function in a network
 /// namespace with a single interface.
-pub fn endpoint_v4<R, F>(func: F) -> ImplNode<F>
+pub fn endpoint_v4<R, F>(func: F) -> EndpointV4Node<F>
 where
     R: Send + 'static,
     F: FnOnce(Ipv4Addr) -> R + Send + 'static,
 {
-    ImplNode { func }
+    EndpointV4Node { func }
 }
 
-impl<R, F> Ipv4Node for ImplNode<F>
+impl<R, F> Ipv4Node for EndpointV4Node<F>
 where
     R: Send + 'static,
     F: FnOnce(Ipv4Addr) -> R + Send + 'static,

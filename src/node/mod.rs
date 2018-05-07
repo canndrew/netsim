@@ -16,16 +16,16 @@ mod ether_adaptor_v4;
 mod endpoint_eth;
 mod hub_eth;
 
-pub use self::nat_v4::nat_v4;
-pub use self::endpoint_v4::endpoint_v4;
-pub use self::hops_v4::hops_v4;
-pub use self::latency_v4::latency_v4;
-pub use self::packet_loss_v4::packet_loss_v4;
-pub use self::router_v4::{router_v4, RouterClientsV4};
-pub use self::ether_adaptor_v4::ether_adaptor_v4;
+pub use self::nat_v4::{nat_v4, NatV4Node};
+pub use self::endpoint_v4::{endpoint_v4, EndpointV4Node};
+pub use self::hops_v4::{hops_v4, HopsV4Node};
+pub use self::latency_v4::{latency_v4, LatencyV4Node};
+pub use self::packet_loss_v4::{packet_loss_v4, PacketLossV4Node};
+pub use self::router_v4::{router_v4, RouterClientsV4, RouterV4Node};
+pub use self::ether_adaptor_v4::{ether_adaptor_v4, EtherAdaptorV4Node};
 
-pub use self::endpoint_eth::endpoint_eth;
-pub use self::hub_eth::hub_eth;
+pub use self::endpoint_eth::{endpoint_eth, EndpointEthNode};
+pub use self::hub_eth::{hub_eth, HubEthNode};
 
 /// An `Ipv4Node` describes a recipe for constructing a network when given the subnet that the network
 /// should operate on. The functions in the `node` module return `Ipv4Node`s that you can then run as a
@@ -48,7 +48,7 @@ pub trait Ipv4Node: Sized {
     fn hops(
         self,
         num_hops: u32,
-    ) -> hops_v4::ImplNode<Self> {
+    ) -> HopsV4Node<Self> {
         hops_v4(num_hops, self)
     }
 
@@ -58,7 +58,7 @@ pub trait Ipv4Node: Sized {
         self,
         min_latency: Duration,
         mean_additional_latency: Duration,
-    ) -> latency_v4::ImplNode<Self> {
+    ) -> LatencyV4Node<Self> {
         latency_v4(min_latency, mean_additional_latency, self)
     }
 
@@ -68,7 +68,7 @@ pub trait Ipv4Node: Sized {
         self,
         loss_rate: f64,
         mean_loss_duration: Duration,
-    ) -> packet_loss_v4::ImplNode<Self> {
+    ) -> PacketLossV4Node<Self> {
         packet_loss_v4(loss_rate, mean_loss_duration, self)
     }
 }

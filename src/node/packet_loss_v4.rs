@@ -1,6 +1,7 @@
 use priv_prelude::*;
 
-pub struct ImplNode<N> {
+/// A `Node` which adds packet loss to an underlying node.
+pub struct PacketLossV4Node<N> {
     node: N,
     loss_rate: f64,
     mean_loss_duration: Duration,
@@ -11,14 +12,14 @@ pub fn packet_loss_v4<N>(
     loss_rate: f64,
     mean_loss_duration: Duration,
     node: N,
-) -> ImplNode<N>
+) -> PacketLossV4Node<N>
 where
     N: Ipv4Node,
 {
-    ImplNode { node, loss_rate, mean_loss_duration }
+    PacketLossV4Node { node, loss_rate, mean_loss_duration }
 }
 
-impl<N> Ipv4Node for ImplNode<N>
+impl<N> Ipv4Node for PacketLossV4Node<N>
 where
     N: Ipv4Node,
 {

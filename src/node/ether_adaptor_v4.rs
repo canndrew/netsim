@@ -1,20 +1,21 @@
 use priv_prelude::*;
 
-pub struct ImplNode<N> {
+/// Adapts an `EtherNode` to an `Ipv4Node`
+pub struct EtherAdaptorV4Node<N> {
     node: N,
 }
 
 /// Adapt a `EtherNode` into an `Ipv4Node`
 pub fn ether_adaptor_v4<N>(
     node: N,
-) -> ImplNode<N>
+) -> EtherAdaptorV4Node<N>
 where
     N: EtherNode,
 {
-    ImplNode { node }
+    EtherAdaptorV4Node { node }
 }
 
-impl<N> Ipv4Node for ImplNode<N>
+impl<N> Ipv4Node for EtherAdaptorV4Node<N>
 where
     N: EtherNode,
 {

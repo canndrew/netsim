@@ -132,16 +132,17 @@ tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,);
 tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,);
 tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15,);
 
-pub struct ImplNode<C> {
+/// A `Node` representing an ethernet hub.
+pub struct HubEthNode<C> {
     clients: C,
 }
 
 /// Create a node for an ethernet hub.
-pub fn hub_eth<C: HubClients>(clients: C) -> ImplNode<C> {
-    ImplNode { clients }
+pub fn hub_eth<C: HubClients>(clients: C) -> HubEthNode<C> {
+    HubEthNode { clients }
 }
 
-impl<C> EtherNode for ImplNode<C>
+impl<C> EtherNode for HubEthNode<C>
 where
     C: HubClients,
 {

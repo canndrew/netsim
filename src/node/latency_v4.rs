@@ -1,6 +1,7 @@
 use priv_prelude::*;
 
-pub struct ImplNode<N> {
+/// A node representing latency on an Ipv4 connection.
+pub struct LatencyV4Node<N> {
     node: N,
     min_latency: Duration,
     mean_additional_latency: Duration,
@@ -16,14 +17,14 @@ pub fn latency_v4<N>(
     min_latency: Duration,
     mean_additional_latency: Duration,
     node: N,
-) -> ImplNode<N>
+) -> LatencyV4Node<N>
 where
     N: Ipv4Node,
 {
-    ImplNode { node, min_latency, mean_additional_latency }
+    LatencyV4Node { node, min_latency, mean_additional_latency }
 }
 
-impl<N> Ipv4Node for ImplNode<N>
+impl<N> Ipv4Node for LatencyV4Node<N>
 where
     N: Ipv4Node,
 {

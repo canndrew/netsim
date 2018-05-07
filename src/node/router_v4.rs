@@ -160,16 +160,17 @@ where
     }
 }
 
-pub struct ImplNode<C> {
+/// A node representing an Ipv4 router
+pub struct RouterV4Node<C> {
     clients: C,
 }
 
 /// Spawns a bunch of sub-nodes and routes packets between them.
-pub fn router_v4<C: RouterClientsV4>(clients: C) -> ImplNode<C> {
-    ImplNode { clients }
+pub fn router_v4<C: RouterClientsV4>(clients: C) -> RouterV4Node<C> {
+    RouterV4Node { clients }
 }
 
-impl<C> Ipv4Node for ImplNode<C>
+impl<C> Ipv4Node for RouterV4Node<C>
 where
     C: RouterClientsV4,
 {
