@@ -83,7 +83,111 @@ pub enum Ipv6PayloadFields {
     },
 }
 
+impl Ipv6PayloadFields {
+    /// Calculate the total length of an Ipv6 packet with the given fields.
+    pub fn total_packet_len(&self) -> usize {
+        40 + match *self {
+            Ipv6PayloadFields::Udp { ref payload, .. } => 8 + payload.len(),
+            Ipv6PayloadFields::Tcp { ref payload, ref fields } => {
+                fields.header_len() + payload.len()
+            },
+        }
+    }
+}
+
+pub fn set_fields(buffer: &mut [u8], fields: Ipv6Fields) {
+    buffer[0] = 0x60;
+    buffer[1] = 0x00;
+    buffer[2] = 0x00;
+    buffer[3] = 0x00;
+    let len = buffer.len() as u16;
+    NetworkEndian::write_u16(&mut buffer[4..6], len);
+    buffer[7] = fields.hop_limit;
+    buffer[8..24].clone_from_slice(&fields.source_ip.octets());
+    buffer[24..40].clone_from_slice(&fields.dest_ip.octets());
+}
+
 impl Ipv6Packet {
+    /// Create a new `Ipv6Packet` with the given header fields and payload. If you are also
+    /// creating the packet's payload data it can be more efficient to use
+    /// `new_from_fields_recursive` and save an allocation/copy.
+    pub fn new_from_fields(
+        fields: Ipv6Fields,
+        payload: &Ipv6Payload,
+    ) -> Ipv6Packet {
+        let len = 40 + match *payload {
+            Ipv6Payload::Udp(ref udp) => udp.as_bytes().len(),
+            Ipv6Payload::Tcp(ref tcp) => tcp.as_bytes().len(),
+            Ipv6Payload::Unknown { ref payload, .. } => payload.len(),
+        };
+        let mut buffer = unsafe { BytesMut::uninit(len) };
+        buffer[6] = match *payload {
+            Ipv6Payload::Udp(..) => 17,
+            Ipv6Payload::Tcp(..) => 6,
+            Ipv6Payload::Unknown { protocol, .. } => protocol,
+        };
+
+        set_fields(&mut buffer, fields);
+
+        match *payload {
+            Ipv6Payload::Udp(ref udp) => buffer[40..].clone_from_slice(udp.as_bytes()),
+            Ipv6Payload::Tcp(ref tcp) => buffer[40..].clone_from_slice(tcp.as_bytes()),
+            Ipv6Payload::Unknown { ref payload, .. } => buffer[40..].clone_from_slice(payload),
+        }
+
+        Ipv6Packet {
+            buffer: buffer.freeze(),
+        }
+    }
+
+    /// Create a new `Ipv6Packet` with the given header fields and payload fields.
+    pub fn new_from_fields_recursive(
+        fields: Ipv6Fields,
+        payload_fields: Ipv6PayloadFields,
+    ) -> Ipv6Packet {
+        let len = payload_fields.total_packet_len();
+        let mut buffer = unsafe { BytesMut::uninit(len) };
+        Ipv6Packet::write_to_buffer(&mut buffer, fields, payload_fields);
+        Ipv6Packet {
+            buffer: buffer.freeze(),
+        }
+    }
+
+    /// Create a new Ipv6 packet by writing it to the given empty buffer.
+    pub fn write_to_buffer(
+        buffer: &mut [u8],
+        fields: Ipv6Fields,
+        payload_fields: Ipv6PayloadFields,
+    ) {
+        buffer[6] = match payload_fields {
+            Ipv6PayloadFields::Udp { .. } => 17,
+            Ipv6PayloadFields::Tcp { .. } => 6,
+        };
+
+        set_fields(buffer, fields);
+
+        match payload_fields {
+            Ipv6PayloadFields::Udp { fields: udp_fields, payload } => {
+                UdpPacket::write_to_buffer_v6(
+                    &mut buffer[40..],
+                    udp_fields,
+                    fields.source_ip,
+                    fields.dest_ip,
+                    payload,
+                );
+            },
+            Ipv6PayloadFields::Tcp { fields: tcp_fields, payload } => {
+                TcpPacket::write_to_buffer_v6(
+                    &mut buffer[40..],
+                    tcp_fields,
+                    fields.source_ip,
+                    fields.dest_ip,
+                    payload,
+                );
+            },
+        }
+    }
+
     /// Parse an IPv6 packet from a byte buffer
     pub fn from_bytes(buffer: Bytes) -> Ipv6Packet {
         Ipv6Packet {

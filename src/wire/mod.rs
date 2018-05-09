@@ -19,5 +19,5 @@ pub use self::mac::*;
 pub use self::udp::*;
 pub use self::tcp::*;
 pub use self::icmpv4::*;
-pub use self::ipv6::*;
+pub use self::ipv6::{Ipv6Packet, Ipv6Fields, Ipv6Payload, Ipv6PayloadFields};
 
