@@ -66,7 +66,6 @@ pub fn pseudo_header_ipv4(
     ])
 }
 
-/*
 /// Compute an IP pseudo header checksum.
 pub fn pseudo_header_ipv6(
     source_ip: Ipv6Addr,
@@ -83,5 +82,4 @@ pub fn pseudo_header_ipv6(
         data(&proto_len[..])
     ])
 }
-*/
 

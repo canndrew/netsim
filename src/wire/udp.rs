@@ -136,5 +136,19 @@ impl UdpPacket {
             checksum::data(&self.buffer[..]),
         ])
     }
+
+    /// Verify the checksum of the packet. The source/destination IP addresses of the packet are
+    /// needed to calculate the checksum.
+    pub fn verify_checksum_v6(
+        &self,
+        source_ip: Ipv6Addr,
+        dest_ip: Ipv6Addr,
+    ) -> bool {
+        let len = NetworkEndian::read_u16(&self.buffer[4..6]);
+        !0 == checksum::combine(&[
+            checksum::pseudo_header_ipv6(source_ip, dest_ip, 17, u32::from(len)),
+            checksum::data(&self.buffer[..]),
+        ])
+    }
 }
 

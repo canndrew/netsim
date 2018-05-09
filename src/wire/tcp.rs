@@ -244,5 +244,19 @@ impl TcpPacket {
             checksum::data(&self.buffer[..]),
         ])
     }
+
+    /// Verify the checksum of the packet. The source/destination IP addresses of the packet are
+    /// needed to calculate the checksum.
+    pub fn verify_checksum_v6(
+        &self,
+        source_ip: Ipv6Addr,
+        dest_ip: Ipv6Addr,
+    ) -> bool {
+        let len = self.buffer.len();
+        !0 == checksum::combine(&[
+            checksum::pseudo_header_ipv6(source_ip, dest_ip, 17, len as u32),
+            checksum::data(&self.buffer[..]),
+        ])
+    }
 }
 
