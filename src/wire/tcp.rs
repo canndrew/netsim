@@ -217,6 +217,7 @@ fn set_fields(buffer: &mut [u8], fields: TcpFields) {
 
     while pos < buffer.len() {
         buffer[pos] = 0;
+        pos += 1;
     }
 }
 

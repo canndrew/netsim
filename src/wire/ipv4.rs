@@ -60,6 +60,11 @@ impl Ipv4Fields {
         let packet = Ipv4Packet { buffer: Bytes::from(&buffer[..20]) };
         packet.fields()
     }
+
+    /// Get the size of the IPv4 header represented by this `Ipv4Fields`
+    pub fn header_len(&self) -> usize {
+        20
+    }
 }
 
 /// The payload of an Ipv4 packet
@@ -78,6 +83,18 @@ pub enum Ipv4Payload {
         /// The payload data.
         payload: Bytes,
     },
+}
+
+impl Ipv4Payload {
+    /// Get the length of the payload, in bytes
+    pub fn payload_len(&self) -> usize {
+        match *self {
+            Ipv4Payload::Udp(ref udp) => udp.as_bytes().len(),
+            Ipv4Payload::Tcp(ref tcp) => tcp.as_bytes().len(),
+            Ipv4Payload::Icmp(ref icmp) => icmp.as_bytes().len(),
+            Ipv4Payload::Unknown { ref payload, .. } => payload.len(),
+        }
+    }
 }
 
 /// The payload of an Ipv4 packet. Can be used to construct an Ipv4 packet and its contents
@@ -107,8 +124,8 @@ pub enum Ipv4PayloadFields {
 
 impl Ipv4PayloadFields {
     /// Calculate the total length of an Ipv4 packet with the given fields.
-    pub fn total_packet_len(&self) -> usize {
-        20 + match *self {
+    pub fn payload_len(&self) -> usize {
+        match *self {
             Ipv4PayloadFields::Udp { ref payload, .. } => 8 + payload.len(),
             Ipv4PayloadFields::Tcp { ref payload, ref fields } => {
                 fields.header_len() + payload.len()
@@ -142,12 +159,8 @@ impl Ipv4Packet {
         fields: Ipv4Fields,
         payload: &Ipv4Payload,
     ) -> Ipv4Packet {
-        let len = 20 + match *payload {
-            Ipv4Payload::Udp(ref udp) => udp.as_bytes().len(),
-            Ipv4Payload::Tcp(ref tcp) => tcp.as_bytes().len(),
-            Ipv4Payload::Icmp(ref icmp) => icmp.as_bytes().len(),
-            Ipv4Payload::Unknown { ref payload, .. } => payload.len(),
-        };
+        let header_len = fields.header_len();
+        let len = header_len + payload.payload_len();
         let mut buffer = unsafe { BytesMut::uninit(len) };
         buffer[9] = match *payload {
             Ipv4Payload::Udp(..) => 17,
@@ -159,10 +172,10 @@ impl Ipv4Packet {
         set_fields(&mut buffer, fields);
 
         match *payload {
-            Ipv4Payload::Udp(ref udp) => buffer[20..].clone_from_slice(udp.as_bytes()),
-            Ipv4Payload::Tcp(ref tcp) => buffer[20..].clone_from_slice(tcp.as_bytes()),
-            Ipv4Payload::Icmp(ref icmp) => buffer[20..].clone_from_slice(icmp.as_bytes()),
-            Ipv4Payload::Unknown { ref payload, .. } => buffer[20..].clone_from_slice(payload),
+            Ipv4Payload::Udp(ref udp) => buffer[header_len..].clone_from_slice(udp.as_bytes()),
+            Ipv4Payload::Tcp(ref tcp) => buffer[header_len..].clone_from_slice(tcp.as_bytes()),
+            Ipv4Payload::Icmp(ref icmp) => buffer[header_len..].clone_from_slice(icmp.as_bytes()),
+            Ipv4Payload::Unknown { ref payload, .. } => buffer[header_len..].clone_from_slice(payload),
         }
 
         Ipv4Packet {
@@ -175,7 +188,7 @@ impl Ipv4Packet {
         fields: Ipv4Fields,
         payload_fields: Ipv4PayloadFields,
     ) -> Ipv4Packet {
-        let len = payload_fields.total_packet_len();
+        let len = fields.header_len() + payload_fields.payload_len();
         let mut buffer = unsafe { BytesMut::uninit(len) };
         Ipv4Packet::write_to_buffer(&mut buffer, fields, payload_fields);
         Ipv4Packet {
@@ -189,6 +202,8 @@ impl Ipv4Packet {
         fields: Ipv4Fields,
         payload_fields: Ipv4PayloadFields,
     ) {
+        let header_len = fields.header_len();
+
         buffer[9] = match payload_fields {
             Ipv4PayloadFields::Udp { .. } => 17,
             Ipv4PayloadFields::Tcp { .. } => 6,
@@ -200,7 +215,7 @@ impl Ipv4Packet {
         match payload_fields {
             Ipv4PayloadFields::Udp { fields: udp_fields, payload } => {
                 UdpPacket::write_to_buffer_v4(
-                    &mut buffer[20..],
+                    &mut buffer[header_len..],
                     udp_fields,
                     fields.source_ip,
                     fields.dest_ip,
@@ -209,7 +224,7 @@ impl Ipv4Packet {
             },
             Ipv4PayloadFields::Tcp { fields: tcp_fields, payload } => {
                 TcpPacket::write_to_buffer_v4(
-                    &mut buffer[20..],
+                    &mut buffer[header_len..],
                     tcp_fields,
                     fields.source_ip,
                     fields.dest_ip,
@@ -218,7 +233,7 @@ impl Ipv4Packet {
             },
             Ipv4PayloadFields::Icmp { kind } => {
                 Icmpv4Packet::write_to_buffer(
-                    &mut buffer[20..],
+                    &mut buffer[header_len..],
                     kind,
                 );
             },
@@ -264,15 +279,21 @@ impl Ipv4Packet {
         self.buffer[8]
     }
 
+    /// Get the length of the IPv4 packet header
+    pub fn header_len(&self) -> usize {
+        ((self.buffer[0] & 0x0f) as usize) * 4
+    }
+
     /// Get the packet's payload
     pub fn payload(&self) -> Ipv4Payload {
+        let header_len = self.header_len();
         match self.buffer[9] {
-            17 => Ipv4Payload::Udp(UdpPacket::from_bytes(self.buffer.slice_from(20))),
-            6 => Ipv4Payload::Tcp(TcpPacket::from_bytes(self.buffer.slice_from(20))),
-            1 => Ipv4Payload::Icmp(Icmpv4Packet::from_bytes(self.buffer.slice_from(20))),
+            17 => Ipv4Payload::Udp(UdpPacket::from_bytes(self.buffer.slice_from(header_len))),
+            6 => Ipv4Payload::Tcp(TcpPacket::from_bytes(self.buffer.slice_from(header_len))),
+            1 => Ipv4Payload::Icmp(Icmpv4Packet::from_bytes(self.buffer.slice_from(header_len))),
             p => Ipv4Payload::Unknown {
                 protocol: p,
-                payload: self.buffer.slice_from(20),
+                payload: self.buffer.slice_from(header_len),
             },
         }
     }
@@ -289,7 +310,8 @@ impl Ipv4Packet {
 
     /// Check that this packet has a valid checksum.
     pub fn verify_checksum(&self) -> bool {
-        checksum::data(&self.buffer[..20]) == !0
+        let header_len = self.header_len();
+        checksum::data(&self.buffer[..header_len]) == !0
     }
 }
 

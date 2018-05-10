@@ -68,11 +68,11 @@ pub enum EtherPayloadFields {
 
 impl EtherPayloadFields {
     /// The total length of an ethernet frame with this payload
-    pub fn total_frame_len(&self) -> usize {
-        14 + match *self {
+    pub fn payload_len(&self) -> usize {
+        match *self {
             EtherPayloadFields::Arp { .. } => 28,
-            EtherPayloadFields::Ipv4 { ref payload_fields, .. } => {
-                payload_fields.total_packet_len()
+            EtherPayloadFields::Ipv4 { ref fields, ref payload_fields } => {
+                fields.header_len() + payload_fields.payload_len()
             },
         }
     }
@@ -119,7 +119,7 @@ impl EtherFrame {
         fields: EtherFields,
         payload_fields: EtherPayloadFields,
     ) -> EtherFrame {
-        let len = payload_fields.total_frame_len();
+        let len = 14 + payload_fields.payload_len();
         let mut buffer = unsafe { BytesMut::uninit(len) };
         
         EtherFrame::write_to_buffer(&mut buffer, fields, payload_fields);
