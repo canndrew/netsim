@@ -1,5 +1,4 @@
 use priv_prelude::*;
-use spawn;
 
 /// A node representing an Ipv4 endpoint.
 pub struct EndpointV4Node<F> {
@@ -35,11 +34,15 @@ where
             .netmask(subnet.netmask())
             .route(RouteV4::new(SubnetV4::global(), None))
         };
-        let (spawn_complete, ipv4_plug) = spawn::with_ipv4_iface(
-            handle,
-            iface, move || (self.func)(address),
-        );
-        (spawn_complete, ipv4_plug)
+        let (plug_a, plug_b) = Ipv4Plug::new_wire();
+
+        let spawn_complete = {
+            MachineBuilder::new()
+            .add_ipv4_iface(iface, plug_b)
+            .spawn(handle, move || (self.func)(address))
+        };
+
+        (spawn_complete, plug_a)
     }
 }
 

@@ -1,5 +1,4 @@
 use priv_prelude::*;
-use spawn;
 
 /// A node representing an ethernet endpoint
 pub struct EndpointEthNode<F> {
@@ -40,11 +39,15 @@ where
                 .netmask(subnet.netmask())
             };
         }
-        spawn::with_ether_iface(
-            handle,
-            iface,
-            self.func,
-        )
+        let (plug_a, plug_b) = EtherPlug::new_wire();
+
+        let spawn_complete = {
+            MachineBuilder::new()
+            .add_ether_iface(iface, plug_b)
+            .spawn(handle, self.func)
+        };
+
+        (spawn_complete, plug_a)
     }
 }
 
