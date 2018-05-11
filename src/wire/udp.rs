@@ -27,7 +27,7 @@ pub struct UdpFields {
     pub dest_port: u16,
 }
 
-fn set_fields(buffer: &mut [u8], fields: UdpFields) {
+fn set_fields(buffer: &mut [u8], fields: &UdpFields) {
     NetworkEndian::write_u16(&mut buffer[0..2], fields.source_port);
     NetworkEndian::write_u16(&mut buffer[2..4], fields.dest_port);
     let len = buffer.len() as u16;
@@ -35,7 +35,7 @@ fn set_fields(buffer: &mut [u8], fields: UdpFields) {
     NetworkEndian::write_u16(&mut buffer[6..8], 0);
 }
 
-fn set_fields_v4(buffer: &mut [u8], fields: UdpFields, source_ip: Ipv4Addr, dest_ip: Ipv4Addr) {
+fn set_fields_v4(buffer: &mut [u8], fields: &UdpFields, source_ip: Ipv4Addr, dest_ip: Ipv4Addr) {
     set_fields(buffer, fields);
 
     let checksum = !checksum::combine(&[
@@ -51,7 +51,7 @@ fn set_fields_v4(buffer: &mut [u8], fields: UdpFields, source_ip: Ipv4Addr, dest
     NetworkEndian::write_u16(&mut buffer[6..8], checksum);
 }
 
-fn set_fields_v6(buffer: &mut [u8], fields: UdpFields, source_ip: Ipv6Addr, dest_ip: Ipv6Addr) {
+fn set_fields_v6(buffer: &mut [u8], fields: &UdpFields, source_ip: Ipv6Addr, dest_ip: Ipv6Addr) {
     set_fields(buffer, fields);
 
     let checksum = !checksum::combine(&[
@@ -70,10 +70,10 @@ fn set_fields_v6(buffer: &mut [u8], fields: UdpFields, source_ip: Ipv6Addr, dest
 impl UdpPacket {
     /// Create a new UDP packet from the given header fields and payload.
     pub fn new_from_fields_v4(
-        fields: UdpFields,
+        fields: &UdpFields,
         source_ip: Ipv4Addr,
         dest_ip: Ipv4Addr,
-        payload: Bytes,
+        payload: &Bytes,
     ) -> UdpPacket {
         let len = 8 + payload.len();
         let mut buffer = unsafe { BytesMut::uninit(len) };
@@ -85,10 +85,10 @@ impl UdpPacket {
 
     /// Create a new UDP packet from the given header fields and payload.
     pub fn new_from_fields_v6(
-        fields: UdpFields,
+        fields: &UdpFields,
         source_ip: Ipv6Addr,
         dest_ip: Ipv6Addr,
-        payload: Bytes,
+        payload: &Bytes,
     ) -> UdpPacket {
         let len = 8 + payload.len();
         let mut buffer = unsafe { BytesMut::uninit(len) };
@@ -101,7 +101,7 @@ impl UdpPacket {
     /// Write a UDP packet to the given empty buffer.
     pub fn write_to_buffer_v4(
         buffer: &mut [u8],
-        fields: UdpFields,
+        fields: &UdpFields,
         source_ip: Ipv4Addr,
         dest_ip: Ipv4Addr,
         payload: &Bytes,
@@ -113,7 +113,7 @@ impl UdpPacket {
     /// Write a UDP packet to the given empty buffer.
     pub fn write_to_buffer_v6(
         buffer: &mut [u8],
-        fields: UdpFields,
+        fields: &UdpFields,
         source_ip: Ipv6Addr,
         dest_ip: Ipv6Addr,
         payload: &Bytes,
@@ -138,7 +138,7 @@ impl UdpPacket {
     }
 
     /// Set the header fields of this UDP packet.
-    pub fn set_fields_v4(&mut self, fields: UdpFields, source_ip: Ipv4Addr, dest_ip: Ipv4Addr) {
+    pub fn set_fields_v4(&mut self, fields: &UdpFields, source_ip: Ipv4Addr, dest_ip: Ipv4Addr) {
         let buffer = mem::replace(&mut self.buffer, Bytes::new());
         let mut buffer = BytesMut::from(buffer);
         set_fields_v4(&mut buffer, fields, source_ip, dest_ip);
@@ -146,7 +146,7 @@ impl UdpPacket {
     }
 
     /// Set the header fields of this UDP packet.
-    pub fn set_fields_v6(&mut self, fields: UdpFields, source_ip: Ipv6Addr, dest_ip: Ipv6Addr) {
+    pub fn set_fields_v6(&mut self, fields: &UdpFields, source_ip: Ipv6Addr, dest_ip: Ipv6Addr) {
         let buffer = mem::replace(&mut self.buffer, Bytes::new());
         let mut buffer = BytesMut::from(buffer);
         set_fields_v6(&mut buffer, fields, source_ip, dest_ip);

@@ -95,7 +95,7 @@ impl Ipv6PayloadFields {
     }
 }
 
-pub fn set_fields(buffer: &mut [u8], fields: Ipv6Fields) {
+pub fn set_fields(buffer: &mut [u8], fields: &Ipv6Fields) {
     buffer[0] = 0x60;
     buffer[1] = 0x00;
     buffer[2] = 0x00;
@@ -112,7 +112,7 @@ impl Ipv6Packet {
     /// creating the packet's payload data it can be more efficient to use
     /// `new_from_fields_recursive` and save an allocation/copy.
     pub fn new_from_fields(
-        fields: Ipv6Fields,
+        fields: &Ipv6Fields,
         payload: &Ipv6Payload,
     ) -> Ipv6Packet {
         let len = 40 + match *payload {
@@ -142,8 +142,8 @@ impl Ipv6Packet {
 
     /// Create a new `Ipv6Packet` with the given header fields and payload fields.
     pub fn new_from_fields_recursive(
-        fields: Ipv6Fields,
-        payload_fields: Ipv6PayloadFields,
+        fields: &Ipv6Fields,
+        payload_fields: &Ipv6PayloadFields,
     ) -> Ipv6Packet {
         let len = payload_fields.total_packet_len();
         let mut buffer = unsafe { BytesMut::uninit(len) };
@@ -156,8 +156,8 @@ impl Ipv6Packet {
     /// Create a new Ipv6 packet by writing it to the given empty buffer.
     pub fn write_to_buffer(
         buffer: &mut [u8],
-        fields: Ipv6Fields,
-        payload_fields: Ipv6PayloadFields,
+        fields: &Ipv6Fields,
+        payload_fields: &Ipv6PayloadFields,
     ) {
         buffer[6] = match payload_fields {
             Ipv6PayloadFields::Udp { .. } => 17,
@@ -167,7 +167,7 @@ impl Ipv6Packet {
         set_fields(buffer, fields);
 
         match payload_fields {
-            Ipv6PayloadFields::Udp { fields: udp_fields, payload } => {
+            Ipv6PayloadFields::Udp { fields: udp_fields, ref payload } => {
                 UdpPacket::write_to_buffer_v6(
                     &mut buffer[40..],
                     udp_fields,
@@ -176,7 +176,7 @@ impl Ipv6Packet {
                     payload,
                 );
             },
-            Ipv6PayloadFields::Tcp { fields: tcp_fields, payload } => {
+            Ipv6PayloadFields::Tcp { fields: tcp_fields, ref payload } => {
                 TcpPacket::write_to_buffer_v6(
                     &mut buffer[40..],
                     tcp_fields,

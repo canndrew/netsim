@@ -221,7 +221,7 @@ fn set_fields(buffer: &mut [u8], fields: &TcpFields) {
     }
 }
 
-fn set_fields_v4(buffer: &mut [u8], fields: TcpFields, source_ip: Ipv4Addr, dest_ip: Ipv4Addr) {
+fn set_fields_v4(buffer: &mut [u8], fields: &TcpFields, source_ip: Ipv4Addr, dest_ip: Ipv4Addr) {
     set_fields(buffer, fields);
 
     let checksum = !checksum::combine(&[
@@ -236,7 +236,7 @@ fn set_fields_v4(buffer: &mut [u8], fields: TcpFields, source_ip: Ipv4Addr, dest
     NetworkEndian::write_u16(&mut buffer[16..18], checksum);
 }
 
-fn set_fields_v6(buffer: &mut [u8], fields: TcpFields, source_ip: Ipv6Addr, dest_ip: Ipv6Addr) {
+fn set_fields_v6(buffer: &mut [u8], fields: &TcpFields, source_ip: Ipv6Addr, dest_ip: Ipv6Addr) {
     set_fields(buffer, fields);
 
     let checksum = !checksum::combine(&[
@@ -254,10 +254,10 @@ fn set_fields_v6(buffer: &mut [u8], fields: TcpFields, source_ip: Ipv6Addr, dest
 impl TcpPacket {
     /// Allocate a new TCP packet from the given fields and payload
     pub fn new_from_fields_v4(
-        fields: TcpFields,
+        fields: &TcpFields,
         source_ip: Ipv4Addr,
         dest_ip: Ipv4Addr,
-        payload: Bytes,
+        payload: &Bytes,
     ) -> TcpPacket {
         let len = fields.header_len() + payload.len();
         let mut buffer = unsafe { BytesMut::uninit(len) };
@@ -269,10 +269,10 @@ impl TcpPacket {
 
     /// Allocate a new TCP packet from the given fields and payload
     pub fn new_from_fields_v6(
-        fields: TcpFields,
+        fields: &TcpFields,
         source_ip: Ipv6Addr,
         dest_ip: Ipv6Addr,
-        payload: Bytes,
+        payload: &Bytes,
     ) -> TcpPacket {
         let len = fields.header_len() + payload.len();
         let mut buffer = unsafe { BytesMut::uninit(len) };
@@ -285,7 +285,7 @@ impl TcpPacket {
     /// Write a TCP packet to the given empty buffer. The buffer must have the exact correct size.
     pub fn write_to_buffer_v4(
         buffer: &mut [u8],
-        fields: TcpFields,
+        fields: &TcpFields,
         source_ip: Ipv4Addr,
         dest_ip: Ipv4Addr,
         payload: &Bytes,
@@ -298,7 +298,7 @@ impl TcpPacket {
     /// Write a TCP packet to the given empty buffer. The buffer must have the exact correct size.
     pub fn write_to_buffer_v6(
         buffer: &mut [u8],
-        fields: TcpFields,
+        fields: &TcpFields,
         source_ip: Ipv6Addr,
         dest_ip: Ipv6Addr,
         payload: &Bytes,
@@ -341,7 +341,7 @@ impl TcpPacket {
     }
 
     /// Set the header fields of a TCP packet
-    pub fn set_fields_v4(&mut self, fields: TcpFields, source_ip: Ipv4Addr, dest_ip: Ipv4Addr) {
+    pub fn set_fields_v4(&mut self, fields: &TcpFields, source_ip: Ipv4Addr, dest_ip: Ipv4Addr) {
         let buffer = mem::replace(&mut self.buffer, Bytes::new());
         let mut buffer = BytesMut::from(buffer);
         set_fields_v4(&mut buffer, fields, source_ip, dest_ip);
@@ -349,7 +349,7 @@ impl TcpPacket {
     }
 
     /// Set the header fields of a TCP packet
-    pub fn set_fields_v6(&mut self, fields: TcpFields, source_ip: Ipv6Addr, dest_ip: Ipv6Addr) {
+    pub fn set_fields_v6(&mut self, fields: &TcpFields, source_ip: Ipv6Addr, dest_ip: Ipv6Addr) {
         let buffer = mem::replace(&mut self.buffer, Bytes::new());
         let mut buffer = BytesMut::from(buffer);
         set_fields_v6(&mut buffer, fields, source_ip, dest_ip);

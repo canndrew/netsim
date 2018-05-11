@@ -213,7 +213,7 @@ impl Ipv4Packet {
         set_fields(buffer, fields);
 
         match payload_fields {
-            Ipv4PayloadFields::Udp { fields: udp_fields, payload } => {
+            Ipv4PayloadFields::Udp { fields: ref udp_fields, ref payload } => {
                 UdpPacket::write_to_buffer_v4(
                     &mut buffer[header_len..],
                     udp_fields,
@@ -222,7 +222,7 @@ impl Ipv4Packet {
                     payload,
                 );
             },
-            Ipv4PayloadFields::Tcp { fields: tcp_fields, payload } => {
+            Ipv4PayloadFields::Tcp { fields: ref tcp_fields, ref payload } => {
                 TcpPacket::write_to_buffer_v4(
                     &mut buffer[header_len..],
                     tcp_fields,

@@ -124,7 +124,7 @@ impl Future for EtherAdaptorV4 {
                                                     source_mac: self.mac_addr,
                                                     dest_mac: source_mac,
                                                 },
-                                                EtherPayload::Ipv4(packet),
+                                                &EtherPayload::Ipv4(packet),
                                             );
                                             info!(
                                                 "ether adaptor {} {} sending queued IPv4 packet \
@@ -187,7 +187,7 @@ impl Future for EtherAdaptorV4 {
                             source_mac: self.mac_addr,
                             dest_mac: dest_mac,
                         },
-                        EtherPayload::Ipv4(packet),
+                        &EtherPayload::Ipv4(packet),
                     );
 
                     info!(
@@ -248,7 +248,7 @@ fn test() {
                     source_mac: MacAddr::random(),
                     dest_mac: veth_mac,
                 },
-                EtherPayload::Ipv4(ipv4_packet.clone()),
+                &EtherPayload::Ipv4(ipv4_packet.clone()),
             );
 
             ether_tx

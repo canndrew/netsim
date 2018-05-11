@@ -97,7 +97,7 @@ impl EtherFrame {
         };
         let mut buffer = unsafe { BytesMut::uninit(len) };
         set_fields(&mut buffer, fields);
-        let ethertype = match payload {
+        let ethertype = match *payload {
             EtherPayload::Arp(..) => 0x0806,
             EtherPayload::Ipv4(..) => 0x0800,
             EtherPayload::Unknown { ethertype, .. } => ethertype,
