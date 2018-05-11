@@ -9,12 +9,14 @@ use iface::build::{IfaceBuilder, build};
 /// using `build`.
 #[derive(Debug)]
 pub struct EtherIfaceBuilder {
+    mac_addr: MacAddr,
     builder: IfaceBuilder,
 }
 
 impl Default for EtherIfaceBuilder {
     fn default() -> EtherIfaceBuilder {
         EtherIfaceBuilder {
+            mac_addr: MacAddr::random(),
             builder: IfaceBuilder {
                 name: String::from("netsim"),
                 address: ipv4!("0.0.0.0"),
@@ -34,6 +36,12 @@ impl EtherIfaceBuilder {
     /// Set the interface name.
     pub fn name<S: Into<String>>(mut self, name: S) -> Self {
         self.builder.name = name.into();
+        self
+    }
+
+    /// Set the interface MAC address.
+    pub fn mac_addr(mut self, addr: MacAddr) -> Self {
+        self.mac_addr = addr;
         self
     }
 

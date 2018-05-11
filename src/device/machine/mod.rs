@@ -64,6 +64,7 @@ impl MachineBuilder {
                 unwrap!(ether_tx.send((tap_unbound, plug, drop_rx)));
                 drop_txs.push(drop_tx);
             }
+            drop(ether_tx);
 
             for (iface, plug) in self.ipv4_ifaces {
                 let (drop_tx, drop_rx) = future_utils::drop_notify();
@@ -71,6 +72,7 @@ impl MachineBuilder {
                 unwrap!(ipv4_tx.send((tun_unbound, plug, drop_rx)));
                 drop_txs.push(drop_tx);
             }
+            drop(ipv4_tx);
 
             let ret = func();
             drop(drop_txs);
