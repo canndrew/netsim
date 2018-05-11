@@ -1,7 +1,6 @@
 use priv_prelude::*;
+use super::*;
 use rand;
-use std::net::AddrParseError;
-use std::num::ParseIntError;
 
 /// An Ipv4 subnet
 #[derive(Clone, Copy)]
@@ -23,7 +22,7 @@ impl SubnetV4 {
     ///
     /// Create the subnet 192.168.0.0/24 with `SubnetV4::new(ipv4!("192.168.0.0"), 24)`
     pub fn new(addr: Ipv4Addr, bits: u8) -> SubnetV4 {
-        let mask = !(0xffff_ffffu32.checked_shr(u32::from(bits)).unwrap_or(0));
+        let mask = !((!0u32).checked_shr(u32::from(bits)).unwrap_or(0));
         SubnetV4 {
             addr: Ipv4Addr::from(u32::from(addr) & mask),
             bits: bits,
@@ -86,7 +85,7 @@ impl SubnetV4 {
 
     /// Get the netmask as an IP address
     pub fn netmask(&self) -> Ipv4Addr {
-        Ipv4Addr::from(!(0xffff_ffffu32.checked_shr(u32::from(self.bits)).unwrap_or(0)))
+        Ipv4Addr::from(!((!0u32).checked_shr(u32::from(self.bits)).unwrap_or(0)))
     }
 
     /// Get the number of netmask bits
@@ -182,56 +181,28 @@ impl SubnetV4 {
 }
 
 impl FromStr for SubnetV4 {
-    type Err = ParseError;
+    type Err = SubnetParseError;
 
-    fn from_str(s: &str) -> Result<SubnetV4, ParseError> {
+    fn from_str(s: &str) -> Result<SubnetV4, SubnetParseError> {
         let mut split = s.split('/');
         let addr = unwrap!(split.next());
         let bits = match split.next() {
             Some(bits) => bits,
-            None => return Err(ParseError::MissingDelimiter),
+            None => return Err(SubnetParseError::MissingDelimiter),
         };
         match split.next() {
-            Some(..) => return Err(ParseError::ExtraDelimiter),
+            Some(..) => return Err(SubnetParseError::ExtraDelimiter),
             None => (),
         };
         let addr = match Ipv4Addr::from_str(addr) {
             Ok(addr) => addr,
-            Err(e) => return Err(ParseError::ParseAddr(e)),
+            Err(e) => return Err(SubnetParseError::ParseAddr(e)),
         };
         let bits = match u8::from_str(bits) {
             Ok(bits) => bits,
-            Err(e) => return Err(ParseError::ParseBits(e)),
+            Err(e) => return Err(SubnetParseError::ParseBits(e)),
         };
         Ok(SubnetV4::new(addr, bits))
     }
-}
-
-quick_error! {
-    #[derive(Debug)]
-    pub enum ParseError {
-        MissingDelimiter {
-            description("missing '/' delimiter")
-        }
-        ExtraDelimiter {
-            description("more than one '/' delimiter")
-        }
-        ParseAddr(e: AddrParseError) {
-            description("error parsing ipv4 address")
-            display("error parsing ipv4 address: {}", e)
-            cause(e)
-        }
-        ParseBits(e: ParseIntError) {
-            description("error parsing subnet bit number")
-            display("error parsing subnet bit number: {}", e)
-            cause(e)
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct SubnetV6 {
-    addr: Ipv6Addr,
-    bits: u8,
 }
 

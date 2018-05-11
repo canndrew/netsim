@@ -19,9 +19,9 @@ impl Default for EtherIfaceBuilder {
             mac_addr: MacAddr::random(),
             builder: IfaceBuilder {
                 name: String::from("netsim"),
-                address: ipv4!("0.0.0.0"),
-                netmask: ipv4!("0.0.0.0"),
-                routes: Vec::new(),
+                ipv4_addr: ipv4!("0.0.0.0"),
+                ipv4_netmask: ipv4!("0.0.0.0"),
+                ipv4_routes: Vec::new(),
             },
         }
     }
@@ -47,19 +47,19 @@ impl EtherIfaceBuilder {
 
     /// Set the interface address.
     pub fn address(mut self, address: Ipv4Addr) -> Self {
-        self.builder.address = address;
+        self.builder.ipv4_addr = address;
         self
     }
 
     /// Set the interface netmask.
     pub fn netmask(mut self, netmask: Ipv4Addr) -> Self {
-        self.builder.netmask = netmask;
+        self.builder.ipv4_netmask = netmask;
         self
     }
 
     /// Add a route to the set of routes that will be created and directed through this interface.
     pub fn route(mut self, route: RouteV4) -> Self {
-        self.builder.routes.push(route);
+        self.builder.ipv4_routes.push(route);
         self
     }
 

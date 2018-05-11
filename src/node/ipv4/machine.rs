@@ -29,18 +29,20 @@ where
     ) -> (SpawnComplete<R>, Ipv4Plug) {
         let address = subnet.random_client_addr();
         let iface = {
-            Ipv4IfaceBuilder::new()
-            .address(address)
-            .netmask(subnet.netmask())
-            .route(RouteV4::new(SubnetV4::global(), None))
+            IpIfaceBuilder::new()
+            .ipv4_address(address)
+            .ipv4_netmask(subnet.netmask())
+            .ipv4_route(RouteV4::new(SubnetV4::global(), None))
         };
-        let (plug_a, plug_b) = Ipv4Plug::new_wire();
+        let (plug_a, plug_b) = IpPlug::new_wire();
 
         let spawn_complete = {
             MachineBuilder::new()
-            .add_ipv4_iface(iface, plug_b)
+            .add_ip_iface(iface, plug_b)
             .spawn(handle, move || (self.func)(address))
         };
+
+        let plug_a = plug_a.into_ipv4_plug(handle);
 
         (spawn_complete, plug_a)
     }

@@ -4,30 +4,30 @@ use priv_prelude::*;
 use sys;
 use iface::build::{IfaceBuilder, build};
 
-/// This object can be used to set the configuration options for a `Ipv4Iface` before creating the
-/// `Ipv4Iface`
+/// This object can be used to set the configuration options for a `IpIface` before creating the
+/// `IpIface`
 /// using `build`.
 #[derive(Debug)]
-pub struct Ipv4IfaceBuilder {
+pub struct IpIfaceBuilder {
     builder: IfaceBuilder,
 }
 
-impl Default for Ipv4IfaceBuilder {
-    fn default() -> Ipv4IfaceBuilder {
-        Ipv4IfaceBuilder {
+impl Default for IpIfaceBuilder {
+    fn default() -> IpIfaceBuilder {
+        IpIfaceBuilder {
             builder: IfaceBuilder {
                 name: String::from("netsim"),
-                address: ipv4!("0.0.0.0"),
-                netmask: ipv4!("0.0.0.0"),
-                routes: Vec::new(),
+                ipv4_addr: ipv4!("0.0.0.0"),
+                ipv4_netmask: ipv4!("0.0.0.0"),
+                ipv4_routes: Vec::new(),
             },
         }
     }
 }
 
-impl Ipv4IfaceBuilder {
-    /// Start building a new `Ipv4Iface` with the default configuration options.
-    pub fn new() -> Ipv4IfaceBuilder {
+impl IpIfaceBuilder {
+    /// Start building a new `IpIface` with the default configuration options.
+    pub fn new() -> IpIfaceBuilder {
         Default::default()
     }
 
@@ -37,71 +37,71 @@ impl Ipv4IfaceBuilder {
         self
     }
 
-    /// Set the interface address.
-    pub fn address(mut self, address: Ipv4Addr) -> Self {
-        self.builder.address = address;
+    /// Set the interface IPv4 address.
+    pub fn ipv4_address(mut self, address: Ipv4Addr) -> Self {
+        self.builder.ipv4_addr = address;
         self
     }
 
-    /// Set the interface netmask.
-    pub fn netmask(mut self, netmask: Ipv4Addr) -> Self {
-        self.builder.netmask = netmask;
+    /// Set the interface IPv4 netmask.
+    pub fn ipv4_netmask(mut self, netmask: Ipv4Addr) -> Self {
+        self.builder.ipv4_netmask = netmask;
         self
     }
 
-    /// Add a route to the set of routes that will be created and directed through this interface.
-    pub fn route(mut self, route: RouteV4) -> Self {
-        self.builder.routes.push(route);
+    /// Add an IPv4 route to the set of routes that will be created and directed through this interface.
+    pub fn ipv4_route(mut self, route: RouteV4) -> Self {
+        self.builder.ipv4_routes.push(route);
         self
     }
 
-    /// Consume this `Ipv4IfaceBuilder` and build a `UnboundIpv4Iface`. This creates the TUN device but does not
+    /// Consume this `IpIfaceBuilder` and build a `UnboundIpIface`. This creates the TUN device but does not
     /// bind it to a tokio event loop. This is useful if the event loop lives in a different thread
-    /// to where you need to create the device. You can send a `UnboundIpv4Iface` to another thread then
-    /// `bind` it to create your `Ipv4Iface`.
-    pub fn build_unbound(self) -> Result<UnboundIpv4Iface, IfaceBuildError> {
+    /// to where you need to create the device. You can send a `UnboundIpIface` to another thread then
+    /// `bind` it to create your `IpIface`.
+    pub fn build_unbound(self) -> Result<UnboundIpIface, IfaceBuildError> {
         let fd = build(self.builder, false)?;
 
         trace!("creating TUN");
 
-        Ok(UnboundIpv4Iface { fd })
+        Ok(UnboundIpIface { fd })
     }
 
-    /// Consume this `Ipv4IfaceBuilder` and build the TUN interface. The returned `Ipv4Iface` object can be
+    /// Consume this `IpIfaceBuilder` and build the TUN interface. The returned `IpIface` object can be
     /// used to read/write ethernet frames from this interface. `handle` is a handle to a tokio
     /// event loop which will be used for reading/writing.
-    pub fn build(self, handle: &Handle) -> Result<Ipv4Iface, IfaceBuildError> {
+    pub fn build(self, handle: &Handle) -> Result<IpIface, IfaceBuildError> {
         Ok(self.build_unbound()?.bind(handle))
     }
 }
 
 /// Represents a TUN device which has been built but not bound to a tokio event loop.
 #[derive(Debug)]
-pub struct UnboundIpv4Iface {
+pub struct UnboundIpIface {
     fd: AsyncFd,
 }
 
-impl UnboundIpv4Iface {
-    /// Bind the tap device to the event loop, creating a `Ipv4Iface` which you can read/write ethernet
+impl UnboundIpIface {
+    /// Bind the tap device to the event loop, creating a `IpIface` which you can read/write ethernet
     /// frames with.
-    pub fn bind(self, handle: &Handle) -> Ipv4Iface {
-        let UnboundIpv4Iface { fd } = self;
+    pub fn bind(self, handle: &Handle) -> IpIface {
+        let UnboundIpIface { fd } = self;
         let fd = unwrap!(PollEvented::new(fd, handle));
-        Ipv4Iface { fd }
+        IpIface { fd }
     }
 }
 
 /// A handle to a virtual (TUN) network interface. Can be used to read/write ethernet frames
 /// directly to the device.
-pub struct Ipv4Iface {
+pub struct IpIface {
     fd: PollEvented<AsyncFd>,
 }
 
-impl Stream for Ipv4Iface {
-    type Item = Ipv4Packet;
+impl Stream for IpIface {
+    type Item = IpPacket;
     type Error = io::Error;
     
-    fn poll(&mut self) -> io::Result<Async<Option<Ipv4Packet>>> {
+    fn poll(&mut self) -> io::Result<Async<Option<IpPacket>>> {
         loop {
             if let Async::NotReady = self.fd.poll_read() {
                 return Ok(Async::NotReady);
@@ -134,7 +134,7 @@ impl Stream for Ipv4Iface {
                         continue;
                     }
                     let bytes = Bytes::from(&buffer[..n]);
-                    let frame = Ipv4Packet::from_bytes(bytes);
+                    let frame = IpPacket::from_bytes(bytes);
                     info!("TUN emitting frame: {:?}", frame);
                     return Ok(Async::Ready(Some(frame)));
                 },
@@ -148,11 +148,11 @@ impl Stream for Ipv4Iface {
     }
 }
 
-impl Sink for Ipv4Iface {
-    type SinkItem = Ipv4Packet;
+impl Sink for IpIface {
+    type SinkItem = IpPacket;
     type SinkError = io::Error;
     
-    fn start_send(&mut self, item: Ipv4Packet) -> io::Result<AsyncSink<Ipv4Packet>> {
+    fn start_send(&mut self, item: IpPacket) -> io::Result<AsyncSink<IpPacket>> {
         info!("TUN received frame: {:?}", item);
         if let Async::NotReady = self.fd.poll_write() {
             return Ok(AsyncSink::NotReady(item));

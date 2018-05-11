@@ -1,4 +1,5 @@
 use priv_prelude::*;
+use future_utils;
 
 /// An IPv6 packet
 #[derive(Clone, PartialEq)]
@@ -230,6 +231,32 @@ impl Ipv6Packet {
     /// Consume the packet and return the underlying buffer
     pub fn into_bytes(self) -> Bytes {
         self.buffer
+    }
+}
+
+/// One end of an Ipv6 connection that can be used to read/write packets to/from the other end.
+#[derive(Debug)]
+pub struct Ipv6Plug {
+    /// The sender
+    pub tx: UnboundedSender<Ipv6Packet>,
+    /// The receiver.
+    pub rx: UnboundedReceiver<Ipv6Packet>,
+}
+
+impl Ipv6Plug {
+    /// Create a new Ipv6 connection, connecting the two returned plugs.
+    pub fn new_wire() -> (Ipv6Plug, Ipv6Plug) {
+        let (a_tx, b_rx) = future_utils::mpsc::unbounded();
+        let (b_tx, a_rx) = future_utils::mpsc::unbounded();
+        let a = Ipv6Plug {
+            tx: a_tx,
+            rx: a_rx,
+        };
+        let b = Ipv6Plug {
+            tx: b_tx,
+            rx: b_rx,
+        };
+        (a, b)
     }
 }
 

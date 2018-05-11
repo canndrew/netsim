@@ -88,9 +88,9 @@ mod ioctl {
 #[derive(Debug)]
 pub struct IfaceBuilder {
     pub name: String,
-    pub address: Ipv4Addr,
-    pub netmask: Ipv4Addr,
-    pub routes: Vec<RouteV4>,
+    pub ipv4_addr: Ipv4Addr,
+    pub ipv4_netmask: Ipv4Addr,
+    pub ipv4_routes: Vec<RouteV4>,
 }
 
 pub fn build(builder: IfaceBuilder, is_tap: bool) -> Result<AsyncFd, IfaceBuildError> {
@@ -200,7 +200,7 @@ pub fn build(builder: IfaceBuilder, is_tap: bool) -> Result<AsyncFd, IfaceBuildE
             let addr = &mut *addr;
             addr.sin_family = sys::AF_INET as sys::sa_family_t;
             addr.sin_port = 0;
-            addr.sin_addr.s_addr = u32::from(builder.address).to_be();
+            addr.sin_addr.s_addr = u32::from(builder.ipv4_addr).to_be();
         }
 
         if ioctl::siocsifaddr(fd, &req) < 0 {
@@ -219,7 +219,7 @@ pub fn build(builder: IfaceBuilder, is_tap: bool) -> Result<AsyncFd, IfaceBuildE
             let addr = &mut *addr;
             addr.sin_family = sys::AF_INET as sys::sa_family_t;
             addr.sin_port = 0;
-            addr.sin_addr.s_addr = u32::from(builder.netmask).to_be();
+            addr.sin_addr.s_addr = u32::from(builder.ipv4_netmask).to_be();
         }
 
         if ioctl::siocsifnetmask(fd, &req) < 0 {
@@ -242,7 +242,7 @@ pub fn build(builder: IfaceBuilder, is_tap: bool) -> Result<AsyncFd, IfaceBuildE
         let _ = sys::close(fd);
     }
 
-    for route in builder.routes {
+    for route in builder.ipv4_routes {
         trace!("adding route {:?} to {}", route, real_name);
         match route.add_to_routing_table(&real_name) {
             Ok(()) => (),

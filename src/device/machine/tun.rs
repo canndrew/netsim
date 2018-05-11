@@ -1,19 +1,19 @@
 use priv_prelude::*;
 
 pub struct TunTask {
-    tun: Ipv4Iface,
-    packet_tx: UnboundedSender<Ipv4Packet>,
-    packet_rx: UnboundedReceiver<Ipv4Packet>,
-    sending_packet: Option<Ipv4Packet>,
+    tun: IpIface,
+    packet_tx: UnboundedSender<IpPacket>,
+    packet_rx: UnboundedReceiver<IpPacket>,
+    sending_packet: Option<IpPacket>,
     handle: Handle,
     state: TunTaskState,
 }
 
 impl TunTask {
     pub fn new(
-        tun: Ipv4Iface,
+        tun: IpIface,
         handle: &Handle,
-        plug: Ipv4Plug,
+        plug: IpPlug,
         drop_rx: DropNotice,
     ) -> TunTask {
         TunTask {

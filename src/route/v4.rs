@@ -1,26 +1,6 @@
 use priv_prelude::*;
+use super::*;
 use sys;
-
-quick_error! {
-    /// Errors returned by `add_route` and `Route::add`
-    #[allow(missing_docs)]
-    #[derive(Debug)]
-    pub enum AddRouteError {
-        ProcessFileDescriptorLimit(e: io::Error) {
-            description("process file descriptor limit hit")
-            display("process file descriptor limit hit ({})", e)
-            cause(e)
-        }
-        SystemFileDescriptorLimit(e: io::Error) {
-            description("system file descriptor limit hit")
-            display("system file descriptor limit hit ({})", e)
-            cause(e)
-        }
-        NameContainsNul {
-            description("interface name contains interior NUL byte")
-        }
-    }
-}
 
 /// Represents an IPv4 route.
 #[derive(Debug, Clone, Copy)]
@@ -50,11 +30,11 @@ impl RouteV4 {
 
     /// Add the route to the routing table of the current network namespace.
     pub fn add_to_routing_table(self, iface_name: &str) -> Result<(), AddRouteError> {
-        add_route(self.destination, self.gateway, iface_name)
+        add_route_v4(self.destination, self.gateway, iface_name)
     }
 }
 
-pub fn add_route(
+pub fn add_route_v4(
     destination: SubnetV4,
     gateway: Option<Ipv4Addr>,
     iface_name: &str,

@@ -11,6 +11,7 @@ mod udp;
 mod tcp;
 mod icmpv4;
 mod ipv6;
+mod ip;
 
 pub use self::arp::*;
 pub use self::ether::*;
@@ -19,5 +20,6 @@ pub use self::mac::*;
 pub use self::udp::*;
 pub use self::tcp::*;
 pub use self::icmpv4::*;
-pub use self::ipv6::{Ipv6Packet, Ipv6Fields, Ipv6Payload, Ipv6PayloadFields};
+pub use self::ipv6::{Ipv6Packet, Ipv6Fields, Ipv6Payload, Ipv6PayloadFields, Ipv6Plug};
+pub use self::ip::{IpPacket, IpPlug};
 

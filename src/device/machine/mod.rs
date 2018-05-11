@@ -12,7 +12,7 @@ mod tun;
 /// A builder for creating a machine.
 pub struct MachineBuilder {
     ether_ifaces: Vec<(EtherIfaceBuilder, EtherPlug)>,
-    ipv4_ifaces: Vec<(Ipv4IfaceBuilder, Ipv4Plug)>,
+    ip_ifaces: Vec<(IpIfaceBuilder, IpPlug)>,
 }
 
 impl MachineBuilder {
@@ -32,12 +32,12 @@ impl MachineBuilder {
     }
 
     /// Add an IP (TUN) interface to the machine
-    pub fn add_ipv4_iface(
+    pub fn add_ip_iface(
         mut self,
-        iface: Ipv4IfaceBuilder,
-        plug: Ipv4Plug,
+        iface: IpIfaceBuilder,
+        plug: IpPlug,
     ) -> MachineBuilder {
-        self.ipv4_ifaces.push((iface, plug));
+        self.ip_ifaces.push((iface, plug));
         self
     }
 
@@ -54,7 +54,7 @@ impl MachineBuilder {
         R: Send + 'static,
     {
         let (ether_tx, ether_rx) = std::sync::mpsc::channel();
-        let (ipv4_tx, ipv4_rx) = std::sync::mpsc::channel();
+        let (ip_tx, ip_rx) = std::sync::mpsc::channel();
         let spawn_complete = spawn::new_namespace(move || {
             let mut drop_txs = Vec::new();
 
@@ -66,13 +66,13 @@ impl MachineBuilder {
             }
             drop(ether_tx);
 
-            for (iface, plug) in self.ipv4_ifaces {
+            for (iface, plug) in self.ip_ifaces {
                 let (drop_tx, drop_rx) = future_utils::drop_notify();
                 let tun_unbound = unwrap!(iface.build_unbound());
-                unwrap!(ipv4_tx.send((tun_unbound, plug, drop_rx)));
+                unwrap!(ip_tx.send((tun_unbound, plug, drop_rx)));
                 drop_txs.push(drop_tx);
             }
-            drop(ipv4_tx);
+            drop(ip_tx);
 
             let ret = func();
             drop(drop_txs);
@@ -85,7 +85,7 @@ impl MachineBuilder {
             handle.spawn(task.infallible());
         }
 
-        for (tun_unbound, plug, drop_rx) in ipv4_rx {
+        for (tun_unbound, plug, drop_rx) in ip_rx {
             let tun = tun_unbound.bind(handle);
             let task = TunTask::new(tun, handle, plug, drop_rx);
             handle.spawn(task.infallible());
