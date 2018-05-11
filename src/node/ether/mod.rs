@@ -1,9 +1,9 @@
 use priv_prelude::*;
 
-mod endpoint;
+mod machine;
 mod hub;
 
-pub use self::endpoint::{endpoint, EndpointNode};
+pub use self::machine::{machine, MachineNode};
 pub use self::hub::{hub, HubNode};
 
 /// An `EtherNode` describes a recipe for constructing a network when given the subnets that the network

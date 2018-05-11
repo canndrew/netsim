@@ -1,7 +1,7 @@
 use priv_prelude::*;
 
 mod nat;
-mod endpoint;
+mod machine;
 mod hops;
 mod latency;
 mod packet_loss;
@@ -9,7 +9,7 @@ mod router;
 mod ether_adaptor;
 
 pub use self::nat::{nat, NatNode};
-pub use self::endpoint::{endpoint, EndpointNode};
+pub use self::machine::{machine, MachineNode};
 pub use self::hops::{hops, HopsNode};
 pub use self::latency::{latency, LatencyNode};
 pub use self::packet_loss::{packet_loss, PacketLossNode};
