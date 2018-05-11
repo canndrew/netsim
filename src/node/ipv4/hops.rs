@@ -1,21 +1,21 @@
 use priv_prelude::*;
 
 /// A node representing hops between Ipv4 nodes.
-pub struct HopsV4Node<N> {
+pub struct HopsNode<N> {
     node: N,
     num_hops: u32,
 }
 
 /// Add hops between nodes. The will cause the TTL of packets travelling on this connection to
 /// decrease by the given amount.
-pub fn hops_v4<N>(num_hops: u32, node: N) -> HopsV4Node<N>
+pub fn hops<N>(num_hops: u32, node: N) -> HopsNode<N>
 where
     N: Ipv4Node,
 {
-    HopsV4Node { node, num_hops }
+    HopsNode { node, num_hops }
 }
 
-impl<N> Ipv4Node for HopsV4Node<N>
+impl<N> Ipv4Node for HopsNode<N>
 where
     N: Ipv4Node,
 {

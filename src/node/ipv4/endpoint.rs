@@ -1,21 +1,21 @@
 use priv_prelude::*;
 
 /// A node representing an Ipv4 endpoint.
-pub struct EndpointV4Node<F> {
+pub struct EndpointNode<F> {
     func: F,
 }
 
 /// Create a node for an Ipv4 endpoint. This node will run the given function in a network
 /// namespace with a single interface.
-pub fn endpoint_v4<R, F>(func: F) -> EndpointV4Node<F>
+pub fn endpoint<R, F>(func: F) -> EndpointNode<F>
 where
     R: Send + 'static,
     F: FnOnce(Ipv4Addr) -> R + Send + 'static,
 {
-    EndpointV4Node { func }
+    EndpointNode { func }
 }
 
-impl<R, F> Ipv4Node for EndpointV4Node<F>
+impl<R, F> Ipv4Node for EndpointNode<F>
 where
     R: Send + 'static,
     F: FnOnce(Ipv4Addr) -> R + Send + 'static,
@@ -73,7 +73,7 @@ mod test {
                 let (spawn_complete, ipv4_plug) = spawn::network_v4(
                     &handle,
                     subnet,
-                    node::endpoint_v4(move |ipv4_addr| {
+                    node::ipv4::endpoint(move |ipv4_addr| {
                         unwrap!(ipv4_addr_tx.send(ipv4_addr));
                         let buffer_out = rand::random::<[u8; 8]>();
                         let socket = unwrap!(std::net::UdpSocket::bind(addr!("0.0.0.0:0")));
@@ -152,7 +152,7 @@ mod test {
                 let (spawn_complete, ipv4_plug) = spawn::network_v4(
                     &handle,
                     subnet,
-                    node::endpoint_v4(move |ipv4_addr| {
+                    node::ipv4::endpoint(move |ipv4_addr| {
                         unwrap!(ipv4_addr_tx.send(ipv4_addr));
                         let buffer_out = rand::random::<[u8; 8]>();
                         let mut stream = unwrap!(std::net::TcpStream::connect(&remote_addr));
@@ -426,7 +426,7 @@ mod test {
                 let (spawn_complete, ipv4_plug) = spawn::network_v4(
                     &handle,
                     subnet,
-                    node::endpoint_v4(move |ipv4_addr| {
+                    node::ipv4::endpoint(move |ipv4_addr| {
                         unwrap!(ipv4_addr_tx.send(ipv4_addr));
                         unwrap!(done_rx.recv());
                     }),

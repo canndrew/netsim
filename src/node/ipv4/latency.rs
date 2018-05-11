@@ -1,7 +1,7 @@
 use priv_prelude::*;
 
 /// A node representing latency on an Ipv4 connection.
-pub struct LatencyV4Node<N> {
+pub struct LatencyNode<N> {
     node: N,
     min_latency: Duration,
     mean_additional_latency: Duration,
@@ -13,18 +13,18 @@ pub struct LatencyV4Node<N> {
 /// `min_latency` is the baseline for the amount of delay to add to packets.
 /// `mean_additional_latency` controls the amount of random variation in the delay added to
 /// packets. A non-zero `mean_additional_latency` can cause packets to be re-ordered.
-pub fn latency_v4<N>(
+pub fn latency<N>(
     min_latency: Duration,
     mean_additional_latency: Duration,
     node: N,
-) -> LatencyV4Node<N>
+) -> LatencyNode<N>
 where
     N: Ipv4Node,
 {
-    LatencyV4Node { node, min_latency, mean_additional_latency }
+    LatencyNode { node, min_latency, mean_additional_latency }
 }
 
-impl<N> Ipv4Node for LatencyV4Node<N>
+impl<N> Ipv4Node for LatencyNode<N>
 where
     N: Ipv4Node,
 {

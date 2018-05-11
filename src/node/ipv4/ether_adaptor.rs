@@ -1,21 +1,21 @@
 use priv_prelude::*;
 
 /// Adapts an `EtherNode` to an `Ipv4Node`
-pub struct EtherAdaptorV4Node<N> {
+pub struct EtherAdaptorNode<N> {
     node: N,
 }
 
 /// Adapt a `EtherNode` into an `Ipv4Node`
-pub fn ether_adaptor_v4<N>(
+pub fn ether_adaptor<N>(
     node: N,
-) -> EtherAdaptorV4Node<N>
+) -> EtherAdaptorNode<N>
 where
     N: EtherNode,
 {
-    EtherAdaptorV4Node { node }
+    EtherAdaptorNode { node }
 }
 
-impl<N> Ipv4Node for EtherAdaptorV4Node<N>
+impl<N> Ipv4Node for EtherAdaptorNode<N>
 where
     N: EtherNode,
 {

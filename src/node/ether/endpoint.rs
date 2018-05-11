@@ -1,21 +1,21 @@
 use priv_prelude::*;
 
 /// A node representing an ethernet endpoint
-pub struct EndpointEthNode<F> {
+pub struct EndpointNode<F> {
     func: F,
 }
 
 /// Create a node for an Ipv4 endpoint. This node will run the given function in a network
 /// namespace with a single interface.
-pub fn endpoint_eth<R, F>(func: F) -> EndpointEthNode<F>
+pub fn endpoint<R, F>(func: F) -> EndpointNode<F>
 where
     R: Send + 'static,
     F: FnOnce(MacAddr, Option<Ipv4Addr>) -> R + Send + 'static,
 {
-    EndpointEthNode { func }
+    EndpointNode { func }
 }
 
-impl<R, F> EtherNode for EndpointEthNode<F>
+impl<R, F> EtherNode for EndpointNode<F>
 where
     R: Send + 'static,
     F: FnOnce(MacAddr, Option<Ipv4Addr>) -> R + Send + 'static,
@@ -91,7 +91,7 @@ mod test {
                 let (spawn_complete, EtherPlug { tx, rx }) = spawn::network_eth(
                     &handle,
                     Some(subnet),
-                    node::endpoint_eth(move |_mac_addr, ipv4_addr_opt| {
+                    node::ether::endpoint(move |_mac_addr, ipv4_addr_opt| {
                         let ipv4_addr = unwrap!(ipv4_addr_opt);
                         unwrap!(ipv4_addr_tx.send(ipv4_addr));
 

@@ -1,23 +1,23 @@
 use priv_prelude::*;
 
 /// A node representing an Ipv4 NAT.
-pub struct NatV4Node<N> {
+pub struct NatNode<N> {
     nat_builder: NatV4Builder,
     node: N,
 }
 
 /// Create a node for an Ipv4 NAT.
-pub fn nat_v4<N>(nat_builder: NatV4Builder, node: N) -> NatV4Node<N>
+pub fn nat<N>(nat_builder: NatV4Builder, node: N) -> NatNode<N>
 where
     N: Ipv4Node,
 {
-    NatV4Node {
+    NatNode {
         nat_builder,
         node,
     }
 }
 
-impl<N> Ipv4Node for NatV4Node<N>
+impl<N> Ipv4Node for NatNode<N>
 where
     N: Ipv4Node,
 {
