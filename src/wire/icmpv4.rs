@@ -123,7 +123,7 @@ fn set(
         },
     }
     
-    let checksum = !checksum::data(&buffer);
+    let checksum = !checksum::data(buffer);
     NetworkEndian::write_u16(&mut buffer[2..4], checksum);
 }
 

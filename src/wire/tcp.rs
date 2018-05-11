@@ -152,7 +152,7 @@ impl TcpFields {
     }
 }
 
-fn set_fields(buffer: &mut [u8], fields: TcpFields) {
+fn set_fields(buffer: &mut [u8], fields: &TcpFields) {
     NetworkEndian::write_u16(&mut buffer[0..2], fields.source_port);
     NetworkEndian::write_u16(&mut buffer[2..4], fields.dest_port);
     NetworkEndian::write_u32(&mut buffer[4..8], fields.seq_num);
@@ -288,10 +288,10 @@ impl TcpPacket {
         fields: TcpFields,
         source_ip: Ipv4Addr,
         dest_ip: Ipv4Addr,
-        payload: Bytes,
+        payload: &Bytes,
     ) {
         let start = fields.header_len();
-        buffer[start..].clone_from_slice(&payload);
+        buffer[start..].clone_from_slice(payload);
         set_fields_v4(buffer, fields, source_ip, dest_ip);
     }
 
@@ -301,10 +301,10 @@ impl TcpPacket {
         fields: TcpFields,
         source_ip: Ipv6Addr,
         dest_ip: Ipv6Addr,
-        payload: Bytes,
+        payload: &Bytes,
     ) {
         let start = fields.header_len();
-        buffer[start..].clone_from_slice(&payload);
+        buffer[start..].clone_from_slice(payload);
         set_fields_v6(buffer, fields, source_ip, dest_ip);
     }
 

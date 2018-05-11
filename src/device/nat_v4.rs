@@ -292,15 +292,12 @@ impl NatV4Builder {
     }
 }
 
-impl Future for NatV4 {
-    type Item = ();
-    type Error = Void;
-
-    fn poll(&mut self) -> Result<Async<()>, Void> {
-        let private_unplugged = loop {
+impl NatV4 {
+    fn process_outgoing(&mut self) -> bool {
+        loop {
             match self.private_plug.rx.poll().void_unwrap() {
-                Async::NotReady => break false,
-                Async::Ready(None) => break true,
+                Async::NotReady => return false,
+                Async::Ready(None) => return true,
                 Async::Ready(Some(packet)) => {
                     let source_ip = packet.source_ip();
                     let dest_ip = packet.dest_ip();
@@ -461,12 +458,14 @@ impl Future for NatV4 {
                     }
                 },
             }
-        };
+        }
+    }
 
-        let public_unplugged = loop {
+    fn process_incoming(&mut self) -> bool {
+        loop {
             match self.public_plug.rx.poll().void_unwrap() {
-                Async::NotReady => break false,
-                Async::Ready(None) => break true,
+                Async::NotReady => return false,
+                Async::Ready(None) => return true,
                 Async::Ready(Some(packet)) => {
                     let ipv4_fields = packet.fields();
                     let source_ip = packet.source_ip();
@@ -570,7 +569,17 @@ impl Future for NatV4 {
                     }
                 },
             }
-        };
+        }
+    }
+}
+
+impl Future for NatV4 {
+    type Item = ();
+    type Error = Void;
+
+    fn poll(&mut self) -> Result<Async<()>, Void> {
+        let private_unplugged = self.process_outgoing();
+        let public_unplugged = self.process_incoming();
 
         if private_unplugged && public_unplugged {
             return Ok(Async::Ready(()));

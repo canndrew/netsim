@@ -1,6 +1,7 @@
 use priv_prelude::*;
 
 /// Used to build a `Hub`
+#[derive(Default)]
 pub struct HubBuilder {
     connections: Vec<EtherPlug>,
 }
@@ -58,17 +59,15 @@ impl Future for Hub {
     fn poll(&mut self) -> Result<Async<()>, Void> {
         let mut all_disconnected = true;
         for i in 0..self.connections.len() {
-            all_disconnected &= {
-                'next_packet: loop {
-                    match self.connections[i].rx.poll().void_unwrap() {
-                        Async::NotReady => break false,
-                        Async::Ready(None) => break true,
-                        Async::Ready(Some(packet)) => {
-                            for connection in &mut self.connections {
-                                let _ = connection.tx.unbounded_send(packet.clone());
-                            }
-                        },
-                    }
+            all_disconnected &= loop {
+                match self.connections[i].rx.poll().void_unwrap() {
+                    Async::NotReady => break false,
+                    Async::Ready(None) => break true,
+                    Async::Ready(Some(packet)) => {
+                        for connection in &mut self.connections {
+                            let _ = connection.tx.unbounded_send(packet.clone());
+                        }
+                    },
                 }
             };
         }

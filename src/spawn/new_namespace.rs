@@ -1,4 +1,4 @@
-use priv_prelude::*;
+ priv_prelude::*;
 use sys;
 use libc;
 use libc::{c_int, c_void, pid_t};
@@ -80,7 +80,7 @@ where
         unwrap!(f.write(s.as_bytes()));
 
         let mut f = unwrap!(File::create("/proc/self/setgroups"));
-        unwrap!(f.write("deny\n".as_bytes()));
+        unwrap!(f.write(b"deny\n"));
 
         let mut f = unwrap!(File::create("/proc/self/gid_map"));
         let s = format!("0 {} 1\n", gid);

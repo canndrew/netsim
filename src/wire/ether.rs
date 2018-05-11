@@ -88,7 +88,7 @@ impl EtherFrame {
     /// allocation if you are also constructing the frame's payload.
     pub fn new_from_fields(
         fields: EtherFields,
-        payload: EtherPayload,
+        payload: &EtherPayload,
     ) -> EtherFrame {
         let len = 14 + match payload {
             EtherPayload::Arp(ref arp) => arp.as_bytes().len(),

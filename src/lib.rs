@@ -175,6 +175,7 @@
 #![cfg_attr(feature="clippy", allow(redundant_field_names))]
 #![cfg_attr(feature="clippy", allow(single_match))]
 #![cfg_attr(feature="clippy", allow(match_same_arms))]
+#![cfg_attr(feature="clippy", allow(decimal_literal_representation))]
 
 extern crate libc;
 extern crate rand;

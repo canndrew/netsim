@@ -24,7 +24,7 @@ enum LogState {
 impl Ipv4Log {
     /// Create a new log file.
     pub fn new(handle: &Handle, path: &Path) -> IoFuture<Ipv4Log> {
-        const MAGIC: u32 = 0xa1b23c4d;
+        const MAGIC: u32 = 0xa1b2_3c4d;
         const VERSION_MAJOR: u16 = 2;
         const VERSION_MINOR: u16 = 4;
         const LINKTYPE_RAW: u32 = 101;
@@ -38,13 +38,13 @@ impl Ipv4Log {
             let mut header = [0u8; 24];
             {
                 let mut cursor = Cursor::new(&mut header[..]);
-                let _ = unwrap!(cursor.write_u32::<NativeEndian>(MAGIC));
-                let _ = unwrap!(cursor.write_u16::<NativeEndian>(VERSION_MAJOR));
-                let _ = unwrap!(cursor.write_u16::<NativeEndian>(VERSION_MINOR));
-                let _ = unwrap!(cursor.write_i32::<NativeEndian>(0));
-                let _ = unwrap!(cursor.write_u32::<NativeEndian>(0));
-                let _ = unwrap!(cursor.write_u32::<NativeEndian>(65536));
-                let _ = unwrap!(cursor.write_u32::<NativeEndian>(LINKTYPE_RAW));
+                unwrap!(cursor.write_u32::<NativeEndian>(MAGIC));
+                unwrap!(cursor.write_u16::<NativeEndian>(VERSION_MAJOR));
+                unwrap!(cursor.write_u16::<NativeEndian>(VERSION_MINOR));
+                unwrap!(cursor.write_i32::<NativeEndian>(0));
+                unwrap!(cursor.write_u32::<NativeEndian>(0));
+                unwrap!(cursor.write_u32::<NativeEndian>(65_536));
+                unwrap!(cursor.write_u32::<NativeEndian>(LINKTYPE_RAW));
             }
 
             Ok({
@@ -81,10 +81,10 @@ impl Sink for Ipv4Log {
                 let mut header = [0u8; 16];
                 {
                     let mut cursor = Cursor::new(&mut header[..]);
-                    let _ = unwrap!(cursor.write_u32::<NativeEndian>(now.as_secs() as u32));
-                    let _ = unwrap!(cursor.write_u32::<NativeEndian>(now.subsec_nanos()));
-                    let _ = unwrap!(cursor.write_u32::<NativeEndian>(bytes.len() as u32));
-                    let _ = unwrap!(cursor.write_u32::<NativeEndian>(bytes.len() as u32));
+                    unwrap!(cursor.write_u32::<NativeEndian>(now.as_secs() as u32));
+                    unwrap!(cursor.write_u32::<NativeEndian>(now.subsec_nanos()));
+                    unwrap!(cursor.write_u32::<NativeEndian>(bytes.len() as u32));
+                    unwrap!(cursor.write_u32::<NativeEndian>(bytes.len() as u32));
                 }
                 self.state = LogState::WritingHeader {
                     header: header,

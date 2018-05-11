@@ -104,9 +104,9 @@ impl UdpPacket {
         fields: UdpFields,
         source_ip: Ipv4Addr,
         dest_ip: Ipv4Addr,
-        payload: Bytes,
+        payload: &Bytes,
     ) {
-        buffer[8..].clone_from_slice(&payload);
+        buffer[8..].clone_from_slice(payload);
         set_fields_v4(buffer, fields, source_ip, dest_ip);
     }
 
@@ -116,9 +116,9 @@ impl UdpPacket {
         fields: UdpFields,
         source_ip: Ipv6Addr,
         dest_ip: Ipv6Addr,
-        payload: Bytes,
+        payload: &Bytes,
     ) {
-        buffer[8..].clone_from_slice(&payload);
+        buffer[8..].clone_from_slice(payload);
         set_fields_v6(buffer, fields, source_ip, dest_ip);
     }
 
