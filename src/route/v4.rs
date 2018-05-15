@@ -48,7 +48,7 @@ pub fn add_route_v4(
     };
     if fd < 0 {
         let os_err = io::Error::last_os_error();
-        match (-fd) as u32 {
+        match sys::errno() as u32 {
             sys::EMFILE => return Err(AddRouteError::ProcessFileDescriptorLimit(os_err)),
             sys::ENFILE => return Err(AddRouteError::SystemFileDescriptorLimit(os_err)),
             _ => {

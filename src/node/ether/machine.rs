@@ -37,9 +37,8 @@ where
                 let address = subnet.random_client_addr();
                 iface = {
                     iface
-                    .address(address)
-                    .netmask(subnet.netmask())
-                    .route(RouteV4::new(SubnetV4::global(), Some(subnet.gateway_ip())))
+                    .ipv4_addr(address, subnet.netmask_bits())
+                    .ipv4_route(RouteV4::new(SubnetV4::global(), Some(subnet.gateway_ip())))
                 };
                 Some(address)
             },

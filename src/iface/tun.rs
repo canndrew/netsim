@@ -17,9 +17,10 @@ impl Default for IpIfaceBuilder {
         IpIfaceBuilder {
             builder: IfaceBuilder {
                 name: String::from("netsim"),
-                ipv4_addr: ipv4!("0.0.0.0"),
-                ipv4_netmask: ipv4!("0.0.0.0"),
+                ipv4_addr: None,
+                ipv6_addr: None,
                 ipv4_routes: Vec::new(),
+                ipv6_routes: Vec::new(),
             },
         }
     }
@@ -37,21 +38,27 @@ impl IpIfaceBuilder {
         self
     }
 
-    /// Set the interface IPv4 address.
-    pub fn ipv4_address(mut self, address: Ipv4Addr) -> Self {
-        self.builder.ipv4_addr = address;
+    /// Set the interface's IPv4 address and netmask
+    pub fn ipv4_addr(mut self, addr: Ipv4Addr, netmask_bits: u8) -> Self {
+        self.builder.ipv4_addr = Some((addr, netmask_bits));
         self
     }
 
-    /// Set the interface IPv4 netmask.
-    pub fn ipv4_netmask(mut self, netmask: Ipv4Addr) -> Self {
-        self.builder.ipv4_netmask = netmask;
+    /// Set the interface's IPv6 address and netmask
+    pub fn ipv6_addr(mut self, addr: Ipv6Addr, netmask_bits: u8) -> Self {
+        self.builder.ipv6_addr = Some((addr, netmask_bits));
         self
     }
 
-    /// Add an IPv4 route to the set of routes that will be created and directed through this interface.
+    /// Add an IPv4 route to the interface
     pub fn ipv4_route(mut self, route: RouteV4) -> Self {
         self.builder.ipv4_routes.push(route);
+        self
+    }
+
+    /// Add an IPv6 route to the interface
+    pub fn ipv6_route(mut self, route: RouteV6) -> Self {
+        self.builder.ipv6_routes.push(route);
         self
     }
 
@@ -60,7 +67,7 @@ impl IpIfaceBuilder {
     /// to where you need to create the device. You can send a `UnboundIpIface` to another thread then
     /// `bind` it to create your `IpIface`.
     pub fn build_unbound(self) -> Result<UnboundIpIface, IfaceBuildError> {
-        let fd = build(self.builder, false)?;
+        let fd = build(self.builder, None)?;
 
         trace!("creating TUN");
 

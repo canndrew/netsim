@@ -19,9 +19,10 @@ impl Default for EtherIfaceBuilder {
             mac_addr: MacAddr::random(),
             builder: IfaceBuilder {
                 name: String::from("netsim"),
-                ipv4_addr: ipv4!("0.0.0.0"),
-                ipv4_netmask: ipv4!("0.0.0.0"),
+                ipv4_addr: None,
+                ipv6_addr: None,
                 ipv4_routes: Vec::new(),
+                ipv6_routes: Vec::new(),
             },
         }
     }
@@ -45,15 +46,27 @@ impl EtherIfaceBuilder {
         self
     }
 
-    /// Set the interface address.
-    pub fn address(mut self, address: Ipv4Addr) -> Self {
-        self.builder.ipv4_addr = address;
+    /// Set the interface's IPv4 address and netmask
+    pub fn ipv4_addr(mut self, addr: Ipv4Addr, netmask_bits: u8) -> Self {
+        self.builder.ipv4_addr = Some((addr, netmask_bits));
         self
     }
 
-    /// Set the interface netmask.
-    pub fn netmask(mut self, netmask: Ipv4Addr) -> Self {
-        self.builder.ipv4_netmask = netmask;
+    /// Set the interface's IPv6 address and netmask
+    pub fn ipv6_addr(mut self, addr: Ipv6Addr, netmask_bits: u8) -> Self {
+        self.builder.ipv6_addr = Some((addr, netmask_bits));
+        self
+    }
+
+    /// Add an IPv4 route to the interface
+    pub fn ipv4_route(mut self, route: RouteV4) -> Self {
+        self.builder.ipv4_routes.push(route);
+        self
+    }
+
+    /// Add an IPv6 route to the interface
+    pub fn ipv6_route(mut self, route: RouteV6) -> Self {
+        self.builder.ipv6_routes.push(route);
         self
     }
 
@@ -68,7 +81,7 @@ impl EtherIfaceBuilder {
     /// to where you need to create the device. You can send a `UnboundEtherIface` to another thread then
     /// `bind` it to create your `EtherIface`.
     pub fn build_unbound(self) -> Result<UnboundEtherIface, IfaceBuildError> {
-        let fd = build(self.builder, true)?;
+        let fd = build(self.builder, Some(self.mac_addr))?;
 
         trace!("creating TAP");
 
@@ -194,13 +207,79 @@ mod test {
     use priv_prelude::*;
     use spawn;
     use capabilities;
+    use rand;
+    use iface;
+    use get_if_addrs::{self, IfAddr};
+
+    #[test]
+    fn build_tap_correct_settings() {
+        run_test(1, || {
+            let spawn_complete = spawn::new_namespace(|| {
+                let mac_addr = MacAddr::random();
+                let ipv4_addr = SubnetV4::local_10().random_client_addr();
+                let ipv4_netmask_bits = 8 + rand::random::<u8>() % 24;
+                let ipv6_addr = Ipv6Addr::random_global();
+                let ipv6_netmask_bits = 64 + rand::random::<u8>() % 64;
+                let name = format!("foo{:x}", rand::random::<u32>());
+
+                let tap_builder = {
+                    EtherIfaceBuilder::new()
+                    .mac_addr(mac_addr)
+                    .ipv4_addr(ipv4_addr, ipv4_netmask_bits)
+                    .ipv6_addr(ipv6_addr, ipv6_netmask_bits)
+                    .name(name.clone())
+                };
+
+                let tap = unwrap!(tap_builder.build_unbound());
+
+                let found_mac_addr = unwrap!(iface::get_mac_addr(&name));
+                assert_eq!(mac_addr, found_mac_addr);
+
+                let mut found_v4 = false;
+                let mut found_v6 = false;
+                let ifaces = unwrap!(get_if_addrs::get_if_addrs());
+
+                for iface in ifaces {
+                    assert_eq!(iface.name, name);
+                    match iface.addr {
+                        IfAddr::V4(ref ifv4_addr) => {
+                            assert!(!found_v4);
+                            assert_eq!(ifv4_addr.ip, ipv4_addr);
+                            assert_eq!(
+                                ifv4_addr.netmask,
+                                Ipv4Addr::from_netmask_bits(ipv4_netmask_bits),
+                            );
+
+                            found_v4 = true;
+                        },
+                        IfAddr::V6(ref ifv6_addr) => {
+                            assert!(!found_v6);
+                            assert_eq!(ifv6_addr.ip, ipv6_addr);
+                            assert_eq!(
+                                ifv6_addr.netmask,
+                                Ipv6Addr::from_netmask_bits(ipv6_netmask_bits),
+                            );
+
+                            found_v6 = true;
+                        },
+                    }
+
+                    assert!(found_v4 && found_v6);
+                }
+
+                drop(tap);
+            });
+            let mut core = unwrap!(Core::new());
+            unwrap!(core.run(spawn_complete))
+        })
+    }
 
     #[test]
     fn build_tap_name_contains_nul() {
         run_test(1, || {
             let tap_builder = {
                 EtherIfaceBuilder::new()
-                .address(Ipv4Addr::random_global())
+                .ipv4_addr(Ipv4Addr::random_global(), 0)
                 .name("hello\0")
             };
             let res = tap_builder.build_unbound();
@@ -217,7 +296,7 @@ mod test {
             let spawn_complete = spawn::new_namespace(|| {
                 let tap_builder = {
                     EtherIfaceBuilder::new()
-                    .address(Ipv4Addr::random_global())
+                    .ipv4_addr(Ipv4Addr::random_global(), 0)
                     .name("hello")
                 };
                 trace!("build_tap_duplicate_name: building first interface");
@@ -225,7 +304,7 @@ mod test {
                 
                 let tap_builder = {
                     EtherIfaceBuilder::new()
-                    .address(Ipv4Addr::random_global())
+                    .ipv4_addr(Ipv4Addr::random_global(), 0)
                     .name("hello")
                 };
                 trace!("build_tap_duplicate_name: building second interface");

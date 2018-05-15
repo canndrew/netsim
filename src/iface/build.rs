@@ -2,6 +2,8 @@ use priv_prelude::*;
 use sys;
 use libc;
 use get_if_addrs;
+use iface;
+use ioctl;
 
 quick_error! {
     /// Error raised when `netsim` fails to build an interface.
@@ -73,27 +75,16 @@ quick_error! {
     }
 }
 
-mod ioctl {
-    use priv_prelude::*;
-    use sys;
-
-    ioctl!(bad read siocgifflags with 0x8913; sys::ifreq);
-    ioctl!(bad write siocsifflags with 0x8914; sys::ifreq);
-    ioctl!(bad write siocsifaddr with 0x8916; sys::ifreq);
-    //ioctl!(bad read siocgifnetmask with 0x891b; sys::ifreq);
-    ioctl!(bad write siocsifnetmask with 0x891c; sys::ifreq);
-    ioctl!(write tunsetiff with b'T', 202; c_int);
-}
-
 #[derive(Debug)]
 pub struct IfaceBuilder {
     pub name: String,
-    pub ipv4_addr: Ipv4Addr,
-    pub ipv4_netmask: Ipv4Addr,
+    pub ipv4_addr: Option<(Ipv4Addr, u8)>,
+    pub ipv6_addr: Option<(Ipv6Addr, u8)>,
     pub ipv4_routes: Vec<RouteV4>,
+    pub ipv6_routes: Vec<RouteV6>,
 }
 
-pub fn build(builder: IfaceBuilder, is_tap: bool) -> Result<AsyncFd, IfaceBuildError> {
+pub fn build(builder: IfaceBuilder, mac_addr: Option<MacAddr>) -> Result<AsyncFd, IfaceBuildError> {
     let name = match CString::new(builder.name.clone()) {
         Ok(name) => name,
         Err(..) => {
@@ -110,7 +101,7 @@ pub fn build(builder: IfaceBuilder, is_tap: bool) -> Result<AsyncFd, IfaceBuildE
         };
         if raw_fd < 0 {
             let os_err = io::Error::last_os_error();
-            match (-raw_fd) as u32 {
+            match sys::errno() as u32 {
                 sys::EACCES => return Err(IfaceBuildError::TunPermissionDenied(os_err)),
                 sys::EINTR => continue,
                 sys::ELOOP => return Err(IfaceBuildError::TunSymbolicLinks(os_err)),
@@ -134,7 +125,7 @@ pub fn build(builder: IfaceBuilder, is_tap: bool) -> Result<AsyncFd, IfaceBuildE
             name.as_bytes().len(),
         );
         req.ifr_ifru.ifru_flags = sys::IFF_NO_PI as i16;
-        if is_tap {
+        if mac_addr.is_some() {
             req.ifr_ifru.ifru_flags |= sys::IFF_TAP as i16;
         } else {
             req.ifr_ifru.ifru_flags |= sys::IFF_TUN as i16;
@@ -180,69 +171,67 @@ pub fn build(builder: IfaceBuilder, is_tap: bool) -> Result<AsyncFd, IfaceBuildE
         name.to_owned()
     };
 
-    unsafe {
-        let fd = sys::socket(sys::AF_INET as i32, sys::__socket_type::SOCK_DGRAM as i32, 0);
-        if fd < 0 {
-            let os_err = io::Error::last_os_error();
-            match (-fd) as u32 {
-                sys::EMFILE => return Err(IfaceBuildError::ProcessFileDescriptorLimit(os_err)),
-                sys::ENFILE => return Err(IfaceBuildError::SystemFileDescriptorLimit(os_err)),
-                _ => {
-                    panic!("unexpected error when creating dummy socket: {}", os_err);
-                },
-            }
+    if let Some(mac_addr) = mac_addr {
+        match iface::set_mac_addr(&real_name, mac_addr) {
+            Ok(()) => (),
+            Err(IfaceConfigError::UnknownInterface)
+                => panic!("the interface we just created doesn't exist?"),
+            Err(IfaceConfigError::ProcessFileDescriptorLimit(e))
+                => return Err(IfaceBuildError::ProcessFileDescriptorLimit(e)),
+            Err(IfaceConfigError::SystemFileDescriptorLimit(e))
+                => return Err(IfaceBuildError::SystemFileDescriptorLimit(e)),
         }
+    }
 
-        {
-            let addr = &mut req.ifr_ifru.ifru_addr;
-            let addr = addr as *mut sys::sockaddr;
-            let addr = addr as *mut sys::sockaddr_in;
-            let addr = &mut *addr;
-            addr.sin_family = sys::AF_INET as sys::sa_family_t;
-            addr.sin_port = 0;
-            addr.sin_addr.s_addr = u32::from(builder.ipv4_addr).to_be();
+    if let Some((ipv4_addr, ipv4_netmask_bits)) = builder.ipv4_addr {
+        match iface::set_ipv4_addr(&real_name, ipv4_addr, ipv4_netmask_bits) {
+            Ok(()) => (),
+            Err(IfaceConfigError::UnknownInterface)
+                => panic!("the interface we just created doesn't exist?"),
+            Err(IfaceConfigError::ProcessFileDescriptorLimit(e))
+                => return Err(IfaceBuildError::ProcessFileDescriptorLimit(e)),
+            Err(IfaceConfigError::SystemFileDescriptorLimit(e))
+                => return Err(IfaceBuildError::SystemFileDescriptorLimit(e)),
         }
+    }
 
-        if ioctl::siocsifaddr(fd, &req) < 0 {
-            let _ = sys::close(fd);
-            // TODO: what errors occur if we
-            //  (a) pick an invalid IP.
-            //  (b) pick an IP already in use
-            panic!("unexpected error from SIOCSIFADDR ioctl: {}", io::Error::last_os_error());
+    if let Some((ipv6_addr, ipv6_netmask_bits)) = builder.ipv6_addr {
+        match iface::set_ipv6_addr(&real_name, ipv6_addr, ipv6_netmask_bits) {
+            Ok(()) => (),
+            Err(IfaceConfigError::UnknownInterface)
+                => panic!("the interface we just created doesn't exist?"),
+            Err(IfaceConfigError::ProcessFileDescriptorLimit(e))
+                => return Err(IfaceBuildError::ProcessFileDescriptorLimit(e)),
+            Err(IfaceConfigError::SystemFileDescriptorLimit(e))
+                => return Err(IfaceBuildError::SystemFileDescriptorLimit(e)),
         }
+    }
 
-
-        {
-            let addr = &mut req.ifr_ifru.ifru_addr;
-            let addr = addr as *mut sys::sockaddr;
-            let addr = addr as *mut sys::sockaddr_in;
-            let addr = &mut *addr;
-            addr.sin_family = sys::AF_INET as sys::sa_family_t;
-            addr.sin_port = 0;
-            addr.sin_addr.s_addr = u32::from(builder.ipv4_netmask).to_be();
-        }
-
-        if ioctl::siocsifnetmask(fd, &req) < 0 {
-            let _ = sys::close(fd);
-            // TODO: what error occurs if we try to use an invalid netmask?
-            panic!("unexpected error from SIOCSIFNETMASK ioctl: {}", io::Error::last_os_error());
-        }
-
-        if ioctl::siocgifflags(fd, &mut req) < 0 {
-            let _ = sys::close(fd);
-            panic!("unexpected error from SIOCGIFFLAGS ioctl: {}", io::Error::last_os_error());
-        }
-
-        req.ifr_ifru.ifru_flags |= (sys::IFF_UP as u32 | sys::IFF_RUNNING as u32) as i16;
-
-        if ioctl::siocsifflags(fd, &req) < 0 {
-            let _ = sys::close(fd);
-            panic!("unexpected error from SIOCSIFFLAGS ioctl: {}", io::Error::last_os_error());
-        }
-        let _ = sys::close(fd);
+    match iface::put_up(&real_name) {
+        Ok(()) => (),
+        Err(IfaceConfigError::UnknownInterface)
+            => panic!("the interface we just created doesn't exist?"),
+        Err(IfaceConfigError::ProcessFileDescriptorLimit(e))
+            => return Err(IfaceBuildError::ProcessFileDescriptorLimit(e)),
+        Err(IfaceConfigError::SystemFileDescriptorLimit(e))
+            => return Err(IfaceBuildError::SystemFileDescriptorLimit(e)),
     }
 
     for route in builder.ipv4_routes {
+        trace!("adding route {:?} to {}", route, real_name);
+        match route.add_to_routing_table(&real_name) {
+            Ok(()) => (),
+            Err(AddRouteError::ProcessFileDescriptorLimit(e)) => {
+                return Err(IfaceBuildError::ProcessFileDescriptorLimit(e));
+            },
+            Err(AddRouteError::SystemFileDescriptorLimit(e)) => {
+                return Err(IfaceBuildError::SystemFileDescriptorLimit(e));
+            },
+            Err(AddRouteError::NameContainsNul) => unreachable!(),
+        }
+    }
+
+    for route in builder.ipv6_routes {
         trace!("adding route {:?} to {}", route, real_name);
         match route.add_to_routing_table(&real_name) {
             Ok(()) => (),

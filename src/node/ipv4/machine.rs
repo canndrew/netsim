@@ -30,8 +30,7 @@ where
         let address = subnet.random_client_addr();
         let iface = {
             IpIfaceBuilder::new()
-            .ipv4_address(address)
-            .ipv4_netmask(subnet.netmask())
+            .ipv4_addr(address, subnet.netmask_bits())
             .ipv4_route(RouteV4::new(SubnetV4::global(), None))
         };
         let (plug_a, plug_b) = IpPlug::new_wire();

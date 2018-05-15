@@ -28,6 +28,8 @@ pub trait Ipv4AddrExt {
     fn is_reserved(&self) -> bool;
     /// Clasify the address.
     fn class(&self) -> Ipv4AddrClass;
+    /// Create an `Ipv4Addr` representing a netmask
+    fn from_netmask_bits(bits: u8) -> Ipv4Addr;
 }
 
 impl Ipv4AddrExt for Ipv4Addr {
@@ -99,6 +101,10 @@ impl Ipv4AddrExt for Ipv4Addr {
         if ip >= 0xf0_00_00_00 && ip < 0xff_ff_ff_ff { return Ipv4AddrClass::Reserved };
         if ip == 0xff_ff_ff_ff { return Ipv4AddrClass::Broadcast };
         Ipv4AddrClass::Global
+    }
+
+    fn from_netmask_bits(bits: u8) -> Ipv4Addr {
+        Ipv4Addr::from(!((!0u32) >> bits))
     }
 }
 
