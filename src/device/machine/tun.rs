@@ -16,11 +16,12 @@ impl TunTask {
         plug: IpPlug,
         drop_rx: DropNotice,
     ) -> TunTask {
+        let (tx, rx) = plug.split();
         TunTask {
             tun: tun,
             handle: handle.clone(),
-            packet_tx: plug.tx,
-            packet_rx: plug.rx,
+            packet_tx: tx,
+            packet_rx: rx,
             sending_packet: None,
             state: TunTaskState::Receiving { drop_rx },
         }

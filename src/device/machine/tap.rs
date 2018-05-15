@@ -16,11 +16,12 @@ impl TapTask {
         plug: EtherPlug,
         drop_rx: DropNotice,
     ) -> TapTask {
+        let (tx, rx) = plug.split();
         TapTask {
             tap: tap,
             handle: handle.clone(),
-            frame_tx: plug.tx,
-            frame_rx: plug.rx,
+            frame_tx: tx,
+            frame_rx: rx,
             sending_frame: None,
             state: TapTaskState::Receiving { drop_rx },
         }

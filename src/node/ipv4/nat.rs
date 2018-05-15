@@ -37,7 +37,7 @@ where
         };
         let nat_builder = self.nat_builder.subnet(private_subnet);
         let (spawn_complete, client_plug) = self.node.build(handle, private_subnet);
-        let (public_plug_0, public_plug_1) = Ipv4Plug::new_wire();
+        let (public_plug_0, public_plug_1) = Ipv4Plug::new_pair();
         nat_builder.spawn(handle, public_plug_1, client_plug, ip);
         (spawn_complete, public_plug_0)
     }

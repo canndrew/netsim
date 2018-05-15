@@ -28,7 +28,7 @@ where
     ) -> (SpawnComplete<N::Output>, Ipv4Plug) {
         let subnets = subnet.split(2);
         let (spawn_complete, ether_plug) = self.node.build(handle, Some(subnets[1]));
-        let (ipv4_plug_0, ipv4_plug_1) = Ipv4Plug::new_wire();
+        let (ipv4_plug_0, ipv4_plug_1) = Ipv4Plug::new_pair();
         EtherAdaptorV4::spawn(handle, subnets[0].base_addr(), ether_plug, ipv4_plug_1);
         (spawn_complete, ipv4_plug_0)
     }

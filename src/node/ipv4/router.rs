@@ -46,7 +46,7 @@ macro_rules! tuple_impl {
                     i += 1;
                 )*
                 
-                let (plug_0, plug_1) = Ipv4Plug::new_wire();
+                let (plug_0, plug_1) = Ipv4Plug::new_pair();
                 let router = router.connect(plug_1, vec![RouteV4::new(SubnetV4::global(), None)]);
                 router.spawn(handle);
 
@@ -140,7 +140,7 @@ where
             spawn_completes.push(spawn_complete);
         }
 
-        let (plug_0, plug_1) = Ipv4Plug::new_wire();
+        let (plug_0, plug_1) = Ipv4Plug::new_pair();
         let router = router.connect(plug_1, vec![RouteV4::new(SubnetV4::global(), None)]);
         router.spawn(handle);
 

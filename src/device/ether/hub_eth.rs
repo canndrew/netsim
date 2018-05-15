@@ -60,12 +60,12 @@ impl Future for Hub {
         let mut all_disconnected = true;
         for i in 0..self.connections.len() {
             all_disconnected &= loop {
-                match self.connections[i].rx.poll().void_unwrap() {
+                match self.connections[i].poll_incoming() {
                     Async::NotReady => break false,
                     Async::Ready(None) => break true,
                     Async::Ready(Some(packet)) => {
                         for connection in &mut self.connections {
-                            let _ = connection.tx.unbounded_send(packet.clone());
+                            let _ = connection.unbounded_send(packet.clone());
                         }
                     },
                 }

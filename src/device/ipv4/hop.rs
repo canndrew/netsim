@@ -37,7 +37,7 @@ impl Future for HopV4 {
 
     fn poll(&mut self) -> Result<Async<()>, Void> {
         let a_unplugged = loop {
-            match self.plug_a.rx.poll().void_unwrap() {
+            match self.plug_a.poll_incoming() {
                 Async::NotReady => break false,
                 Async::Ready(None) => break true,
                 Async::Ready(Some(mut packet)) => {
@@ -56,13 +56,13 @@ impl Future for HopV4 {
                         ttl: next_ttl,
                         .. fields
                     });
-                    let _ = self.plug_b.tx.unbounded_send(packet);
+                    let _ = self.plug_b.unbounded_send(packet);
                 },
             }
         };
 
         let b_unplugged = loop {
-            match self.plug_b.rx.poll().void_unwrap() {
+            match self.plug_b.poll_incoming() {
                 Async::NotReady => break false,
                 Async::Ready(None) => break true,
                 Async::Ready(Some(mut packet)) => {
@@ -81,7 +81,7 @@ impl Future for HopV4 {
                         ttl: next_ttl,
                         .. fields
                     });
-                    let _ = self.plug_a.tx.unbounded_send(packet);
+                    let _ = self.plug_a.unbounded_send(packet);
                 },
             }
         };

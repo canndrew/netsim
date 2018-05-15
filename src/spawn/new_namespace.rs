@@ -188,5 +188,19 @@ mod test {
             TEST.with(|v| assert_eq!(v.get(), 123));
         })
     }
+
+    /*
+    #[test]
+    #[should_panic]
+    fn failing_tests_fail() {
+        run_test(1, || {
+            let spawn_complete = new_namespace(|| {
+                panic!("this is supposed to panic");
+            });
+            let mut core = unwrap!(Core::new());
+            unwrap!(core.run(spawn_complete));
+        })
+    }
+    */
 }
 

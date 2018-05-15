@@ -50,7 +50,7 @@ where
                 None
             },
         };
-        let (plug_a, plug_b) = EtherPlug::new_wire();
+        let (plug_a, plug_b) = EtherPlug::new_pair();
 
         let spawn_complete = {
             MachineBuilder::new()
@@ -87,7 +87,7 @@ mod test {
                 let gateway_ip = subnet.gateway_ip();
 
                 let (ipv4_addr_tx, ipv4_addr_rx) = std::sync::mpsc::channel();
-                let (spawn_complete, EtherPlug { tx, rx }) = spawn::network_eth(
+                let (spawn_complete, plug) = spawn::network_eth(
                     &handle,
                     Some(subnet),
                     node::ether::machine(move |_mac_addr, ipv4_addr_opt| {
@@ -99,6 +99,7 @@ mod test {
                         trace!("sent udp packet");
                     }),
                 );
+                let (tx, rx) = plug.split();
                 
                 let iface_ip = unwrap!(ipv4_addr_rx.recv());
 

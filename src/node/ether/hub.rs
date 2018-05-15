@@ -60,7 +60,7 @@ macro_rules! tuple_impl {
                     (hub, join_all)
                 };
 
-                let (plug_0, plug_1) = EtherPlug::new_wire();
+                let (plug_0, plug_1) = EtherPlug::new_pair();
                 let hub = hub.connect(plug_1);
                 hub.spawn(handle);
 

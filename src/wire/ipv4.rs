@@ -1,6 +1,6 @@
 use priv_prelude::*;
 use super::*;
-use future_utils;
+use futures::sync::mpsc::SendError;
 
 /// An Ipv4 packet.
 #[derive(Clone, PartialEq)]
@@ -315,46 +315,43 @@ impl Ipv4Packet {
     }
 }
 
-/// One end of an Ipv4 connection that can be used to read/write packets to/from the other end.
 #[derive(Debug)]
+/// An IPv4 plug
 pub struct Ipv4Plug {
-    /// The sender
-    pub tx: UnboundedSender<Ipv4Packet>,
-    /// The receiver.
-    pub rx: UnboundedReceiver<Ipv4Packet>,
+    inner: Plug<Ipv4Packet>,
 }
 
 impl Ipv4Plug {
-    /// Create a new Ipv4 connection, connecting the two returned plugs.
-    pub fn new_wire() -> (Ipv4Plug, Ipv4Plug) {
-        let (a_tx, b_rx) = future_utils::mpsc::unbounded();
-        let (b_tx, a_rx) = future_utils::mpsc::unbounded();
-        let a = Ipv4Plug {
-            tx: a_tx,
-            rx: a_rx,
-        };
-        let b = Ipv4Plug {
-            tx: b_tx,
-            rx: b_rx,
-        };
-        (a, b)
+    /// Create a pair of connected plugs
+    pub fn new_pair() -> (Ipv4Plug, Ipv4Plug) {
+        let (plug_a, plug_b) = Plug::new_pair();
+        let plug_a = Ipv4Plug { inner: plug_a };
+        let plug_b = Ipv4Plug { inner: plug_b };
+        (plug_a, plug_b)
     }
 
-    /// Add latency to the end of this connection.
-    ///
-    /// `min_latency` is the baseline for the amount of delay added to a packet travelling on this
-    /// connection. `mean_additional_latency` controls the amount of extra, random latency added to
-    /// any given packet on this connection. A non-zero `mean_additional_latency` can cause packets
-    /// to be re-ordered.
+    /// Add latency to a connection
     pub fn with_latency(
         self, 
         handle: &Handle,
         min_latency: Duration,
         mean_additional_latency: Duration,
     ) -> Ipv4Plug {
-        let (plug_0, plug_1) = Ipv4Plug::new_wire();
-        LatencyV4::spawn(handle, min_latency, mean_additional_latency, self, plug_0);
-        plug_1
+        Ipv4Plug {
+            inner: self.inner.with_latency(handle, min_latency, mean_additional_latency),
+        }
+    }
+
+    /// Add packet loss to a connection
+    pub fn with_packet_loss(
+        self,
+        handle: &Handle,
+        loss_rate: f64,
+        mean_loss_duration: Duration,
+    ) -> Ipv4Plug {
+        Ipv4Plug {
+            inner: self.inner.with_packet_loss(handle, loss_rate, mean_loss_duration),
+        }
     }
 
     /// Add extra hops to the end of this connection. Packets travelling through this plug will
@@ -366,24 +363,32 @@ impl Ipv4Plug {
     ) -> Ipv4Plug {
         let mut plug = self;
         for _ in 0..num_hops {
-            let (plug_0, plug_1) = Ipv4Plug::new_wire();
+            let (plug_0, plug_1) = Ipv4Plug::new_pair();
             HopV4::spawn(handle, plug, plug_0);
             plug = plug_1;
         }
         plug
     }
 
-    /// Add packet loss to the connection. Loss happens in burst, rather than on an individual
-    /// packet basis. `mean_loss_duration` controls the burstiness of the loss.
-    pub fn with_packet_loss(
-        self,
-        handle: &Handle,
-        loss_rate: f64,
-        mean_loss_duration: Duration,
-    ) -> Ipv4Plug {
-        let (plug_0, plug_1) = Ipv4Plug::new_wire();
-        PacketLossV4::spawn(handle, loss_rate, mean_loss_duration, self, plug_0);
-        plug_1
+    /// Split into sending and receiving halves
+    pub fn split(self) -> (UnboundedSender<Ipv4Packet>, UnboundedReceiver<Ipv4Packet>) {
+        self.inner.split()
+    }
+
+    /// Poll for incoming packets
+    pub fn poll_incoming(&mut self) -> Async<Option<Ipv4Packet>> {
+        self.inner.rx.poll().void_unwrap()
+    }
+
+    /// Send a packet
+    pub fn unbounded_send(&mut self, packet: Ipv4Packet) -> Result<(), SendError<Ipv4Packet>> {
+        self.inner.tx.unbounded_send(packet)
+    }
+}
+
+impl From<Ipv4Plug> for Plug<Ipv4Packet> {
+    fn from(plug: Ipv4Plug) -> Plug<Ipv4Packet> {
+        plug.inner
     }
 }
 

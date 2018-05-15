@@ -48,7 +48,8 @@ impl RouterV4 {
     pub fn new(ipv4_addr: Ipv4Addr, connections: Vec<(Ipv4Plug, Vec<RouteV4>)>) -> RouterV4 {
         let mut rxs = Vec::with_capacity(connections.len());
         let mut txs = Vec::with_capacity(connections.len());
-        for (Ipv4Plug { tx, rx }, routes) in connections {
+        for (plug, routes) in connections {
+            let (tx, rx) = plug.split();
             rxs.push(rx);
             txs.push((tx, routes));
         }

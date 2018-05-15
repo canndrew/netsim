@@ -1,5 +1,5 @@
 use priv_prelude::*;
-use future_utils;
+use futures::sync::mpsc::SendError;
 
 /// An IPv6 packet
 #[derive(Clone, PartialEq)]
@@ -234,29 +234,64 @@ impl Ipv6Packet {
     }
 }
 
-/// One end of an Ipv6 connection that can be used to read/write packets to/from the other end.
 #[derive(Debug)]
+/// An IPv6 plug
 pub struct Ipv6Plug {
-    /// The sender
-    pub tx: UnboundedSender<Ipv6Packet>,
-    /// The receiver.
-    pub rx: UnboundedReceiver<Ipv6Packet>,
+    inner: Plug<Ipv6Packet>,
 }
 
 impl Ipv6Plug {
-    /// Create a new Ipv6 connection, connecting the two returned plugs.
-    pub fn new_wire() -> (Ipv6Plug, Ipv6Plug) {
-        let (a_tx, b_rx) = future_utils::mpsc::unbounded();
-        let (b_tx, a_rx) = future_utils::mpsc::unbounded();
-        let a = Ipv6Plug {
-            tx: a_tx,
-            rx: a_rx,
-        };
-        let b = Ipv6Plug {
-            tx: b_tx,
-            rx: b_rx,
-        };
-        (a, b)
+    /// Create a pair of connected plugs
+    pub fn new_pair() -> (Ipv6Plug, Ipv6Plug) {
+        let (plug_a, plug_b) = Plug::new_pair();
+        let plug_a = Ipv6Plug { inner: plug_a };
+        let plug_b = Ipv6Plug { inner: plug_b };
+        (plug_a, plug_b)
+    }
+
+    /// Add latency to a connection
+    pub fn with_latency(
+        self, 
+        handle: &Handle,
+        min_latency: Duration,
+        mean_additional_latency: Duration,
+    ) -> Ipv6Plug {
+        Ipv6Plug {
+            inner: self.inner.with_latency(handle, min_latency, mean_additional_latency),
+        }
+    }
+
+    /// Add packet loss to a connection
+    pub fn with_packet_loss(
+        self,
+        handle: &Handle,
+        loss_rate: f64,
+        mean_loss_duration: Duration,
+    ) -> Ipv6Plug {
+        Ipv6Plug {
+            inner: self.inner.with_packet_loss(handle, loss_rate, mean_loss_duration),
+        }
+    }
+
+    /// Split into sending and receiving halves
+    pub fn split(self) -> (UnboundedSender<Ipv6Packet>, UnboundedReceiver<Ipv6Packet>) {
+        self.inner.split()
+    }
+
+    /// Poll for incoming packets
+    pub fn poll_incoming(&mut self) -> Async<Option<Ipv6Packet>> {
+        self.inner.rx.poll().void_unwrap()
+    }
+
+    /// Send a packet
+    pub fn unbounded_send(&mut self, packet: Ipv6Packet) -> Result<(), SendError<Ipv6Packet>> {
+        self.inner.tx.unbounded_send(packet)
+    }
+}
+
+impl From<Ipv6Plug> for Plug<Ipv6Packet> {
+    fn from(plug: Ipv6Plug) -> Plug<Ipv6Packet> {
+        plug.inner
     }
 }
 

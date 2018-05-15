@@ -33,7 +33,7 @@ where
             .ipv4_addr(address, subnet.netmask_bits())
             .ipv4_route(RouteV4::new(SubnetV4::global(), None))
         };
-        let (plug_a, plug_b) = IpPlug::new_wire();
+        let (plug_a, plug_b) = IpPlug::new_pair();
 
         let spawn_complete = {
             MachineBuilder::new()
@@ -90,7 +90,7 @@ mod test {
                     }),
                 );
 
-                let Ipv4Plug { tx: plug_tx, rx: plug_rx } = ipv4_plug;
+                let (plug_tx, plug_rx) = ipv4_plug.split();
                 let iface_ip = unwrap!(ipv4_addr_rx.recv());
 
                 plug_rx
@@ -168,7 +168,7 @@ mod test {
                     }),
                 );
 
-                let Ipv4Plug { tx: plug_tx, rx: plug_rx } = ipv4_plug;
+                let (plug_tx, plug_rx) = ipv4_plug.split();
                 let iface_ip = unwrap!(ipv4_addr_rx.recv());
 
                 plug_rx
@@ -292,8 +292,6 @@ mod test {
                                         payload: tcp.payload(),
                                     },
                                 );
-
-                                trace!("\n\n\t\tSENDING {} bytes!", tcp.payload().len());
 
                                 plug_tx
                                 .send(ack_packet)
@@ -433,7 +431,7 @@ mod test {
                     }),
                 );
 
-                let Ipv4Plug { tx, rx } = ipv4_plug;
+                let (tx, rx) = ipv4_plug.split();
                 let iface_ip = unwrap!(ipv4_addr_rx.recv());
 
                 let id = rand::random();

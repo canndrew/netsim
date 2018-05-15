@@ -295,7 +295,7 @@ impl NatV4Builder {
 impl NatV4 {
     fn process_outgoing(&mut self) -> bool {
         loop {
-            match self.private_plug.rx.poll().void_unwrap() {
+            match self.private_plug.poll_incoming() {
                 Async::NotReady => return false,
                 Async::Ready(None) => return true,
                 Async::Ready(Some(packet)) => {
@@ -354,7 +354,7 @@ impl NatV4 {
                                     }
                                 );
 
-                                let _ = self.private_plug.tx.unbounded_send(bounced_packet);
+                                let _ = self.private_plug.unbounded_send(bounced_packet);
                             },
                             Ipv4Payload::Tcp(tcp) => {
                                 let tcp_fields = tcp.fields();
@@ -388,7 +388,7 @@ impl NatV4 {
                                     }
                                 );
 
-                                let _ = self.private_plug.tx.unbounded_send(bounced_packet);
+                                let _ = self.private_plug.unbounded_send(bounced_packet);
                             },
                             _ => (),
                         }
@@ -423,7 +423,7 @@ impl NatV4 {
                                 self.public_ip, natted_packet,
                             );
 
-                            let _ = self.public_plug.tx.unbounded_send(natted_packet);
+                            let _ = self.public_plug.unbounded_send(natted_packet);
                         },
                         Ipv4Payload::Tcp(tcp) => {
                             let tcp_fields = tcp.fields();
@@ -452,7 +452,7 @@ impl NatV4 {
                                 self.public_ip, natted_packet,
                             );
 
-                            let _ = self.public_plug.tx.unbounded_send(natted_packet);
+                            let _ = self.public_plug.unbounded_send(natted_packet);
                         },
                         _ => (),
                     }
@@ -463,7 +463,7 @@ impl NatV4 {
 
     fn process_incoming(&mut self) -> bool {
         loop {
-            match self.public_plug.rx.poll().void_unwrap() {
+            match self.public_plug.poll_incoming() {
                 Async::NotReady => return false,
                 Async::Ready(None) => return true,
                 Async::Ready(Some(packet)) => {
@@ -517,7 +517,7 @@ impl NatV4 {
                                         self.public_ip, natted_packet,
                                     );
 
-                                    let _ = self.private_plug.tx.unbounded_send(natted_packet);
+                                    let _ = self.private_plug.unbounded_send(natted_packet);
                                 },
                                 None => {
                                     if self.blacklist_unrecognized_addrs {
@@ -556,7 +556,7 @@ impl NatV4 {
                                         self.public_ip, natted_packet,
                                     );
 
-                                    let _ = self.private_plug.tx.unbounded_send(natted_packet);
+                                    let _ = self.private_plug.unbounded_send(natted_packet);
                                 },
                                 None => {
                                     if self.blacklist_unrecognized_addrs {
@@ -599,15 +599,15 @@ fn test() {
         let handle = core.handle();
 
         let res = core.run(future::lazy(move || {
-            let (public_plug_0, public_plug_1) = Ipv4Plug::new_wire();
-            let (private_plug_0, private_plug_1) = Ipv4Plug::new_wire();
+            let (public_plug_0, public_plug_1) = Ipv4Plug::new_pair();
+            let (private_plug_0, private_plug_1) = Ipv4Plug::new_pair();
             let public_ip = Ipv4Addr::random_global();
             let subnet = SubnetV4::random_local();
 
             NatV4::spawn(&handle, public_plug_0, private_plug_0, public_ip, subnet);
 
-            let Ipv4Plug { tx: public_tx, rx: public_rx } = public_plug_1;
-            let Ipv4Plug { tx: private_tx, rx: private_rx } = private_plug_1;
+            let (public_tx, public_rx) = public_plug_1.split();
+            let (private_tx, private_rx) = private_plug_1.split();
 
             let remote_addr = SocketAddrV4::new(
                 Ipv4Addr::random_global(),

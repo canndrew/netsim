@@ -51,7 +51,7 @@ impl Future for EtherAdaptorV4 {
 
     fn poll(&mut self) -> Result<Async<()>, Void> {
         let ether_unplugged = loop {
-            match self.ether_plug.rx.poll().void_unwrap() {
+            match self.ether_plug.poll_incoming() {
                 Async::NotReady => break false,
                 Async::Ready(None) => break true,
                 Async::Ready(Some(frame)) => {
@@ -96,7 +96,7 @@ impl Future for EtherAdaptorV4 {
                                         "ether adaptor {} {} replying to arp request: {:?}",
                                         self.ipv4_addr, self.mac_addr, frame
                                     );
-                                    let _ = self.ether_plug.tx.unbounded_send(frame);
+                                    let _ = self.ether_plug.unbounded_send(frame);
                                 },
                                 ArpFields::Response {
                                     source_mac,
@@ -131,7 +131,7 @@ impl Future for EtherAdaptorV4 {
                                                 which it now knows the destination MAC for: {:?}",
                                                 self.ipv4_addr, self.mac_addr, frame
                                             );
-                                            let _ = self.ether_plug.tx.unbounded_send(frame);
+                                            let _ = self.ether_plug.unbounded_send(frame);
                                         }
                                     }
                                 },
@@ -142,7 +142,7 @@ impl Future for EtherAdaptorV4 {
                                 "ether adaptor {} {} forwarding IPv4 packet: {:?}",
                                 self.ipv4_addr, self.mac_addr, ipv4
                             );
-                            let _ = self.ipv4_plug.tx.unbounded_send(ipv4);
+                            let _ = self.ipv4_plug.unbounded_send(ipv4);
                         },
                         EtherPayload::Unknown { .. } => (),
                     }
@@ -151,7 +151,7 @@ impl Future for EtherAdaptorV4 {
         };
 
         let ipv4_unplugged = loop {
-            match self.ipv4_plug.rx.poll().void_unwrap() {
+            match self.ipv4_plug.poll_incoming() {
                 Async::NotReady => break false,
                 Async::Ready(None) => break true,
                 Async::Ready(Some(packet)) => {
@@ -177,7 +177,7 @@ impl Future for EtherAdaptorV4 {
                                 unsendable IPv4 packet: {:?}, {:?}",
                                 self.ipv4_addr, self.mac_addr, frame, packet
                             );
-                            let _ = self.ether_plug.tx.unbounded_send(frame);
+                            let _ = self.ether_plug.unbounded_send(frame);
                             self.arp_pending.entry(dest_ip).or_insert_with(Vec::new).push(packet);
                             continue;
                         },
@@ -194,7 +194,7 @@ impl Future for EtherAdaptorV4 {
                         "ether adaptor {} {} forwarding ethernet frame: {:?}",
                         self.ipv4_addr, self.mac_addr, frame
                     );
-                    let _ = self.ether_plug.tx.unbounded_send(frame);
+                    let _ = self.ether_plug.unbounded_send(frame);
                 },
             }
         };
@@ -216,15 +216,15 @@ fn test() {
         let mut core = unwrap!(Core::new());
         let handle = core.handle();
         let res = core.run({
-            let (ether_plug_0, ether_plug_1) = EtherPlug::new_wire();
-            let (ipv4_plug_0, ipv4_plug_1) = Ipv4Plug::new_wire();
+            let (ether_plug_0, ether_plug_1) = EtherPlug::new_pair();
+            let (ipv4_plug_0, ipv4_plug_1) = Ipv4Plug::new_pair();
             let veth_ip = Ipv4Addr::random_global();
             let veth = EtherAdaptorV4::new(veth_ip, ether_plug_0, ipv4_plug_0);
             let veth_mac = veth.mac_addr();
             handle.spawn(veth.infallible());
 
-            let EtherPlug { tx: ether_tx, rx: ether_rx } = ether_plug_1;
-            let Ipv4Plug { tx: ipv4_tx, rx: ipv4_rx } = ipv4_plug_1;
+            let (ether_tx, ether_rx) = ether_plug_1.split();
+            let (ipv4_tx, ipv4_rx) = ipv4_plug_1.split();
 
             let source_ip = Ipv4Addr::random_global();
             let dest_ip = Ipv4Addr::random_global();

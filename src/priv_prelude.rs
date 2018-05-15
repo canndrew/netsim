@@ -40,6 +40,7 @@ pub use device::MachineBuilder;
 pub use node::{Ipv4Node, EtherNode};
 pub use spawn_complete::SpawnComplete;
 pub use process_handle::ProcessHandle;
+pub use plug::{Latency, PacketLoss, Plug};
 
 #[cfg(test)]
 pub use test::run_test;

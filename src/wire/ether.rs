@@ -1,5 +1,5 @@
 use priv_prelude::*;
-use future_utils;
+use futures::sync::mpsc::SendError;
 
 #[derive(Clone, PartialEq)]
 /// Represents an ethernet frame.
@@ -208,29 +208,64 @@ impl EtherFrame {
     }
 }
 
-/// An ethernet connection, used to send/receive ethernet frames to/from the plug at the other end.
 #[derive(Debug)]
+/// An ethernet plug
 pub struct EtherPlug {
-    /// The sender.
-    pub tx: UnboundedSender<EtherFrame>,
-    /// The receiver.
-    pub rx: UnboundedReceiver<EtherFrame>,
+    inner: Plug<EtherFrame>,
 }
 
 impl EtherPlug {
-    /// Construct an ethernet 'wire' connection the two given plugs.
-    pub fn new_wire() -> (EtherPlug, EtherPlug) {
-        let (a_tx, b_rx) = future_utils::mpsc::unbounded();
-        let (b_tx, a_rx) = future_utils::mpsc::unbounded();
-        let a = EtherPlug {
-            tx: a_tx,
-            rx: a_rx,
-        };
-        let b = EtherPlug {
-            tx: b_tx,
-            rx: b_rx,
-        };
-        (a, b)
+    /// Create a connected pair of plugs
+    pub fn new_pair() -> (EtherPlug, EtherPlug) {
+        let (plug_a, plug_b) = Plug::new_pair();
+        let plug_a = EtherPlug { inner: plug_a };
+        let plug_b = EtherPlug { inner: plug_b };
+        (plug_a, plug_b)
+    }
+
+    /// Add latency to a connection
+    pub fn with_latency(
+        self, 
+        handle: &Handle,
+        min_latency: Duration,
+        mean_additional_latency: Duration,
+    ) -> EtherPlug {
+        EtherPlug {
+            inner: self.inner.with_latency(handle, min_latency, mean_additional_latency),
+        }
+    }
+
+    /// Add packet loss to a connection
+    pub fn with_packet_loss(
+        self,
+        handle: &Handle,
+        loss_rate: f64,
+        mean_loss_duration: Duration,
+    ) -> EtherPlug {
+        EtherPlug {
+            inner: self.inner.with_packet_loss(handle, loss_rate, mean_loss_duration),
+        }
+    }
+
+    /// Split into sending and receiving halves
+    pub fn split(self) -> (UnboundedSender<EtherFrame>, UnboundedReceiver<EtherFrame>) {
+        self.inner.split()
+    }
+
+    /// Poll for incoming frames
+    pub fn poll_incoming(&mut self) -> Async<Option<EtherFrame>> {
+        self.inner.rx.poll().void_unwrap()
+    }
+
+    /// Send a frame
+    pub fn unbounded_send(&mut self, frame: EtherFrame) -> Result<(), SendError<EtherFrame>> {
+        self.inner.tx.unbounded_send(frame)
+    }
+}
+
+impl From<EtherPlug> for Plug<EtherFrame> {
+    fn from(plug: EtherPlug) -> Plug<EtherFrame> {
+        plug.inner
     }
 }
 

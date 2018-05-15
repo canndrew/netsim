@@ -1,6 +1,6 @@
 use priv_prelude::*;
-use future_utils;
 use futures::future::Loop;
+use futures::sync::mpsc::SendError;
 
 #[derive(Clone, PartialEq)]
 /// An IP packet.
@@ -55,37 +55,51 @@ impl IpPacket {
     }
 }
 
-/// One end of an IP connection that can be used to read/write packets to/from the other end.
 #[derive(Debug)]
+/// An IP plug
 pub struct IpPlug {
-    /// The sender
-    pub tx: UnboundedSender<IpPacket>,
-    /// The receiver.
-    pub rx: UnboundedReceiver<IpPacket>,
+    inner: Plug<IpPacket>,
 }
 
 impl IpPlug {
-    /// Create a new Ip connection, connecting the two returned plugs.
-    pub fn new_wire() -> (IpPlug, IpPlug) {
-        let (a_tx, b_rx) = future_utils::mpsc::unbounded();
-        let (b_tx, a_rx) = future_utils::mpsc::unbounded();
-        let a = IpPlug {
-            tx: a_tx,
-            rx: a_rx,
-        };
-        let b = IpPlug {
-            tx: b_tx,
-            rx: b_rx,
-        };
-        (a, b)
+    /// Create a pair of connected plugs
+    pub fn new_pair() -> (IpPlug, IpPlug) {
+        let (plug_a, plug_b) = Plug::new_pair();
+        let plug_a = IpPlug { inner: plug_a };
+        let plug_b = IpPlug { inner: plug_b };
+        (plug_a, plug_b)
+    }
+
+    /// Add latency to a connection
+    pub fn with_latency(
+        self, 
+        handle: &Handle,
+        min_latency: Duration,
+        mean_additional_latency: Duration,
+    ) -> IpPlug {
+        IpPlug {
+            inner: self.inner.with_latency(handle, min_latency, mean_additional_latency),
+        }
+    }
+
+    /// Add packet loss to a connection
+    pub fn with_packet_loss(
+        self,
+        handle: &Handle,
+        loss_rate: f64,
+        mean_loss_duration: Duration,
+    ) -> IpPlug {
+        IpPlug {
+            inner: self.inner.with_packet_loss(handle, loss_rate, mean_loss_duration),
+        }
     }
 
     /// Adapt the plug to an IPv4 plug, dropping all incoming IPv6 packets.
     pub fn into_ipv4_plug(self, handle: &Handle) -> Ipv4Plug {
-        let (ipv4_plug_a, ipv4_plug_b) = Ipv4Plug::new_wire();
+        let (ipv4_plug_a, ipv4_plug_b) = Ipv4Plug::new_pair();
 
-        let IpPlug { tx: ip_tx, rx: ip_rx } = self;
-        let Ipv4Plug { tx: ipv4_tx, rx: ipv4_rx } = ipv4_plug_a;
+        let (ip_tx, ip_rx) = self.split();
+        let (ipv4_tx, ipv4_rx) = ipv4_plug_a.split();
         handle.spawn({
             future::loop_fn((ipv4_tx, ip_rx), move |(ipv4_tx, ip_rx)| {
                 ip_rx
@@ -131,10 +145,10 @@ impl IpPlug {
 
     /// Adapt the plug to an IPv6 plug, dropping all incoming IPv6 packets.
     pub fn into_ipv6_plug(self, handle: &Handle) -> Ipv6Plug {
-        let (ipv6_plug_a, ipv6_plug_b) = Ipv6Plug::new_wire();
+        let (ipv6_plug_a, ipv6_plug_b) = Ipv6Plug::new_pair();
 
-        let IpPlug { tx: ip_tx, rx: ip_rx } = self;
-        let Ipv6Plug { tx: ipv6_tx, rx: ipv6_rx } = ipv6_plug_a;
+        let (ip_tx, ip_rx) = self.split();
+        let (ipv6_tx, ipv6_rx) = ipv6_plug_a.split();
         handle.spawn({
             future::loop_fn((ipv6_tx, ip_rx), move |(ipv6_tx, ip_rx)| {
                 ip_rx
@@ -176,6 +190,27 @@ impl IpPlug {
             .infallible()
         });
         ipv6_plug_b
+    }
+
+    /// Split into sending and receiving halves
+    pub fn split(self) -> (UnboundedSender<IpPacket>, UnboundedReceiver<IpPacket>) {
+        self.inner.split()
+    }
+
+    /// Poll for incoming packets
+    pub fn poll_incoming(&mut self) -> Async<Option<IpPacket>> {
+        self.inner.rx.poll().void_unwrap()
+    }
+
+    /// Send a packet
+    pub fn unbounded_send(&mut self, packet: IpPacket) -> Result<(), SendError<IpPacket>> {
+        self.inner.tx.unbounded_send(packet)
+    }
+}
+
+impl From<IpPlug> for Plug<IpPacket> {
+    fn from(plug: IpPlug) -> Plug<IpPacket> {
+        plug.inner
     }
 }
 
