@@ -16,7 +16,7 @@ pub use self::packet_loss::{packet_loss, PacketLossNode};
 pub use self::router::{router, RouterClientsV4, RouterNode};
 pub use self::ether_adaptor::{ether_adaptor, EtherAdaptorNode};
 
-/// An `Ipv4Node` describes a recipe for constructing a network when given the subnet that the network
+/// An `Ipv4Node` describes a recipe for constructing a network when given the IP range that the network
 /// should operate on. The functions in the `node` module return `Ipv4Node`s that you can then run as a
 /// network with the `spawn::network_v4` function.
 pub trait Ipv4Node: Sized {
@@ -29,7 +29,7 @@ pub trait Ipv4Node: Sized {
     fn build(
         self,
         handle: &Handle,
-        subnet: SubnetV4,
+        ipv4_range: Ipv4Range,
     ) -> (SpawnComplete<Self::Output>, Ipv4Plug);
 
     /// Chain some extra hops onto the node, causing TTL values of packets to decrease by

@@ -5,21 +5,21 @@ use sys;
 /// Represents an IPv4 route.
 #[derive(Debug, Clone, Copy)]
 pub struct RouteV4 {
-    destination: SubnetV4,
+    destination: Ipv4Range,
     gateway: Option<Ipv4Addr>,
 }
 
 impl RouteV4 {
     /// Create a new route with the given destination and gateway
-    pub fn new(destination: SubnetV4, gateway: Option<Ipv4Addr>) -> RouteV4 {
+    pub fn new(destination: Ipv4Range, gateway: Option<Ipv4Addr>) -> RouteV4 {
         RouteV4 {
             destination,
             gateway,
         }
     }
 
-    /// Get the destination subnet of the route.
-    pub fn destination(&self) -> SubnetV4 {
+    /// Get the destination IP range of the route.
+    pub fn destination(&self) -> Ipv4Range {
         self.destination
     }
 
@@ -35,7 +35,7 @@ impl RouteV4 {
 }
 
 pub fn add_route_v4(
-    destination: SubnetV4,
+    destination: Ipv4Range,
     gateway: Option<Ipv4Addr>,
     iface_name: &str,
 ) -> Result<(), AddRouteError> {

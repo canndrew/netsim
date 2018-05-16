@@ -4,21 +4,21 @@ use sys;
 /// Represents an IPv6 route.
 #[derive(Debug, Clone, Copy)]
 pub struct RouteV6 {
-    destination: SubnetV6,
+    destination: Ipv6Range,
     next_hop: Ipv6Addr,
 }
 
 impl RouteV6 {
     /// Create a new route with the given destination and next hop.
-    pub fn new(destination: SubnetV6, next_hop: Ipv6Addr) -> RouteV6 {
+    pub fn new(destination: Ipv6Range, next_hop: Ipv6Addr) -> RouteV6 {
         RouteV6 {
             destination,
             next_hop,
         }
     }
 
-    /// Get the destination subnet of the route.
-    pub fn destination(&self) -> SubnetV6 {
+    /// Get the destination IP range of the route.
+    pub fn destination(&self) -> Ipv6Range {
         self.destination
     }
 
@@ -34,7 +34,7 @@ impl RouteV6 {
 }
 
 pub fn add_route_v6(
-    destination: SubnetV6,
+    destination: Ipv6Range,
     next_hop: Ipv6Addr,
     iface_name: &str,
 ) -> Result<(), AddRouteError> {

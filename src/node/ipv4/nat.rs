@@ -26,14 +26,14 @@ where
     fn build(
         self,
         handle: &Handle,
-        subnet: SubnetV4,
+        ipv4_range: Ipv4Range,
     ) -> (SpawnComplete<N::Output>, Ipv4Plug) {
-        let ip = subnet.random_client_addr();
+        let ip = ipv4_range.random_client_addr();
 
         let private_subnet = {
             self.nat_builder
             .get_subnet()
-            .unwrap_or_else(SubnetV4::random_local)
+            .unwrap_or_else(Ipv4Range::random_local_subnet)
         };
         let nat_builder = self.nat_builder.subnet(private_subnet);
         let (spawn_complete, client_plug) = self.node.build(handle, private_subnet);

@@ -32,7 +32,7 @@ pub use util::ipv6_addr::Ipv6AddrExt;
 pub use util::duration::DurationExt;
 pub use wire::*;
 pub use route::{RouteV4, RouteV6, AddRouteError};
-pub use subnet::{SubnetV4, SubnetV6};
+pub use range::{Ipv4Range, Ipv6Range};
 pub use iface::{IfaceBuildError, EtherIface, EtherIfaceBuilder, IpIface, IpIfaceBuilder};
 pub use iface::{SetMacAddrError, GetMacAddrError, SetIpv4AddrError, SetIpv6AddrError, PutUpError};
 pub use device::ipv4::{EtherAdaptorV4, NatV4Builder, LatencyV4, HopV4, RouterV4Builder, PacketLossV4};

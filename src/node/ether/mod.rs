@@ -6,7 +6,7 @@ mod hub;
 pub use self::machine::{machine, MachineNode};
 pub use self::hub::{hub, HubNode};
 
-/// An `EtherNode` describes a recipe for constructing a network when given the subnets that the network
+/// An `EtherNode` describes a recipe for constructing a network when given the IP ranges that the network
 /// should operate on.
 pub trait EtherNode: Sized {
     /// The type returned by the thread spawned by this node.
@@ -18,7 +18,7 @@ pub trait EtherNode: Sized {
     fn build(
         self,
         handle: &Handle,
-        subnet_v4: Option<SubnetV4>,
+        ipv4_range: Option<Ipv4Range>,
     ) -> (SpawnComplete<Self::Output>, EtherPlug);
 }
 

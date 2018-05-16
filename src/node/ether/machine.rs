@@ -25,27 +25,27 @@ where
     fn build(
         self,
         handle: &Handle,
-        subnet_v4: Option<SubnetV4>,
+        ipv4_range: Option<Ipv4Range>,
     ) -> (SpawnComplete<R>, EtherPlug) {
         let mac_addr = MacAddr::random();
         let mut iface = {
             EtherIfaceBuilder::new()
             .mac_addr(mac_addr)
         };
-        let ipv4_addr = match subnet_v4 {
-            Some(subnet) => {
-                let address = subnet.random_client_addr();
+        let ipv4_addr = match ipv4_range {
+            Some(range) => {
+                let address = range.random_client_addr();
                 iface = {
                     iface
-                    .ipv4_addr(address, subnet.netmask_bits())
-                    .ipv4_route(RouteV4::new(SubnetV4::global(), Some(subnet.gateway_ip())))
+                    .ipv4_addr(address, range.netmask_prefix_length())
+                    .ipv4_route(RouteV4::new(Ipv4Range::global(), Some(range.gateway_ip())))
                 };
                 Some(address)
             },
             None => {
                 iface = {
                     iface
-                    .route(RouteV4::new(SubnetV4::global(), None))
+                    .route(RouteV4::new(Ipv4Range::global(), None))
                 };
                 None
             },
@@ -83,13 +83,13 @@ mod test {
                 let target_port = rand::random::<u16>() / 2 + 1000;
                 let target_addr = SocketAddrV4::new(target_ip, target_port);
 
-                let subnet = SubnetV4::random_local();
-                let gateway_ip = subnet.gateway_ip();
+                let range = Ipv4Range::random_local();
+                let gateway_ip = range.gateway_ip();
 
                 let (ipv4_addr_tx, ipv4_addr_rx) = std::sync::mpsc::channel();
                 let (spawn_complete, plug) = spawn::network_eth(
                     &handle,
-                    Some(subnet),
+                    Some(range),
                     node::ether::machine(move |_mac_addr, ipv4_addr_opt| {
                         let ipv4_addr = unwrap!(ipv4_addr_opt);
                         unwrap!(ipv4_addr_tx.send(ipv4_addr));

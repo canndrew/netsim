@@ -7,7 +7,7 @@ pub struct NatV4 {
     private_plug: Ipv4Plug,
     public_plug: Ipv4Plug,
     public_ip: Ipv4Addr,
-    subnet: SubnetV4, 
+    subnet: Ipv4Range, 
     hair_pinning: bool,
     udp_map: PortMap,
     tcp_map: PortMap,
@@ -150,7 +150,7 @@ impl NatV4 {
         public_plug: Ipv4Plug,
         private_plug: Ipv4Plug,
         public_ip: Ipv4Addr,
-        subnet: SubnetV4,
+        subnet: Ipv4Range,
     ) -> NatV4 {
         let ret = NatV4 {
             private_plug: private_plug,
@@ -173,7 +173,7 @@ impl NatV4 {
         public_plug: Ipv4Plug,
         private_plug: Ipv4Plug,
         public_ip: Ipv4Addr,
-        subnet: SubnetV4,
+        subnet: Ipv4Range,
     ) {
         let nat_v4 = NatV4::new(public_plug, private_plug, public_ip, subnet);
         handle.spawn(nat_v4.infallible());
@@ -183,7 +183,7 @@ impl NatV4 {
 #[derive(Default)]
 /// A builder for `NatV4`
 pub struct NatV4Builder {
-    subnet: Option<SubnetV4>,
+    subnet: Option<Ipv4Range>,
     hair_pinning: bool,
     udp_map: PortMap,
     tcp_map: PortMap,
@@ -198,13 +198,13 @@ impl NatV4Builder {
 
     /// Set the subnet used on the local side of the NAT. If left unset, a random subnet will be
     /// chosen.
-    pub fn subnet(mut self, subnet: SubnetV4) -> NatV4Builder {
+    pub fn subnet(mut self, subnet: Ipv4Range) -> NatV4Builder {
         self.subnet = Some(subnet);
         self
     }
 
     /// Get the subnet set by the last call to `subnet` (if any).
-    pub fn get_subnet(&self) -> Option<SubnetV4> {
+    pub fn get_subnet(&self) -> Option<Ipv4Range> {
         self.subnet
     }
 
@@ -263,7 +263,7 @@ impl NatV4Builder {
         private_plug: Ipv4Plug,
         public_ip: Ipv4Addr,
     ) -> NatV4 {
-        let subnet = self.subnet.unwrap_or_else(SubnetV4::random_local);
+        let subnet = self.subnet.unwrap_or_else(Ipv4Range::random_local_subnet);
         let ret = NatV4 {
             private_plug: private_plug,
             public_plug: public_plug,
@@ -602,7 +602,7 @@ fn test() {
             let (public_plug_0, public_plug_1) = Ipv4Plug::new_pair();
             let (private_plug_0, private_plug_1) = Ipv4Plug::new_pair();
             let public_ip = Ipv4Addr::random_global();
-            let subnet = SubnetV4::random_local();
+            let subnet = Ipv4Range::random_local();
 
             NatV4::spawn(&handle, public_plug_0, private_plug_0, public_ip, subnet);
 
@@ -709,7 +709,7 @@ fn test_port_restriction() {
     let mut restricted = PortMap::default();
     restricted.allowed_endpoints = Some(HashMap::new());
 
-    let subnet = SubnetV4::random_local();
+    let subnet = Ipv4Range::random_local();
     let internal_addr = SocketAddrV4::new(subnet.random_client_addr(), rand::random());
     let remote_addr = SocketAddrV4::new(Ipv4Addr::random_global(), rand::random());
     let unknown_addr = SocketAddrV4::new(Ipv4Addr::random_global(), rand::random());
@@ -733,7 +733,7 @@ fn test_symmetric_map() {
     let mut symmetric = PortMap::default();
     symmetric.symmetric_map = Some(SymmetricMap::default());
 
-    let subnet = SubnetV4::random_local();
+    let subnet = Ipv4Range::random_local();
     let internal_addr = SocketAddrV4::new(subnet.random_client_addr(), rand::random());
     let remote_addr_0 = SocketAddrV4::new(Ipv4Addr::random_global(), rand::random());
     let remote_addr_1 = SocketAddrV4::new(Ipv4Addr::random_global(), rand::random());

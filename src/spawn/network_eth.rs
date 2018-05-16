@@ -4,9 +4,9 @@ use priv_prelude::*;
 /// the network and read frames that try to leave the network.
 pub fn network_eth<N: EtherNode>(
     handle: &Handle,
-    subnet: Option<SubnetV4>,
+    ipv4_range: Option<Ipv4Range>,
     node: N,
 ) -> (SpawnComplete<N::Output>, EtherPlug) {
-    node.build(handle, subnet)
+    node.build(handle, ipv4_range)
 }
 

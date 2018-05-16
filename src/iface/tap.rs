@@ -216,7 +216,7 @@ mod test {
         run_test(1, || {
             let spawn_complete = spawn::new_namespace(|| {
                 let mac_addr = MacAddr::random();
-                let ipv4_addr = SubnetV4::local_10().random_client_addr();
+                let ipv4_addr = Ipv4Range::local_subnet_10().random_client_addr();
                 let ipv4_netmask_bits = 8 + rand::random::<u8>() % 24;
                 let ipv6_addr = Ipv6Addr::random_global();
                 let ipv6_netmask_bits = 64 + rand::random::<u8>() % 64;

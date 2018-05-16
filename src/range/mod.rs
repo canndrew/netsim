@@ -10,7 +10,7 @@ pub use self::v6::*;
 quick_error! {
     /// Errors returned by `SubnetV*::from_str`
     #[derive(Debug)]
-    pub enum SubnetParseError {
+    pub enum IpRangeParseError {
         /// Missing '/' delimiter
         MissingDelimiter {
             description("missing '/' delimiter")
@@ -25,10 +25,10 @@ quick_error! {
             display("error parsing IP address: {}", e)
             cause(e)
         }
-        /// error parsing subnet bit count
-        ParseBits(e: ParseIntError) {
-            description("error parsing subnet bit count")
-            display("error parsing subnet bit count: {}", e)
+        /// error parsing netmask prefix length
+        ParseNetmaskPrefixLength(e: ParseIntError) {
+            description("error parsing netmask prefix length")
+            display("error parsing netmask prefix length: {}", e)
             cause(e)
         }
     }

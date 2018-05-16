@@ -7,7 +7,7 @@ pub trait RouterClientsV4 {
     type Output: Send + 'static;
 
     /// Build the set of nodes.
-    fn build(self, handle: &Handle, subnet: SubnetV4) -> (SpawnComplete<Self::Output>, Ipv4Plug);
+    fn build(self, handle: &Handle, ipv4_range: Ipv4Range) -> (SpawnComplete<Self::Output>, Ipv4Plug);
 }
 
 struct JoinAll<X, T> {
@@ -23,7 +23,7 @@ macro_rules! tuple_impl {
         {
             type Output = ($($ty::Output,)*);
             
-            fn build(self, handle: &Handle, subnet: SubnetV4) -> (SpawnComplete<Self::Output>, Ipv4Plug) {
+            fn build(self, handle: &Handle, ipv4_range: Ipv4Range) -> (SpawnComplete<Self::Output>, Ipv4Plug) {
                 #![allow(non_snake_case)]
                 #![allow(unused_assignments)]
                 #![allow(unused_mut)]
@@ -36,18 +36,18 @@ macro_rules! tuple_impl {
                     let $ty = $ty;
                     i += 1;
                 )*
-                let subnets = subnet.split(i + 1);
+                let ranges = ipv4_range.split(i + 1);
 
-                let router = RouterV4Builder::new(subnets[0].base_addr());
+                let router = RouterV4Builder::new(ranges[0].base_addr());
                 let mut i = 1;
                 $(
-                    let ($ty, plug) = $ty.build(handle, subnets[i]);
-                    let router = router.connect(plug, vec![RouteV4::new(subnets[i], None)]);
+                    let ($ty, plug) = $ty.build(handle, ranges[i]);
+                    let router = router.connect(plug, vec![RouteV4::new(ranges[i], None)]);
                     i += 1;
                 )*
                 
                 let (plug_0, plug_1) = Ipv4Plug::new_pair();
-                let router = router.connect(plug_1, vec![RouteV4::new(SubnetV4::global(), None)]);
+                let router = router.connect(plug_1, vec![RouteV4::new(Ipv4Range::global(), None)]);
                 router.spawn(handle);
 
                 let (ret_tx, ret_rx) = oneshot::channel();
@@ -128,20 +128,20 @@ where
     fn build(
         self,
         handle: &Handle,
-        subnet: SubnetV4,
+        ipv4_range: Ipv4Range,
     ) -> (SpawnComplete<Vec<N::Output>>, Ipv4Plug) {
-        let subnets = subnet.split(self.len() as u32 + 1);
-        let mut router = RouterV4Builder::new(subnets[0].base_addr());
+        let ranges = ipv4_range.split(self.len() as u32 + 1);
+        let mut router = RouterV4Builder::new(ranges[0].base_addr());
         let mut spawn_completes = FuturesOrdered::new();
 
         for (i, node) in self.into_iter().enumerate() {
-            let (spawn_complete, plug) = node.build(handle, subnets[i + 1]);
-            router = router.connect(plug, vec![RouteV4::new(subnets[i + 1], None)]);
+            let (spawn_complete, plug) = node.build(handle, ranges[i + 1]);
+            router = router.connect(plug, vec![RouteV4::new(ranges[i + 1], None)]);
             spawn_completes.push(spawn_complete);
         }
 
         let (plug_0, plug_1) = Ipv4Plug::new_pair();
-        let router = router.connect(plug_1, vec![RouteV4::new(SubnetV4::global(), None)]);
+        let router = router.connect(plug_1, vec![RouteV4::new(Ipv4Range::global(), None)]);
         router.spawn(handle);
 
         let (tx, rx) = oneshot::channel();
@@ -179,9 +179,9 @@ where
     fn build(
         self,
         handle: &Handle,
-        subnet: SubnetV4,
+        ipv4_range: Ipv4Range,
     ) -> (SpawnComplete<C::Output>, Ipv4Plug) {
-        self.clients.build(handle, subnet)
+        self.clients.build(handle, ipv4_range)
     }
 }
 

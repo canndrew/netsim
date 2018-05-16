@@ -42,23 +42,23 @@ impl Ipv6AddrExt for Ipv6Addr {
     }
 
     fn is_unicast_link_local(&self) -> bool {
-        let subnet = SubnetV6::new(Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 0), 10);
-        subnet.contains(*self)
+        let range = Ipv6Range::new(ipv6!("fe80::"), 10);
+        range.contains(*self)
     }
 
     fn is_unicast_site_local(&self) -> bool {
-        let subnet = SubnetV6::new(Ipv6Addr::new(0xfec0, 0, 0, 0, 0, 0, 0, 0), 10);
-        subnet.contains(*self)
+        let range = Ipv6Range::new(ipv6!("fec0::"), 10);
+        range.contains(*self)
     }
 
     fn is_unique_local(&self) -> bool {
-        let subnet = SubnetV6::new(Ipv6Addr::new(0xfc00, 0, 0, 0, 0, 0, 0, 0), 7);
-        subnet.contains(*self)
+        let range = Ipv6Range::new(ipv6!("fc00::"), 7);
+        range.contains(*self)
     }
 
     fn is_documentation(&self) -> bool {
-        let subnet = SubnetV6::new(Ipv6Addr::new(0x2001, 0x0db8, 0, 0, 0, 0, 0, 0), 32);
-        subnet.contains(*self)
+        let range = Ipv6Range::new(ipv6!("2001:0db8::"), 32);
+        range.contains(*self)
     }
 
     fn from_netmask_bits(bits: u8) -> Ipv6Addr {

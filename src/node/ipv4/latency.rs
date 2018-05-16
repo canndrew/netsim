@@ -33,9 +33,9 @@ where
     fn build(
         self,
         handle: &Handle,
-        subnet: SubnetV4,
+        ipv4_range: Ipv4Range,
     ) -> (SpawnComplete<N::Output>, Ipv4Plug) {
-        let (spawn_complete, plug) = self.node.build(handle, subnet);
+        let (spawn_complete, plug) = self.node.build(handle, ipv4_range);
         let plug = plug.with_latency(handle, self.min_latency, self.mean_additional_latency);
         (spawn_complete, plug)
     }

@@ -7,7 +7,7 @@ pub trait HubClients {
     type Output: Send + 'static;
 
     /// Build the set of nodes.
-    fn build(self, handle: &Handle, subnet: Option<SubnetV4>) -> (SpawnComplete<Self::Output>, EtherPlug);
+    fn build(self, handle: &Handle, ipv4_range: Option<Ipv4Range>) -> (SpawnComplete<Self::Output>, EtherPlug);
 }
 
 struct JoinAll<X, T> {
@@ -26,7 +26,7 @@ macro_rules! tuple_impl {
             fn build(
                 self,
                 handle: &Handle, 
-                subnet: Option<SubnetV4>,
+                ipv4_range: Option<Ipv4Range>,
             ) -> (SpawnComplete<Self::Output>, EtherPlug)
             {
                 #![allow(non_snake_case)]
@@ -36,16 +36,16 @@ macro_rules! tuple_impl {
 
                 let ($($ty,)*) = self;
                 let hub = HubBuilder::new();
-                let (hub, join_all) = if let Some(subnet) = subnet {
+                let (hub, join_all) = if let Some(ipv4_range) = ipv4_range {
                     let mut i = 0;
                     $(
                         let $ty = $ty;
                         i += 1;
                     )*
-                    let subnets = subnet.split(i);
+                    let ranges = ipv4_range.split(i);
                     let mut i = 0;
                     $(
-                        let ($ty, plug) = $ty.build(handle, Some(subnets[i]));
+                        let ($ty, plug) = $ty.build(handle, Some(ranges[i]));
                         let hub = hub.connect(plug);
                         i += 1;
                     )*
@@ -151,9 +151,9 @@ where
     fn build(
         self,
         handle: &Handle,
-        subnet: Option<SubnetV4>,
+        ipv4_range: Option<Ipv4Range>,
     ) -> (SpawnComplete<C::Output>, EtherPlug) {
-        self.clients.build(handle, subnet)
+        self.clients.build(handle, ipv4_range)
     }
 }
 

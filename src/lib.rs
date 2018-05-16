@@ -93,13 +93,13 @@
 //! use std::net::UdpSocket;
 //! use tokio_core::reactor::Core;
 //! use futures::{Future, Stream};
-//! use netsim::{spawn, SubnetV4};
+//! use netsim::{spawn, Ipv4Range};
 //! use netsim::wire::Ipv4Payload;
 //!
 //! let mut core = Core::new().unwrap();
 //! let handle = core.handle();
 //!
-//! let subnet = SubnetV4::local_10();
+//! let subnet = Ipv4Range::local_subnet_10();
 //! let (spawn_complete, plug) = spawn::on_subnet_v4(&handle, subnet, |ip_addr| {
 //!     let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 //!     socket.send_to(b"hello world", "10.1.2.3:4567").unwrap();
@@ -132,7 +132,7 @@
 //! 
 //! use std::net::UdpSocket;
 //! use tokio_core::reactor::Core;
-//! use netsim::{spawn, node, SubnetV4};
+//! use netsim::{spawn, node, Ipv4Range};
 //! 
 //! let mut core = Core::new().unwrap();
 //! let handle = core.handle();
@@ -153,7 +153,7 @@
 //! });
 //!
 //! let router_node = node::router_v4((node_a, node_b));
-//! let (spawn_complete, _plug) = spawn::network_v4(&handle, SubnetV4::global(), router_node);
+//! let (spawn_complete, _plug) = spawn::network_v4(&handle, Ipv4Range::global(), router_node);
 //! let (received, ()) = core.run(spawn_complete).unwrap();
 //! assert_eq!(&received[..], b"hello world");
 //! ```
@@ -240,7 +240,7 @@ mod sys;
 mod ioctl;
 mod async_fd;
 mod route;
-mod subnet;
+mod range;
 mod spawn_complete;
 mod process_handle;
 mod pcap;
@@ -253,7 +253,7 @@ pub mod spawn;
 #[cfg(test)]
 mod test;
 
-pub use subnet::{SubnetV4, SubnetV6, SubnetParseError};
+pub use range::{Ipv4Range, Ipv6Range, IpRangeParseError};
 pub use route::{RouteV4, RouteV6, AddRouteError};
 pub use spawn_complete::SpawnComplete;
 pub use pcap::Ipv4Log;

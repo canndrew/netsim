@@ -25,13 +25,13 @@ where
     fn build(
         self,
         handle: &Handle,
-        subnet: SubnetV4,
+        ipv4_range: Ipv4Range,
     ) -> (SpawnComplete<R>, Ipv4Plug) {
-        let address = subnet.random_client_addr();
+        let address = ipv4_range.random_client_addr();
         let iface = {
             IpIfaceBuilder::new()
-            .ipv4_addr(address, subnet.netmask_bits())
-            .ipv4_route(RouteV4::new(SubnetV4::global(), None))
+            .ipv4_addr(address, ipv4_range.netmask_prefix_length())
+            .ipv4_route(RouteV4::new(Ipv4Range::global(), None))
         };
         let (plug_a, plug_b) = IpPlug::new_pair();
 
@@ -69,11 +69,11 @@ mod test {
                 let remote_port = rand::random::<u16>() / 2 + 1000;
                 let remote_addr = SocketAddrV4::new(remote_ip, remote_port);
 
-                let subnet = SubnetV4::random_local();
+                let ipv4_range = Ipv4Range::random_local();
                 let (ipv4_addr_tx, ipv4_addr_rx) = std::sync::mpsc::channel();
                 let (spawn_complete, ipv4_plug) = spawn::network_v4(
                     &handle,
-                    subnet,
+                    ipv4_range,
                     node::ipv4::machine(move |ipv4_addr| {
                         unwrap!(ipv4_addr_tx.send(ipv4_addr));
                         let buffer_out = rand::random::<[u8; 8]>();
@@ -148,11 +148,11 @@ mod test {
                 let remote_port = rand::random::<u16>() / 2 + 1000;
                 let remote_addr = SocketAddrV4::new(remote_ip, remote_port);
 
-                let subnet = SubnetV4::random_local();
+                let ipv4_range = Ipv4Range::random_local();
                 let (ipv4_addr_tx, ipv4_addr_rx) = std::sync::mpsc::channel();
                 let (spawn_complete, ipv4_plug) = spawn::network_v4(
                     &handle,
-                    subnet,
+                    ipv4_range,
                     node::ipv4::machine(move |ipv4_addr| {
                         unwrap!(ipv4_addr_tx.send(ipv4_addr));
                         let buffer_out = rand::random::<[u8; 8]>();
@@ -420,11 +420,11 @@ mod test {
 
                 let client_ip = Ipv4Addr::random_global();
 
-                let subnet = SubnetV4::random_local();
+                let ipv4_range = Ipv4Range::random_local();
                 let (ipv4_addr_tx, ipv4_addr_rx) = std::sync::mpsc::channel();
                 let (spawn_complete, ipv4_plug) = spawn::network_v4(
                     &handle,
-                    subnet,
+                    ipv4_range,
                     node::ipv4::machine(move |ipv4_addr| {
                         unwrap!(ipv4_addr_tx.send(ipv4_addr));
                         unwrap!(done_rx.recv());
