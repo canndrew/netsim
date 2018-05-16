@@ -6,7 +6,42 @@ use libc;
 quick_error! {
     #[derive(Debug)]
     /// Errors raised when configuring network interfaces.
-    pub enum IfaceConfigError {
+    pub enum SetMacAddrError {
+        /// There is no interface with the given name
+        UnknownInterface {
+            description("there is no interface with the given name")
+        }
+        /// Process file descriptor limit hit
+        ProcessFileDescriptorLimit(e: io::Error) {
+            description("process file descriptor limit hit")
+            display("process file descriptor limit hit ({})", e)
+            cause(e)
+        }
+        /// System file descriptor limit hit
+        SystemFileDescriptorLimit(e: io::Error) {
+            description("system file descriptor limit hit")
+            display("system file descriptor limit hit ({})", e)
+            cause(e)
+        }
+        /// Permission denied
+        PermissionDenied(e: io::Error) {
+            description("permission denied")
+            display("permission denied: {}", e)
+            cause(e)
+        }
+        /// Address not available
+        AddrNotAvailable(e: io::Error) {
+            description("the address is invalid or already in use")
+            display("the address is invalid or already in use: {}", e)
+            cause(e)
+        }
+    }
+}
+
+quick_error! {
+    #[derive(Debug)]
+    /// Errors raised when configuring network interfaces.
+    pub enum GetMacAddrError {
         /// There is no interface with the given name
         UnknownInterface {
             description("there is no interface with the given name")
@@ -26,9 +61,115 @@ quick_error! {
     }
 }
 
-fn get_req(iface_name: &str) -> Result<sys::ifreq, IfaceConfigError> {
+quick_error! {
+    #[derive(Debug)]
+    /// Errors raised when configuring network interfaces.
+    pub enum SetIpv4AddrError {
+        /// There is no interface with the given name
+        UnknownInterface {
+            description("there is no interface with the given name")
+        }
+        /// Process file descriptor limit hit
+        ProcessFileDescriptorLimit(e: io::Error) {
+            description("process file descriptor limit hit")
+            display("process file descriptor limit hit ({})", e)
+            cause(e)
+        }
+        /// System file descriptor limit hit
+        SystemFileDescriptorLimit(e: io::Error) {
+            description("system file descriptor limit hit")
+            display("system file descriptor limit hit ({})", e)
+            cause(e)
+        }
+        /// Permission denied
+        PermissionDenied(e: io::Error) {
+            description("permission denied")
+            display("permission denied: {}", e)
+            cause(e)
+        }
+        /// Address not available
+        AddrNotAvailable(e: io::Error) {
+            description("the address is invalid or already in use")
+            display("the address is invalid or already in use: {}", e)
+            cause(e)
+        }
+    }
+}
+
+quick_error! {
+    #[derive(Debug)]
+    /// Errors raised when configuring network interfaces.
+    pub enum SetIpv6AddrError {
+        /// There is no interface with the given name
+        UnknownInterface {
+            description("there is no interface with the given name")
+        }
+        /// Process file descriptor limit hit
+        ProcessFileDescriptorLimit(e: io::Error) {
+            description("process file descriptor limit hit")
+            display("process file descriptor limit hit ({})", e)
+            cause(e)
+        }
+        /// System file descriptor limit hit
+        SystemFileDescriptorLimit(e: io::Error) {
+            description("system file descriptor limit hit")
+            display("system file descriptor limit hit ({})", e)
+            cause(e)
+        }
+        /// Permission denied
+        PermissionDenied(e: io::Error) {
+            description("permission denied")
+            display("permission denied: {}", e)
+            cause(e)
+        }
+        /// Address not available
+        AddrNotAvailable(e: io::Error) {
+            description("the address is invalid or already in use")
+            display("the address is invalid or already in use: {}", e)
+            cause(e)
+        }
+    }
+}
+
+quick_error! {
+    #[derive(Debug)]
+    /// Errors raised when configuring network interfaces.
+    pub enum PutUpError {
+        /// There is no interface with the given name
+        UnknownInterface {
+            description("there is no interface with the given name")
+        }
+        /// Process file descriptor limit hit
+        ProcessFileDescriptorLimit(e: io::Error) {
+            description("process file descriptor limit hit")
+            display("process file descriptor limit hit ({})", e)
+            cause(e)
+        }
+        /// System file descriptor limit hit
+        SystemFileDescriptorLimit(e: io::Error) {
+            description("system file descriptor limit hit")
+            display("system file descriptor limit hit ({})", e)
+            cause(e)
+        }
+        /// Permission denied
+        PermissionDenied(e: io::Error) {
+            description("permission denied")
+            display("permission denied: {}", e)
+            cause(e)
+        }
+    }
+}
+
+enum GetSocketError {
+    ProcessFileDescriptorLimit(io::Error),
+    SystemFileDescriptorLimit(io::Error),
+}
+
+struct UnknownInterface;
+
+fn get_req(iface_name: &str) -> Result<sys::ifreq, UnknownInterface> {
     if iface_name.len() > sys::IF_NAMESIZE as usize {
-        return Err(IfaceConfigError::UnknownInterface)
+        return Err(UnknownInterface);
     }
     unsafe {
         let mut req: sys::ifreq = mem::zeroed();
@@ -41,14 +182,14 @@ fn get_req(iface_name: &str) -> Result<sys::ifreq, IfaceConfigError> {
     }
 }
 
-fn get_socket() -> Result<c_int, IfaceConfigError> {
+fn get_socket() -> Result<c_int, GetSocketError> {
     unsafe {
         let fd = sys::socket(sys::AF_INET as i32, sys::__socket_type::SOCK_DGRAM as i32, 0);
         if fd < 0 {
             let os_err = io::Error::last_os_error();
             match sys::errno() as u32 {
-                sys::EMFILE => return Err(IfaceConfigError::ProcessFileDescriptorLimit(os_err)),
-                sys::ENFILE => return Err(IfaceConfigError::SystemFileDescriptorLimit(os_err)),
+                sys::EMFILE => return Err(GetSocketError::ProcessFileDescriptorLimit(os_err)),
+                sys::ENFILE => return Err(GetSocketError::SystemFileDescriptorLimit(os_err)),
                 _ => {
                     panic!("unexpected error when creating dummy socket: {}", os_err);
                 },
@@ -59,10 +200,19 @@ fn get_socket() -> Result<c_int, IfaceConfigError> {
 }
 
 /// Set an interface MAC address
-pub fn set_mac_addr(iface_name: &str, mac_addr: MacAddr) -> Result<(), IfaceConfigError> {
+pub fn set_mac_addr(iface_name: &str, mac_addr: MacAddr) -> Result<(), SetMacAddrError> {
     unsafe {
-        let mut req = get_req(iface_name)?;
-        let fd = get_socket()?;
+        let mut req = match get_req(iface_name) {
+            Ok(req) => req,
+            Err(UnknownInterface) => return Err(SetMacAddrError::UnknownInterface),
+        };
+        let fd = match get_socket() {
+            Ok(fd) => fd,
+            Err(GetSocketError::ProcessFileDescriptorLimit(e))
+                => return Err(SetMacAddrError::ProcessFileDescriptorLimit(e)),
+            Err(GetSocketError::SystemFileDescriptorLimit(e))
+                => return Err(SetMacAddrError::SystemFileDescriptorLimit(e)),
+        };
 
         let mac_addr = slice::from_raw_parts(
             mac_addr.as_bytes().as_ptr() as *const _,
@@ -78,7 +228,15 @@ pub fn set_mac_addr(iface_name: &str, mac_addr: MacAddr) -> Result<(), IfaceConf
 
         if ioctl::siocsifhwaddr(fd, &req) < 0 {
             let _ = sys::close(fd);
-            panic!("unexpected error from SIOCSIFHWADDR ioctl: {}", io::Error::last_os_error());
+            let os_err = io::Error::last_os_error();
+            match sys::errno() as u32 {
+                sys::ENODEV => return Err(SetMacAddrError::UnknownInterface),
+                sys::EPERM => return Err(SetMacAddrError::PermissionDenied(os_err)),
+                sys::EADDRNOTAVAIL => return Err(SetMacAddrError::AddrNotAvailable(os_err)),
+                _ => {
+                    panic!("unexpected error from SIOCSIFHWADDR ioctl: {}", os_err);
+                }
+            }
         }
 
         let _ = sys::close(fd);
@@ -88,14 +246,29 @@ pub fn set_mac_addr(iface_name: &str, mac_addr: MacAddr) -> Result<(), IfaceConf
 }
 
 /// Get an interface MAC address
-pub fn get_mac_addr(iface_name: &str) -> Result<MacAddr, IfaceConfigError> {
+pub fn get_mac_addr(iface_name: &str) -> Result<MacAddr, GetMacAddrError> {
     unsafe {
-        let mut req = get_req(iface_name)?;
-        let fd = get_socket()?;
+        let mut req = match get_req(iface_name) {
+            Ok(req) => req,
+            Err(UnknownInterface) => return Err(GetMacAddrError::UnknownInterface),
+        };
+        let fd = match get_socket() {
+            Ok(fd) => fd,
+            Err(GetSocketError::ProcessFileDescriptorLimit(e))
+                => return Err(GetMacAddrError::ProcessFileDescriptorLimit(e)),
+            Err(GetSocketError::SystemFileDescriptorLimit(e))
+                => return Err(GetMacAddrError::SystemFileDescriptorLimit(e)),
+        };
 
         if ioctl::siocgifhwaddr(fd, &mut req) < 0 {
             let _ = sys::close(fd);
-            panic!("unexpected error from SIOCGIFHWADDR ioctl: {}", io::Error::last_os_error());
+            let os_err = io::Error::last_os_error();
+            match sys::errno() as u32 {
+                sys::ENODEV => return Err(GetMacAddrError::UnknownInterface),
+                _ => {
+                    panic!("unexpected error from SIOCGIFHWADDR ioctl: {}", os_err);
+                }
+            }
         }
 
         let mac_addr = {
@@ -122,11 +295,20 @@ pub fn set_ipv4_addr(
     iface_name: &str,
     ipv4_addr: Ipv4Addr,
     netmask_bits: u8,
-) -> Result<(), IfaceConfigError> {
+) -> Result<(), SetIpv4AddrError> {
     let netmask = Ipv4Addr::from_netmask_bits(netmask_bits);
     unsafe {
-        let mut req = get_req(iface_name)?;
-        let fd = get_socket()?;
+        let mut req = match get_req(iface_name) {
+            Ok(req) => req,
+            Err(UnknownInterface) => return Err(SetIpv4AddrError::UnknownInterface),
+        };
+        let fd = match get_socket() {
+            Ok(fd) => fd,
+            Err(GetSocketError::ProcessFileDescriptorLimit(e))
+                => return Err(SetIpv4AddrError::ProcessFileDescriptorLimit(e)),
+            Err(GetSocketError::SystemFileDescriptorLimit(e))
+                => return Err(SetIpv4AddrError::SystemFileDescriptorLimit(e)),
+        };
 
         {
             let addr = &mut req.ifr_ifru.ifru_addr;
@@ -143,7 +325,15 @@ pub fn set_ipv4_addr(
             // TODO: what errors occur if we
             //  (a) pick an invalid IP.
             //  (b) pick an IP already in use
-            panic!("unexpected error from SIOCSIFADDR ioctl: {}", io::Error::last_os_error());
+            let os_err = io::Error::last_os_error();
+            match sys::errno() as u32 {
+                sys::ENODEV => return Err(SetIpv4AddrError::UnknownInterface),
+                sys::EPERM => return Err(SetIpv4AddrError::PermissionDenied(os_err)),
+                sys::EADDRNOTAVAIL => return Err(SetIpv4AddrError::AddrNotAvailable(os_err)),
+                _ => {
+                    panic!("unexpected error from SIOCSIFADDR ioctl: {}", os_err);
+                },
+            }
         }
 
         {
@@ -158,8 +348,14 @@ pub fn set_ipv4_addr(
 
         if ioctl::siocsifnetmask(fd, &req) < 0 {
             let _ = sys::close(fd);
-            // TODO: what error occurs if we try to use an invalid netmask?
-            panic!("unexpected error from SIOCSIFNETMASK ioctl: {}", io::Error::last_os_error());
+            let os_err = io::Error::last_os_error();
+            match sys::errno() as u32 {
+                sys::ENODEV => return Err(SetIpv4AddrError::UnknownInterface),
+                sys::EADDRNOTAVAIL => return Err(SetIpv4AddrError::AddrNotAvailable(os_err)),
+                _ => {
+                    panic!("unexpected error from SIOCSIFNETMASK ioctl: {}", os_err);
+                },
+            }
         }
         let _ = sys::close(fd);
     }
@@ -172,14 +368,29 @@ pub fn set_ipv6_addr(
     iface_name: &str,
     ipv6_addr: Ipv6Addr,
     netmask_bits: u8,
-) -> Result<(), IfaceConfigError> {
+) -> Result<(), SetIpv6AddrError> {
     unsafe {
-        let mut req = get_req(iface_name)?;
-        let fd = get_socket()?;
+        let mut req = match get_req(iface_name) {
+            Ok(req) => req,
+            Err(UnknownInterface) => return Err(SetIpv6AddrError::UnknownInterface),
+        };
+        let fd = match get_socket() {
+            Ok(fd) => fd,
+            Err(GetSocketError::ProcessFileDescriptorLimit(e))
+                => return Err(SetIpv6AddrError::ProcessFileDescriptorLimit(e)),
+            Err(GetSocketError::SystemFileDescriptorLimit(e))
+                => return Err(SetIpv6AddrError::SystemFileDescriptorLimit(e)),
+        };
 
         if ioctl::siocgifindex(fd, &mut req) < 0 {
             let _ = sys::close(fd);
-            panic!("unexpected error from SIOGIFINDEX ioctl: {}", io::Error::last_os_error());
+            let os_err = io::Error::last_os_error();
+            match sys::errno() as u32 {
+                sys::ENODEV => return Err(SetIpv6AddrError::UnknownInterface),
+                _ => {
+                    panic!("unexpected error from SIOGIFINDEX ioctl: {}", os_err);
+                },
+            };
         }
         let index = req.ifr_ifru.ifru_ivalue as u32;
 
@@ -187,8 +398,8 @@ pub fn set_ipv6_addr(
         if netlink < 0 {
             let os_err = io::Error::last_os_error();
             match sys::errno() as u32 {
-                sys::EMFILE => return Err(IfaceConfigError::ProcessFileDescriptorLimit(os_err)),
-                sys::ENFILE => return Err(IfaceConfigError::SystemFileDescriptorLimit(os_err)),
+                sys::EMFILE => return Err(SetIpv6AddrError::ProcessFileDescriptorLimit(os_err)),
+                sys::ENFILE => return Err(SetIpv6AddrError::SystemFileDescriptorLimit(os_err)),
                 _ => {
                     panic!("unexpected error when creating netlink socket: {}", os_err);
                 },
@@ -291,7 +502,21 @@ pub fn set_ipv6_addr(
                     buffer.as_ptr().offset(error_start as isize) as *const _
                 };
                 let nlmsgerr: &sys::nlmsgerr = &*nlmsgerr;
-                assert_eq!(nlmsgerr.error, 0);
+                if nlmsgerr.error != 0 {
+                    let os_err = io::Error::from_raw_os_error(-nlmsgerr.error);
+                    match (-nlmsgerr.error) as u32 {
+                        sys::EPERM
+                            => return Err(SetIpv6AddrError::PermissionDenied(os_err)),
+                        sys::EADDRNOTAVAIL
+                            => return Err(SetIpv6AddrError::AddrNotAvailable(os_err)),
+                        _ => {
+                            panic!(
+                                "unexpected error from netlink when setting IPv6 address: {}",
+                                os_err,
+                            );
+                        }
+                    }
+                }
             }
 
             break;
@@ -305,25 +530,132 @@ pub fn set_ipv6_addr(
 }
 
 /// Put an interface up.
-pub fn put_up(iface_name: &str) -> Result<(), IfaceConfigError> {
+pub fn put_up(iface_name: &str) -> Result<(), PutUpError> {
     unsafe {
-        let mut req = get_req(iface_name)?;
-        let fd = get_socket()?;
+        let mut req = match get_req(iface_name) {
+            Ok(req) => req,
+            Err(UnknownInterface) => return Err(PutUpError::UnknownInterface),
+        };
+        let fd = match get_socket() {
+            Ok(fd) => fd,
+            Err(GetSocketError::ProcessFileDescriptorLimit(e))
+                => return Err(PutUpError::ProcessFileDescriptorLimit(e)),
+            Err(GetSocketError::SystemFileDescriptorLimit(e))
+                => return Err(PutUpError::SystemFileDescriptorLimit(e)),
+        };
 
         if ioctl::siocgifflags(fd, &mut req) < 0 {
             let _ = sys::close(fd);
-            panic!("unexpected error from SIOCGIFFLAGS ioctl: {}", io::Error::last_os_error());
+            let os_err = io::Error::last_os_error();
+            match sys::errno() as u32 {
+                sys::ENODEV => return Err(PutUpError::UnknownInterface),
+                _ => {
+                    panic!("unexpected error from SIOCGIFFLAGS ioctl: {}", os_err);
+                },
+            };
         }
 
         req.ifr_ifru.ifru_flags |= (sys::IFF_UP as u32 | sys::IFF_RUNNING as u32) as i16;
 
         if ioctl::siocsifflags(fd, &req) < 0 {
             let _ = sys::close(fd);
-            panic!("unexpected error from SIOCSIFFLAGS ioctl: {}", io::Error::last_os_error());
+            let os_err = io::Error::last_os_error();
+            match sys::errno() as u32 {
+                sys::ENODEV => return Err(PutUpError::UnknownInterface),
+                sys::EPERM => return Err(PutUpError::PermissionDenied(os_err)),
+                _ => {
+                    panic!("unexpected error from SIOCSIFFLAGS ioctl: {}", os_err);
+                },
+            }
         }
         let _ = sys::close(fd);
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use rand;
+    use spawn;
+    use capabilities;
+
+    #[test]
+    fn configure_tap() {
+        run_test(1, || {
+            let spawn_complete = spawn::new_namespace(|| {
+                let name = format!("foo{:x}", rand::random::<u32>());
+
+                match set_mac_addr(&name, MacAddr::random()) {
+                    Err(SetMacAddrError::UnknownInterface) => (),
+                    res => panic!("unexpected result: {:?}", res),
+                };
+                match get_mac_addr(&name) {
+                    Err(GetMacAddrError::UnknownInterface) => (),
+                    res => panic!("unexpected result: {:?}", res),
+                };
+                match set_ipv4_addr(&name, Ipv4Addr::random_global(), 3) {
+                    Err(SetIpv4AddrError::UnknownInterface) => (),
+                    res => panic!("unexpected result: {:?}", res),
+                };
+                match set_ipv6_addr(&name, Ipv6Addr::random_global(), 3) {
+                    Err(SetIpv6AddrError::UnknownInterface) => (),
+                    res => panic!("unexpected result: {:?}", res),
+                };
+
+                let tap_builder = {
+                    EtherIfaceBuilder::new()
+                    .ipv4_addr(Ipv4Addr::random_global(), 0)
+                    .ipv6_addr(Ipv6Addr::random_global(), 0)
+                    .name(name.clone())
+                };
+                let tap = unwrap!(tap_builder.build_unbound());
+
+                let mac_addr_0 = MacAddr::random();
+                unwrap!(set_mac_addr(&name, mac_addr_0));
+                let mac_addr_1 = unwrap!(get_mac_addr(&name));
+                assert_eq!(mac_addr_0, mac_addr_1);
+
+                unwrap!(set_ipv4_addr(&name, Ipv4Addr::random_global(), 3));
+                unwrap!(set_ipv6_addr(&name, Ipv6Addr::random_global(), 3));
+
+                match set_mac_addr(&name, MacAddr::from_bytes(&[0, 0, 0, 0, 0, 0])) {
+                    Err(SetMacAddrError::AddrNotAvailable(..)) => (),
+                    res => panic!("unexpected result: {:?}", res),
+                };
+                match set_ipv4_addr(&name, ipv4!("0.0.0.0"), 0) {
+                    Err(SetIpv4AddrError::AddrNotAvailable(..)) => (),
+                    res => panic!("unexpected result: {:?}", res),
+                };
+                match set_ipv6_addr(&name, ipv6!("::"), 0) {
+                    Err(SetIpv6AddrError::AddrNotAvailable(..)) => (),
+                    res => panic!("unexpected result: {:?}", res),
+                };
+
+                unwrap!(unwrap!(capabilities::Capabilities::new()).apply());
+
+                match set_mac_addr(&name, MacAddr::random()) {
+                    Err(SetMacAddrError::PermissionDenied(..)) => (),
+                    res => panic!("unexpected result: {:?}", res),
+                };
+                let mac_addr_1 = unwrap!(get_mac_addr(&name));
+                assert_eq!(mac_addr_0, mac_addr_1);
+
+                match set_ipv4_addr(&name, Ipv4Addr::random_global(), 3) {
+                    Err(SetIpv4AddrError::PermissionDenied(..)) => (),
+                    res => panic!("unexpected result: {:?}", res),
+                };
+                match set_ipv6_addr(&name, Ipv6Addr::random_global(), 3) {
+                    Err(SetIpv6AddrError::PermissionDenied(..)) => (),
+                    res => panic!("unexpected result: {:?}", res),
+                };
+
+                drop(tap);
+            });
+            let mut core = unwrap!(Core::new());
+            unwrap!(core.run(spawn_complete))
+        })
+    }
 }
 

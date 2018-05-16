@@ -52,24 +52,19 @@ quick_error! {
         InterfaceAlreadyExists {
             description("an interface with the given name already exists")
         }
-        SetInterfaceAddress(ip: Ipv4Addr, e: io::Error) {
-            description("failed to set interface address")
-            display("failed to set interface address: {}", e)
+        MacAddrNotAvailable(e: io::Error) {
+            description("the requested MAC address is invalid or already in use")
+            display("the requested MAC address is invalid or already in use: {}", e)
             cause(e)
         }
-        SetInterfaceNetmask(netmask: Ipv4Addr, e: io::Error) {
-            description("failed to set interface netmask")
-            display("failed to set interface netmask: {}", e)
+        Ipv4AddrNotAvailable(e: io::Error) {
+            description("the requested IPv4 address is invalid or already in use")
+            display("the requested IPv4 address is invalid or already in use: {}", e)
             cause(e)
         }
-        GetInterfaceFlags(e: io::Error) {
-            description("failed to get newly created interface's flags")
-            display("failed to get newly created interface's flags: {}", e)
-            cause(e)
-        }
-        SetInterfaceFlags(e: io::Error) {
-            description("failed to set newly created interface's flags")
-            display("failed to set newly created interface's flags: {}", e)
+        Ipv6AddrNotAvailable(e: io::Error) {
+            description("the requested IPv6 address is invalid or already in use")
+            display("the requested IPv6 address is invalid or already in use: {}", e)
             cause(e)
         }
     }
@@ -174,11 +169,15 @@ pub fn build(builder: IfaceBuilder, mac_addr: Option<MacAddr>) -> Result<AsyncFd
     if let Some(mac_addr) = mac_addr {
         match iface::set_mac_addr(&real_name, mac_addr) {
             Ok(()) => (),
-            Err(IfaceConfigError::UnknownInterface)
+            Err(SetMacAddrError::UnknownInterface)
                 => panic!("the interface we just created doesn't exist?"),
-            Err(IfaceConfigError::ProcessFileDescriptorLimit(e))
+            Err(SetMacAddrError::PermissionDenied(..))
+                => panic!("don't have permission to configure the interface we just created?"),
+            Err(SetMacAddrError::AddrNotAvailable(e))
+                => return Err(IfaceBuildError::MacAddrNotAvailable(e)),
+            Err(SetMacAddrError::ProcessFileDescriptorLimit(e))
                 => return Err(IfaceBuildError::ProcessFileDescriptorLimit(e)),
-            Err(IfaceConfigError::SystemFileDescriptorLimit(e))
+            Err(SetMacAddrError::SystemFileDescriptorLimit(e))
                 => return Err(IfaceBuildError::SystemFileDescriptorLimit(e)),
         }
     }
@@ -186,11 +185,15 @@ pub fn build(builder: IfaceBuilder, mac_addr: Option<MacAddr>) -> Result<AsyncFd
     if let Some((ipv4_addr, ipv4_netmask_bits)) = builder.ipv4_addr {
         match iface::set_ipv4_addr(&real_name, ipv4_addr, ipv4_netmask_bits) {
             Ok(()) => (),
-            Err(IfaceConfigError::UnknownInterface)
+            Err(SetIpv4AddrError::UnknownInterface)
                 => panic!("the interface we just created doesn't exist?"),
-            Err(IfaceConfigError::ProcessFileDescriptorLimit(e))
+            Err(SetIpv4AddrError::PermissionDenied(..))
+                => panic!("don't have permission to configure the interface we just created?"),
+            Err(SetIpv4AddrError::AddrNotAvailable(e))
+                => return Err(IfaceBuildError::Ipv4AddrNotAvailable(e)),
+            Err(SetIpv4AddrError::ProcessFileDescriptorLimit(e))
                 => return Err(IfaceBuildError::ProcessFileDescriptorLimit(e)),
-            Err(IfaceConfigError::SystemFileDescriptorLimit(e))
+            Err(SetIpv4AddrError::SystemFileDescriptorLimit(e))
                 => return Err(IfaceBuildError::SystemFileDescriptorLimit(e)),
         }
     }
@@ -198,22 +201,28 @@ pub fn build(builder: IfaceBuilder, mac_addr: Option<MacAddr>) -> Result<AsyncFd
     if let Some((ipv6_addr, ipv6_netmask_bits)) = builder.ipv6_addr {
         match iface::set_ipv6_addr(&real_name, ipv6_addr, ipv6_netmask_bits) {
             Ok(()) => (),
-            Err(IfaceConfigError::UnknownInterface)
+            Err(SetIpv6AddrError::UnknownInterface)
                 => panic!("the interface we just created doesn't exist?"),
-            Err(IfaceConfigError::ProcessFileDescriptorLimit(e))
+            Err(SetIpv6AddrError::PermissionDenied(..))
+                => panic!("don't have permission to configure the interface we just created?"),
+            Err(SetIpv6AddrError::AddrNotAvailable(e))
+                => return Err(IfaceBuildError::Ipv6AddrNotAvailable(e)),
+            Err(SetIpv6AddrError::ProcessFileDescriptorLimit(e))
                 => return Err(IfaceBuildError::ProcessFileDescriptorLimit(e)),
-            Err(IfaceConfigError::SystemFileDescriptorLimit(e))
+            Err(SetIpv6AddrError::SystemFileDescriptorLimit(e))
                 => return Err(IfaceBuildError::SystemFileDescriptorLimit(e)),
         }
     }
 
     match iface::put_up(&real_name) {
         Ok(()) => (),
-        Err(IfaceConfigError::UnknownInterface)
+        Err(PutUpError::UnknownInterface)
             => panic!("the interface we just created doesn't exist?"),
-        Err(IfaceConfigError::ProcessFileDescriptorLimit(e))
+        Err(PutUpError::PermissionDenied(..))
+            => panic!("don't have permission to configure the interface we just created?"),
+        Err(PutUpError::ProcessFileDescriptorLimit(e))
             => return Err(IfaceBuildError::ProcessFileDescriptorLimit(e)),
-        Err(IfaceConfigError::SystemFileDescriptorLimit(e))
+        Err(PutUpError::SystemFileDescriptorLimit(e))
             => return Err(IfaceBuildError::SystemFileDescriptorLimit(e)),
     }
 
