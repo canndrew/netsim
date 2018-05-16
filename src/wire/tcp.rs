@@ -26,7 +26,7 @@ impl fmt::Debug for TcpPacket {
 
                 let mut written = false;
                 for &(mask, name) in &[
-                    (0x0010, "FIN"),
+                    (0x0001, "FIN"),
                     (0x0002, "SYN"),
                     (0x0004, "RST"),
                     (0x0008, "PSH"),
@@ -222,7 +222,8 @@ fn set_fields(buffer: &mut [u8], fields: &TcpFields) {
 }
 
 fn set_fields_v4(buffer: &mut [u8], fields: &TcpFields, source_ip: Ipv4Addr, dest_ip: Ipv4Addr) {
-    set_fields(buffer, fields);
+    let header_len = fields.header_len();
+    set_fields(&mut buffer[..header_len], fields);
 
     let checksum = !checksum::combine(&[
         checksum::pseudo_header_ipv4(
@@ -237,7 +238,8 @@ fn set_fields_v4(buffer: &mut [u8], fields: &TcpFields, source_ip: Ipv4Addr, des
 }
 
 fn set_fields_v6(buffer: &mut [u8], fields: &TcpFields, source_ip: Ipv6Addr, dest_ip: Ipv6Addr) {
-    set_fields(buffer, fields);
+    let header_len = fields.header_len();
+    set_fields(&mut buffer[..header_len], fields);
 
     let checksum = !checksum::combine(&[
         checksum::pseudo_header_ipv6(
@@ -548,7 +550,7 @@ impl TcpPacket {
     ) -> bool {
         let len = self.buffer.len();
         !0 == checksum::combine(&[
-            checksum::pseudo_header_ipv4(source_ip, dest_ip, 17, len as u32),
+            checksum::pseudo_header_ipv4(source_ip, dest_ip, 6, len as u32),
             checksum::data(&self.buffer[..]),
         ])
     }
@@ -562,7 +564,7 @@ impl TcpPacket {
     ) -> bool {
         let len = self.buffer.len();
         !0 == checksum::combine(&[
-            checksum::pseudo_header_ipv6(source_ip, dest_ip, 17, len as u32),
+            checksum::pseudo_header_ipv6(source_ip, dest_ip, 6, len as u32),
             checksum::data(&self.buffer[..]),
         ])
     }
