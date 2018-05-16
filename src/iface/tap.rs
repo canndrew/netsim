@@ -263,9 +263,8 @@ mod test {
                             found_v6 = true;
                         },
                     }
-
-                    assert!(found_v4 && found_v6);
                 }
+                assert!(found_v4 && found_v6);
 
                 drop(tap);
             });

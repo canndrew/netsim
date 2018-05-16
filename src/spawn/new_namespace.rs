@@ -189,7 +189,6 @@ mod test {
         })
     }
 
-    /*
     #[test]
     #[should_panic]
     fn failing_tests_fail() {
@@ -201,6 +200,5 @@ mod test {
             unwrap!(core.run(spawn_complete));
         })
     }
-    */
 }
 
