@@ -5,8 +5,8 @@ pub struct MachineNode<F> {
     func: F,
 }
 
-/// Create a node for an Ipv4 machine. This node will run the given function in a network
-/// namespace with a single interface.
+/// Create a node for a machine with an ethernet interface. This node will run the given function
+/// in a network namespace with a single interface.
 pub fn machine<R, F>(func: F) -> MachineNode<F>
 where
     R: Send + 'static,
