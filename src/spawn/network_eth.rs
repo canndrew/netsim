@@ -5,8 +5,9 @@ use priv_prelude::*;
 pub fn network_eth<N: EtherNode>(
     handle: &Handle,
     ipv4_range: Option<Ipv4Range>,
+    ipv6_range: Option<Ipv6Range>,
     node: N,
 ) -> (SpawnComplete<N::Output>, EtherPlug) {
-    node.build(handle, ipv4_range)
+    node.build(handle, ipv4_range, ipv6_range)
 }
 

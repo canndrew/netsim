@@ -108,7 +108,7 @@ impl Ipv4Range {
     /// Get a random IP address from the range which is not the base address or the default
     /// for the gateway address.
     pub fn random_client_addr(&self) -> Ipv4Addr {
-        let mask = 0xffff_ffff >> self.bits;
+        let mask = !0 >> self.bits;
         assert!(mask > 1);
         let class = if self.bits == 0 {
             Ipv4AddrClass::Global

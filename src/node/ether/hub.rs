@@ -7,7 +7,12 @@ pub trait HubClients {
     type Output: Send + 'static;
 
     /// Build the set of nodes.
-    fn build(self, handle: &Handle, ipv4_range: Option<Ipv4Range>) -> (SpawnComplete<Self::Output>, EtherPlug);
+    fn build(
+        self,
+        handle: &Handle,
+        ipv4_range: Option<Ipv4Range>,
+        ipv6_range: Option<Ipv6Range>,
+    ) -> (SpawnComplete<Self::Output>, EtherPlug);
 }
 
 struct JoinAll<X, T> {
@@ -27,6 +32,7 @@ macro_rules! tuple_impl {
                 self,
                 handle: &Handle, 
                 ipv4_range: Option<Ipv4Range>,
+                ipv6_range: Option<Ipv6Range>,
             ) -> (SpawnComplete<Self::Output>, EtherPlug)
             {
                 #![allow(non_snake_case)]
@@ -36,25 +42,23 @@ macro_rules! tuple_impl {
 
                 let ($($ty,)*) = self;
                 let hub = HubBuilder::new();
-                let (hub, join_all) = if let Some(ipv4_range) = ipv4_range {
+                let (hub, join_all) = {
                     let mut i = 0;
                     $(
                         let $ty = $ty;
                         i += 1;
                     )*
-                    let ranges = ipv4_range.split(i);
+                    let ipv4_ranges = ipv4_range.map(|range| range.split(i));
+                    let ipv6_ranges = ipv6_range.map(|range| range.split(i));
                     let mut i = 0;
                     $(
-                        let ($ty, plug) = $ty.build(handle, Some(ranges[i]));
+                        let ($ty, plug) = $ty.build(
+                            handle,
+                            ipv4_ranges.as_ref().map(|v| v[i]),
+                            ipv6_ranges.as_ref().map(|v| v[i]),
+                        );
                         let hub = hub.connect(plug);
                         i += 1;
-                    )*
-                    let join_all = JoinAll { phantoms: PhantomData::<($($ty,)*)>, children: ($(($ty, None),)*) };
-                    (hub, join_all)
-                } else {
-                    $(
-                        let ($ty, plug) = $ty.build(handle, None);
-                        let hub = hub.connect(plug);
                     )*
                     let join_all = JoinAll { phantoms: PhantomData::<($($ty,)*)>, children: ($(($ty, None),)*) };
                     (hub, join_all)
@@ -152,8 +156,9 @@ where
         self,
         handle: &Handle,
         ipv4_range: Option<Ipv4Range>,
+        ipv6_range: Option<Ipv6Range>,
     ) -> (SpawnComplete<C::Output>, EtherPlug) {
-        self.clients.build(handle, ipv4_range)
+        self.clients.build(handle, ipv4_range, ipv6_range)
     }
 }
 

@@ -69,7 +69,7 @@ mod test {
                 let remote_port = rand::random::<u16>() / 2 + 1000;
                 let remote_addr = SocketAddrV4::new(remote_ip, remote_port);
 
-                let ipv4_range = Ipv4Range::random_local();
+                let ipv4_range = Ipv4Range::random_local_subnet();
                 let (ipv4_addr_tx, ipv4_addr_rx) = std::sync::mpsc::channel();
                 let (spawn_complete, ipv4_plug) = spawn::network_v4(
                     &handle,
@@ -148,7 +148,7 @@ mod test {
                 let remote_port = rand::random::<u16>() / 2 + 1000;
                 let remote_addr = SocketAddrV4::new(remote_ip, remote_port);
 
-                let ipv4_range = Ipv4Range::random_local();
+                let ipv4_range = Ipv4Range::random_local_subnet();
                 let (ipv4_addr_tx, ipv4_addr_rx) = std::sync::mpsc::channel();
                 let (spawn_complete, ipv4_plug) = spawn::network_v4(
                     &handle,
@@ -420,7 +420,7 @@ mod test {
 
                 let client_ip = Ipv4Addr::random_global();
 
-                let ipv4_range = Ipv4Range::random_local();
+                let ipv4_range = Ipv4Range::random_local_subnet();
                 let (ipv4_addr_tx, ipv4_addr_rx) = std::sync::mpsc::channel();
                 let (spawn_complete, ipv4_plug) = spawn::network_v4(
                     &handle,

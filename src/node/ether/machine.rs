@@ -10,7 +10,7 @@ pub struct MachineNode<F> {
 pub fn machine<R, F>(func: F) -> MachineNode<F>
 where
     R: Send + 'static,
-    F: FnOnce(MacAddr, Option<Ipv4Addr>) -> R + Send + 'static,
+    F: FnOnce(MacAddr, Option<Ipv4Addr>, Option<Ipv6Addr>) -> R + Send + 'static,
 {
     MachineNode { func }
 }
@@ -18,7 +18,7 @@ where
 impl<R, F> EtherNode for MachineNode<F>
 where
     R: Send + 'static,
-    F: FnOnce(MacAddr, Option<Ipv4Addr>) -> R + Send + 'static,
+    F: FnOnce(MacAddr, Option<Ipv4Addr>, Option<Ipv6Addr>) -> R + Send + 'static,
 {
     type Output = R;
 
@@ -26,6 +26,7 @@ where
         self,
         handle: &Handle,
         ipv4_range: Option<Ipv4Range>,
+        ipv6_range: Option<Ipv6Range>,
     ) -> (SpawnComplete<R>, EtherPlug) {
         let mac_addr = MacAddr::random();
         let mut iface = {
@@ -42,20 +43,26 @@ where
                 };
                 Some(address)
             },
-            None => {
+            None => None,
+        };
+        let ipv6_addr = match ipv6_range {
+            Some(range) => {
+                let address = range.random_client_addr();
                 iface = {
                     iface
-                    .route(RouteV4::new(Ipv4Range::global(), None))
+                    .ipv6_addr(address, range.netmask_prefix_length())
+                    .ipv6_route(RouteV6::new(Ipv6Range::global(), range.next_hop_ip()))
                 };
-                None
+                Some(address)
             },
+            None => None,
         };
         let (plug_a, plug_b) = EtherPlug::new_pair();
 
         let spawn_complete = {
             MachineBuilder::new()
             .add_ether_iface(iface, plug_b)
-            .spawn(handle, move || (self.func)(mac_addr, ipv4_addr))
+            .spawn(handle, move || (self.func)(mac_addr, ipv4_addr, ipv6_addr))
         };
 
         (spawn_complete, plug_a)
@@ -72,7 +79,7 @@ mod test {
     use node;
 
     #[test]
-    fn one_interface_send_udp() {
+    fn one_interface_send_udp_ipv4() {
         run_test(3, || {
             let mut core = unwrap!(Core::new());
             let handle = core.handle();
@@ -83,14 +90,15 @@ mod test {
                 let target_port = rand::random::<u16>() / 2 + 1000;
                 let target_addr = SocketAddrV4::new(target_ip, target_port);
 
-                let range = Ipv4Range::random_local();
+                let range = Ipv4Range::random_local_subnet();
                 let gateway_ip = range.gateway_ip();
 
                 let (ipv4_addr_tx, ipv4_addr_rx) = std::sync::mpsc::channel();
                 let (spawn_complete, plug) = spawn::network_eth(
                     &handle,
                     Some(range),
-                    node::ether::machine(move |_mac_addr, ipv4_addr_opt| {
+                    None,
+                    node::ether::machine(move |_mac_addr, ipv4_addr_opt, _ipv6_addr_opt| {
                         let ipv4_addr = unwrap!(ipv4_addr_opt);
                         unwrap!(ipv4_addr_tx.send(ipv4_addr));
 

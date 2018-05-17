@@ -70,12 +70,6 @@ impl EtherIfaceBuilder {
         self
     }
 
-    /// Add a route to the set of routes that will be created and directed through this interface.
-    pub fn route(mut self, route: RouteV4) -> Self {
-        self.builder.ipv4_routes.push(route);
-        self
-    }
-
     /// Consume this `EtherIfaceBuilder` and build a `UnboundEtherIface`. This creates the TAP device but does not
     /// bind it to a tokio event loop. This is useful if the event loop lives in a different thread
     /// to where you need to create the device. You can send a `UnboundEtherIface` to another thread then

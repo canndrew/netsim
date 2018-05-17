@@ -19,6 +19,7 @@ pub trait EtherNode: Sized {
         self,
         handle: &Handle,
         ipv4_range: Option<Ipv4Range>,
+        ipv6_range: Option<Ipv6Range>,
     ) -> (SpawnComplete<Self::Output>, EtherPlug);
 }
 

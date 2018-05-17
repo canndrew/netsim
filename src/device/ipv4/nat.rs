@@ -602,7 +602,7 @@ fn test() {
             let (public_plug_0, public_plug_1) = Ipv4Plug::new_pair();
             let (private_plug_0, private_plug_1) = Ipv4Plug::new_pair();
             let public_ip = Ipv4Addr::random_global();
-            let subnet = Ipv4Range::random_local();
+            let subnet = Ipv4Range::random_local_subnet();
 
             NatV4::spawn(&handle, public_plug_0, private_plug_0, public_ip, subnet);
 
@@ -709,7 +709,7 @@ fn test_port_restriction() {
     let mut restricted = PortMap::default();
     restricted.allowed_endpoints = Some(HashMap::new());
 
-    let subnet = Ipv4Range::random_local();
+    let subnet = Ipv4Range::random_local_subnet();
     let internal_addr = SocketAddrV4::new(subnet.random_client_addr(), rand::random());
     let remote_addr = SocketAddrV4::new(Ipv4Addr::random_global(), rand::random());
     let unknown_addr = SocketAddrV4::new(Ipv4Addr::random_global(), rand::random());
@@ -733,7 +733,7 @@ fn test_symmetric_map() {
     let mut symmetric = PortMap::default();
     symmetric.symmetric_map = Some(SymmetricMap::default());
 
-    let subnet = Ipv4Range::random_local();
+    let subnet = Ipv4Range::random_local_subnet();
     let internal_addr = SocketAddrV4::new(subnet.random_client_addr(), rand::random());
     let remote_addr_0 = SocketAddrV4::new(Ipv4Addr::random_global(), rand::random());
     let remote_addr_1 = SocketAddrV4::new(Ipv4Addr::random_global(), rand::random());
