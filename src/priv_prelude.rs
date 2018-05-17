@@ -38,7 +38,7 @@ pub use iface::{SetMacAddrError, GetMacAddrError, SetIpv4AddrError, SetIpv6AddrE
 pub use device::ipv4::{EtherAdaptorV4, NatV4Builder, LatencyV4, HopV4, RouterV4Builder, PacketLossV4};
 pub use device::ether::{HubBuilder, Hub};
 pub use device::MachineBuilder;
-pub use node::{Ipv4Node, EtherNode};
+pub use node::{IpNode, Ipv4Node, Ipv6Node, EtherNode};
 pub use spawn_complete::SpawnComplete;
 pub use process_handle::ProcessHandle;
 pub use plug::{Latency, PacketLoss, Plug};

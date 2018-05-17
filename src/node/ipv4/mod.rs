@@ -16,16 +16,16 @@ pub use self::packet_loss::{packet_loss, PacketLossNode};
 pub use self::router::{router, RouterClientsV4, RouterNode};
 pub use self::ether_adaptor::{ether_adaptor, EtherAdaptorNode};
 
-/// An `Ipv4Node` describes a recipe for constructing a network when given the IP range that the network
-/// should operate on. The functions in the `node` module return `Ipv4Node`s that you can then run as a
-/// network with the `spawn::network_v4` function.
+/// An `Ipv4Node` describes a recipe for constructing a network when given the IP range that the
+/// network should operate on. The functions in the `node::ipv4` module return `Ipv4Node`s that you
+/// can run as a network with the `spawn::network_v4` function.
 pub trait Ipv4Node: Sized {
     /// The type returned by the thread spawned by this node.
     type Output: Send + 'static;
 
-    /// Consume the `Ipv4Node` and build the network it describes. Returns a `SpawnComplete` that can
-    /// be used to join the spawned thread and an `Ipv4Plug` that can be used to read-write packets to
-    /// the head node of the network.
+    /// Consume the `Ipv4Node` and build the network it describes. Returns a `SpawnComplete` that
+    /// can be used to join the spawned thread and an `Ipv4Plug` that can be used to read-write
+    /// packets to the head node of the network.
     fn build(
         self,
         handle: &Handle,

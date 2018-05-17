@@ -71,7 +71,7 @@ mod test {
 
                 let ipv4_range = Ipv4Range::random_local_subnet();
                 let (ipv4_addr_tx, ipv4_addr_rx) = std::sync::mpsc::channel();
-                let (spawn_complete, ipv4_plug) = spawn::network_v4(
+                let (spawn_complete, ipv4_plug) = spawn::network_ipv4(
                     &handle,
                     ipv4_range,
                     node::ipv4::machine(move |ipv4_addr| {
@@ -150,7 +150,7 @@ mod test {
 
                 let ipv4_range = Ipv4Range::random_local_subnet();
                 let (ipv4_addr_tx, ipv4_addr_rx) = std::sync::mpsc::channel();
-                let (spawn_complete, ipv4_plug) = spawn::network_v4(
+                let (spawn_complete, ipv4_plug) = spawn::network_ipv4(
                     &handle,
                     ipv4_range,
                     node::ipv4::machine(move |ipv4_addr| {
@@ -422,7 +422,7 @@ mod test {
 
                 let ipv4_range = Ipv4Range::random_local_subnet();
                 let (ipv4_addr_tx, ipv4_addr_rx) = std::sync::mpsc::channel();
-                let (spawn_complete, ipv4_plug) = spawn::network_v4(
+                let (spawn_complete, ipv4_plug) = spawn::network_ipv4(
                     &handle,
                     ipv4_range,
                     node::ipv4::machine(move |ipv4_addr| {
