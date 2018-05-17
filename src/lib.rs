@@ -271,5 +271,5 @@ mod test;
 pub use range::{Ipv4Range, Ipv6Range, IpRangeParseError};
 pub use route::{RouteV4, RouteV6, AddRouteError};
 pub use spawn_complete::SpawnComplete;
-pub use pcap::Ipv4Log;
+pub use pcap::IpLog;
 

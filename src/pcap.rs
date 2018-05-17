@@ -1,8 +1,8 @@
 use priv_prelude::*;
 use tokio_io;
 
-/// A sink for IPv4 packets which writes the packets to a pcap file.
-pub struct Ipv4Log {
+/// A sink for IP packets which writes the packets to a pcap file.
+pub struct IpLog {
     fd: PollEvented<AsyncFd>,
     state: LogState,
 }
@@ -21,9 +21,9 @@ enum LogState {
     Invalid,
 }
 
-impl Ipv4Log {
+impl IpLog {
     /// Create a new log file.
-    pub fn new(handle: &Handle, path: &Path) -> IoFuture<Ipv4Log> {
+    pub fn new(handle: &Handle, path: &Path) -> IoFuture<IpLog> {
         const MAGIC: u32 = 0xa1b2_3c4d;
         const VERSION_MAJOR: u16 = 2;
         const VERSION_MINOR: u16 = 4;
@@ -50,7 +50,7 @@ impl Ipv4Log {
             Ok({
                 tokio_io::io::write_all(fd, header)
                 .map(|(fd, _header)| {
-                    Ipv4Log {
+                    IpLog {
                         fd: fd,
                         state: LogState::Ready,
                     }
@@ -62,11 +62,11 @@ impl Ipv4Log {
     }
 }
 
-impl Sink for Ipv4Log {
-    type SinkItem = Ipv4Packet;
+impl Sink for IpLog {
+    type SinkItem = IpPacket;
     type SinkError = io::Error;
 
-    fn start_send(&mut self, packet: Ipv4Packet) -> io::Result<AsyncSink<Ipv4Packet>> {
+    fn start_send(&mut self, packet: IpPacket) -> io::Result<AsyncSink<IpPacket>> {
         if let Async::NotReady = self.fd.poll_write() {
             return Ok(AsyncSink::NotReady(packet));
         }

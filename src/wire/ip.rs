@@ -38,6 +38,14 @@ impl IpPacket {
         }
     }
 
+    /// Consume the packet and return the underlying byte buffer
+    pub fn into_bytes(self) -> Bytes {
+        match self {
+            IpPacket::V4(packet) => packet.into_bytes(),
+            IpPacket::V6(packet) => packet.into_bytes(),
+        }
+    }
+
     /// Get the packet's source IP address
     pub fn source_ip(&self) -> IpAddr {
         match self {
