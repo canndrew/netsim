@@ -310,6 +310,7 @@ pub fn set_ipv4_addr(
                 => return Err(SetIpv4AddrError::SystemFileDescriptorLimit(e)),
         };
 
+        #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
         {
             let addr = &mut req.ifr_ifru.ifru_addr;
             let addr = addr as *mut sys::sockaddr;
@@ -336,6 +337,7 @@ pub fn set_ipv4_addr(
             }
         }
 
+        #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
         {
             let addr = &mut req.ifr_ifru.ifru_addr;
             let addr = addr as *mut sys::sockaddr;
@@ -420,7 +422,10 @@ pub fn set_ipv6_addr(
 
         let mut buffer: Vec<u8> = Vec::with_capacity(total_size);
         {
-            let nlmsghdr: *mut sys::nlmsghdr = buffer.as_mut_ptr() as *mut _;
+            let nlmsghdr: *mut sys::nlmsghdr = {
+                #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
+                { buffer.as_mut_ptr() as *mut _ }
+            };
             let nlmsghdr: &mut sys::nlmsghdr = &mut *nlmsghdr;
 
             nlmsghdr.nlmsg_len = total_size as u32;
@@ -437,7 +442,8 @@ pub fn set_ipv6_addr(
 
         {
             let ifaddrmsg: *mut sys::ifaddrmsg = {
-                buffer.as_mut_ptr().offset(data_start as isize) as *mut _
+                #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
+                { buffer.as_mut_ptr().offset(data_start as isize) as *mut _ }
             };
             let ifaddrmsg: &mut sys::ifaddrmsg = &mut *ifaddrmsg;
             ifaddrmsg.ifa_family = sys::AF_INET6 as u8;
@@ -449,7 +455,8 @@ pub fn set_ipv6_addr(
 
         {
             let rtattr: *mut sys::rtattr = {
-                buffer.as_mut_ptr().offset(attr_header_start as isize) as *mut _
+                #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
+                { buffer.as_mut_ptr().offset(attr_header_start as isize) as *mut _ }
             };
             let rtattr: &mut sys::rtattr = &mut *rtattr;
             rtattr.rta_len = (attr_data_end - attr_header_start) as u16;
@@ -488,7 +495,10 @@ pub fn set_ipv6_addr(
             assert!(n as usize >= header_end);
 
             {
-                let nlmsghdr: *const sys::nlmsghdr = buffer.as_ptr() as *const _;
+                let nlmsghdr: *const sys::nlmsghdr = {
+                    #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
+                    { buffer.as_ptr() as *const _ }
+                };
                 let nlmsghdr: &sys::nlmsghdr = &*nlmsghdr;
                 if nlmsghdr.nlmsg_type == sys::NLMSG_NOOP as u16 {
                     continue;
@@ -499,7 +509,8 @@ pub fn set_ipv6_addr(
 
             {
                 let nlmsgerr: *const sys::nlmsgerr = {
-                    buffer.as_ptr().offset(error_start as isize) as *const _
+                    #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
+                    { buffer.as_ptr().offset(error_start as isize) as *const _ }
                 };
                 let nlmsgerr: &sys::nlmsgerr = &*nlmsgerr;
                 if nlmsgerr.error != 0 {

@@ -36,14 +36,14 @@ impl Ipv6AddrExt for Ipv6Addr {
     fn random_global() -> Ipv6Addr {
         let x0 = rand::random::<u64>();
         let x1 = rand::random::<u64>();
-        let mut x = ((x0 as u128) << 64) | (x1 as u128);
+        let mut x = (u128::from(x0) << 64) | u128::from(x1);
         loop {
             let ip = Ipv6Addr::from(x);
             if Ipv6AddrExt::is_unicast_global(&ip) {
                 return ip
             }
             x >>= 8;
-            x |= (rand::random::<u8>() as u128) << 120;
+            x |= u128::from(rand::random::<u8>()) << 120;
         }
     }
 

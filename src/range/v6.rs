@@ -117,7 +117,7 @@ impl Ipv6Range {
             // `impl Rand for u128` doesn't exist yet
             let r0 = rand::random::<u64>();
             let r1 = rand::random::<u64>();
-            let r = ((r1 as u128) << 64) | (r0 as u128);
+            let r = (u128::from(r1) << 64) | u128::from(r0);
 
             let x = r & mask;
             if x < 2 {
