@@ -9,7 +9,7 @@ pub trait HubClients {
     /// Build the set of nodes.
     fn build(
         self,
-        handle: &Handle,
+        handle: &NetworkHandle,
         ipv4_range: Option<Ipv4Range>,
         ipv6_range: Option<Ipv6Range>,
     ) -> (SpawnComplete<Self::Output>, EtherPlug);
@@ -30,7 +30,7 @@ macro_rules! tuple_impl {
 
             fn build(
                 self,
-                handle: &Handle, 
+                handle: &NetworkHandle, 
                 ipv4_range: Option<Ipv4Range>,
                 ipv6_range: Option<Ipv6Range>,
             ) -> (SpawnComplete<Self::Output>, EtherPlug)
@@ -154,7 +154,7 @@ where
 
     fn build(
         self,
-        handle: &Handle,
+        handle: &NetworkHandle,
         ipv4_range: Option<Ipv4Range>,
         ipv6_range: Option<Ipv6Range>,
     ) -> (SpawnComplete<C::Output>, EtherPlug) {

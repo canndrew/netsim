@@ -26,7 +26,7 @@ impl HubBuilder {
     }
 
     /// Build the `Hub` on the event loop.
-    pub fn spawn(self, handle: &Handle) {
+    pub fn spawn(self, handle: &NetworkHandle) {
         Hub::spawn(handle, self.connections)
     }
 }
@@ -46,7 +46,7 @@ impl Hub {
     }
 
     /// Spawn a new ethernet hub on the event loop.
-    pub fn spawn(handle: &Handle, connections: Vec<EtherPlug>) {
+    pub fn spawn(handle: &NetworkHandle, connections: Vec<EtherPlug>) {
         let hub = Hub::new(connections);
         handle.spawn(hub.infallible());
     }

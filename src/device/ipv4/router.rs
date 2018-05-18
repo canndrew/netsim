@@ -30,7 +30,7 @@ impl RouterV4Builder {
     }
 
     /// Build the `RouterV4`, spawning it directly onto the tokio event loop.
-    pub fn spawn(self, handle: &Handle) {
+    pub fn spawn(self, handle: &NetworkHandle) {
         RouterV4::spawn(handle, self.ipv4_addr, self.connections)
     }
 }
@@ -59,7 +59,7 @@ impl RouterV4 {
 
     /// Create a new `RouterV4`, spawning it directly onto the tokio event loop.
     pub fn spawn(
-        handle: &Handle,
+        handle: &NetworkHandle,
         ipv4_addr: Ipv4Addr,
         connections: Vec<(Ipv4Plug, Vec<RouteV4>)>,
     ) {

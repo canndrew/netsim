@@ -25,7 +25,7 @@ where
 
     fn build(
         self,
-        handle: &Handle,
+        handle: &NetworkHandle,
         ipv4_range: Ipv4Range,
     ) -> (SpawnComplete<N::Output>, Ipv4Plug) {
         let ip = ipv4_range.random_client_addr();

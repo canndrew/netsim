@@ -45,7 +45,7 @@ impl MachineBuilder {
     /// value returned by the given function.
     pub fn spawn<F, R>(
         self,
-        handle: &Handle,
+        handle: &NetworkHandle,
         func: F,
     ) -> SpawnComplete<R>
     where
@@ -80,13 +80,13 @@ impl MachineBuilder {
         });
 
         for (tap_unbound, plug, drop_rx) in ether_rx {
-            let tap = tap_unbound.bind(handle);
+            let tap = tap_unbound.bind(&handle.event_loop());
             let task = TapTask::new(tap, handle, plug, drop_rx);
             handle.spawn(task.infallible());
         }
 
         for (tun_unbound, plug, drop_rx) in ip_rx {
-            let tun = tun_unbound.bind(handle);
+            let tun = tun_unbound.bind(&handle.event_loop());
             let task = TunTask::new(tun, handle, plug, drop_rx);
             handle.spawn(task.infallible());
         }

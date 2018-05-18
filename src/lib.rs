@@ -92,11 +92,12 @@
 //! use std::net::UdpSocket;
 //! use tokio_core::reactor::Core;
 //! use futures::{Future, Stream};
-//! use netsim::{spawn, node, Ipv4Range};
+//! use netsim::{spawn, node, Network, Ipv4Range};
 //! use netsim::wire::Ipv4Payload;
 //!
 //! let mut core = Core::new().unwrap();
-//! let handle = core.handle();
+//! let network = Network::new(&core.handle());
+//! let handle = network.handle();
 //! 
 //! // Spawn a network with a single node - a machine with an IPv4 interface in the 10.0.0.0/8
 //! // range, running the given callback.
@@ -140,10 +141,11 @@
 //! 
 //! use std::net::UdpSocket;
 //! use tokio_core::reactor::Core;
-//! use netsim::{spawn, node, Ipv4Range};
+//! use netsim::{spawn, node, Network, Ipv4Range};
 //! 
 //! let mut core = Core::new().unwrap();
-//! let handle = core.handle();
+//! let network = Network::new(&core.handle());
+//! let handle = network.handle();
 //!
 //! let (tx, rx) = std::sync::mpsc::channel();
 //!
@@ -260,6 +262,7 @@ mod spawn_complete;
 mod process_handle;
 mod pcap;
 mod plug;
+mod network;
 pub mod iface;
 pub mod node;
 pub mod device;
@@ -272,4 +275,5 @@ pub use range::{Ipv4Range, Ipv6Range, IpRangeParseError};
 pub use route::{RouteV4, RouteV6, AddRouteError};
 pub use spawn_complete::SpawnComplete;
 pub use pcap::IpLog;
+pub use network::{Network, NetworkHandle};
 

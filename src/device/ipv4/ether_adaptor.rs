@@ -35,7 +35,7 @@ impl EtherAdaptorV4 {
 
     /// Create a new adaptor and spawn it directly onto the tokio event loop.
     pub fn spawn(
-        handle: &Handle,
+        handle: &NetworkHandle,
         addr: Ipv4Addr,
         ether: EtherPlug,
         ipv4: Ipv4Plug,

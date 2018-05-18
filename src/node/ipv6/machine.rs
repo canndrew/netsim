@@ -24,7 +24,7 @@ where
 
     fn build(
         self,
-        handle: &Handle,
+        handle: &NetworkHandle,
         ipv6_range: Ipv6Range,
     ) -> (SpawnComplete<R>, Ipv6Plug) {
         let address = ipv6_range.random_client_addr();

@@ -5,14 +5,14 @@ pub struct TunTask {
     packet_tx: UnboundedSender<IpPacket>,
     packet_rx: UnboundedReceiver<IpPacket>,
     sending_packet: Option<IpPacket>,
-    handle: Handle,
+    handle: NetworkHandle,
     state: TunTaskState,
 }
 
 impl TunTask {
     pub fn new(
         tun: IpIface,
-        handle: &Handle,
+        handle: &NetworkHandle,
         plug: IpPlug,
         drop_rx: DropNotice,
     ) -> TunTask {
@@ -105,7 +105,7 @@ impl Future for TunTask {
                     trace!("state == receiving");
                     match drop_rx.poll().void_unwrap() {
                         Async::Ready(()) => {
-                            state = TunTaskState::Dying(Timeout::new(grace_period, &self.handle));
+                            state = TunTaskState::Dying(Timeout::new(grace_period, self.handle.event_loop()));
                             continue;
                         },
                         Async::NotReady => {

@@ -13,7 +13,7 @@ impl LatencyV4 {
     /// latency added to any given packet. A non-zero `mean_additional_latency` can cause packets
     /// to be re-ordered.
     pub fn spawn(
-        handle: &Handle,
+        handle: &NetworkHandle,
         min_latency: Duration,
         mean_additional_latency: Duration,
         plug_a: Ipv4Plug,

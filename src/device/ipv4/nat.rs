@@ -169,7 +169,7 @@ impl NatV4 {
 
     /// Create a new Ipv4 NAT, spawning it directly onto the tokio event loop.
     pub fn spawn(
-        handle: &Handle,
+        handle: &NetworkHandle,
         public_plug: Ipv4Plug,
         private_plug: Ipv4Plug,
         public_ip: Ipv4Addr,
@@ -282,7 +282,7 @@ impl NatV4Builder {
     /// Build the NAT, spawning it directly onto the tokio event loop.
     pub fn spawn(
         self,
-        handle: &Handle,
+        handle: &NetworkHandle,
         public_plug: Ipv4Plug,
         private_plug: Ipv4Plug,
         public_ip: Ipv4Addr,
@@ -596,7 +596,8 @@ fn test() {
         use void;
 
         let mut core = unwrap!(Core::new());
-        let handle = core.handle();
+        let network = Network::new(&core.handle());
+        let handle = network.handle();
 
         let res = core.run(future::lazy(move || {
             let (public_plug_0, public_plug_1) = Ipv4Plug::new_pair();

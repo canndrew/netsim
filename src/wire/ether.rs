@@ -226,7 +226,7 @@ impl EtherPlug {
     /// Add latency to a connection
     pub fn with_latency(
         self, 
-        handle: &Handle,
+        handle: &NetworkHandle,
         min_latency: Duration,
         mean_additional_latency: Duration,
     ) -> EtherPlug {
@@ -238,7 +238,7 @@ impl EtherPlug {
     /// Add packet loss to a connection
     pub fn with_packet_loss(
         self,
-        handle: &Handle,
+        handle: &NetworkHandle,
         loss_rate: f64,
         mean_loss_duration: Duration,
     ) -> EtherPlug {

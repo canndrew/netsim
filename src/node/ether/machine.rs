@@ -24,7 +24,7 @@ where
 
     fn build(
         self,
-        handle: &Handle,
+        handle: &NetworkHandle,
         ipv4_range: Option<Ipv4Range>,
         ipv6_range: Option<Ipv6Range>,
     ) -> (SpawnComplete<R>, EtherPlug) {
@@ -82,7 +82,8 @@ mod test {
     fn one_interface_send_udp_ipv4() {
         run_test(3, || {
             let mut core = unwrap!(Core::new());
-            let handle = core.handle();
+            let network = Network::new(&core.handle());
+            let handle = network.handle();
             let res = core.run(future::lazy(|| {
                 trace!("starting");
                 let payload: [u8; 8] = rand::random();

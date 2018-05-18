@@ -16,7 +16,7 @@ pub struct PacketLoss<T: fmt::Debug + 'static> {
 impl<T: fmt::Debug + 'static> PacketLoss<T> {
     /// Spawn a `PacketLoss` directly onto the event loop
     pub fn spawn(
-        handle: &Handle,
+        handle: &NetworkHandle,
         loss_rate: f64,
         mean_loss_duration: Duration,
         plug_a: Plug<T>,

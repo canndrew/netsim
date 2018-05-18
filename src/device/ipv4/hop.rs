@@ -22,7 +22,7 @@ impl HopV4 {
     /// Create a new hop by connecting the two given plugs. Spawn the `Hopv4` directly onto the
     /// tokio event loop.
     pub fn spawn(
-        handle: &Handle,
+        handle: &NetworkHandle,
         plug_a: Ipv4Plug,
         plug_b: Ipv4Plug,
     ) {

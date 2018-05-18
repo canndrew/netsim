@@ -81,7 +81,7 @@ impl IpPlug {
     /// Add latency to a connection
     pub fn with_latency(
         self, 
-        handle: &Handle,
+        handle: &NetworkHandle,
         min_latency: Duration,
         mean_additional_latency: Duration,
     ) -> IpPlug {
@@ -93,7 +93,7 @@ impl IpPlug {
     /// Add packet loss to a connection
     pub fn with_packet_loss(
         self,
-        handle: &Handle,
+        handle: &NetworkHandle,
         loss_rate: f64,
         mean_loss_duration: Duration,
     ) -> IpPlug {
@@ -103,7 +103,7 @@ impl IpPlug {
     }
 
     /// Adapt the plug to an IPv4 plug, dropping all incoming IPv6 packets.
-    pub fn into_ipv4_plug(self, handle: &Handle) -> Ipv4Plug {
+    pub fn into_ipv4_plug(self, handle: &NetworkHandle) -> Ipv4Plug {
         let (ipv4_plug_a, ipv4_plug_b) = Ipv4Plug::new_pair();
 
         let (ip_tx, ip_rx) = self.split();
@@ -152,7 +152,7 @@ impl IpPlug {
     }
 
     /// Adapt the plug to an IPv6 plug, dropping all incoming IPv6 packets.
-    pub fn into_ipv6_plug(self, handle: &Handle) -> Ipv6Plug {
+    pub fn into_ipv6_plug(self, handle: &NetworkHandle) -> Ipv6Plug {
         let (ipv6_plug_a, ipv6_plug_b) = Ipv6Plug::new_pair();
 
         let (ip_tx, ip_rx) = self.split();

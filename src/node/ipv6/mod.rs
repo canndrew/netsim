@@ -15,7 +15,7 @@ pub trait Ipv6Node: Sized {
     /// packets to the head node of the network.
     fn build(
         self,
-        handle: &Handle,
+        handle: &NetworkHandle,
         ipv6_range: Ipv6Range,
     ) -> (SpawnComplete<Self::Output>, Ipv6Plug);
 }

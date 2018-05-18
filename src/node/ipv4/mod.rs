@@ -28,7 +28,7 @@ pub trait Ipv4Node: Sized {
     /// packets to the head node of the network.
     fn build(
         self,
-        handle: &Handle,
+        handle: &NetworkHandle,
         ipv4_range: Ipv4Range,
     ) -> (SpawnComplete<Self::Output>, Ipv4Plug);
 

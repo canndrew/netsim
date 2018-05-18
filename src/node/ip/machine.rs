@@ -24,7 +24,7 @@ where
 
     fn build(
         self,
-        handle: &Handle,
+        handle: &NetworkHandle,
         ipv4_range: Option<Ipv4Range>,
         ipv6_range: Option<Ipv6Range>,
     ) -> (SpawnComplete<R>, IpPlug) {

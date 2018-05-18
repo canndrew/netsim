@@ -24,7 +24,7 @@ where
 
     fn build(
         self,
-        handle: &Handle,
+        handle: &NetworkHandle,
         ipv4_range: Ipv4Range,
     ) -> (SpawnComplete<R>, Ipv4Plug) {
         let address = ipv4_range.random_client_addr();
@@ -62,7 +62,8 @@ mod test {
     fn test_udp() {
         run_test(3, || {
             let mut core = unwrap!(Core::new());
-            let handle = core.handle();
+            let network = Network::new(&core.handle());
+            let handle = network.handle();
 
             let res = core.run(future::lazy(move || {
                 let remote_ip = Ipv4Addr::random_global();
@@ -141,7 +142,8 @@ mod test {
     fn test_tcp_connect() {
         run_test(3, || {
             let mut core = unwrap!(Core::new());
-            let handle = core.handle();
+            let network = Network::new(&core.handle());
+            let handle = network.handle();
 
             let res = core.run(future::lazy(move || {
                 let remote_ip = Ipv4Addr::random_global();
@@ -413,7 +415,8 @@ mod test {
     fn test_ping_reply() {
         run_test(3, || {
             let mut core = unwrap!(Core::new());
-            let handle = core.handle();
+            let network = Network::new(&core.handle());
+            let handle = network.handle();
 
             let res = core.run(future::lazy(move || {
                 let (done_tx, done_rx) = std::sync::mpsc::channel();

@@ -31,14 +31,14 @@ pub struct Latency<T: fmt::Debug + 'static> {
 
 impl<T: fmt::Debug + 'static> Latency<T> {
     pub fn spawn(
-        handle: &Handle,
+        handle: &NetworkHandle,
         min_latency: Duration,
         mean_additional_latency: Duration,
         plug_a: Plug<T>,
         plug_b: Plug<T>,
     ) {
         let latency = Latency {
-            handle: handle.clone(),
+            handle: handle.event_loop().clone(),
             plug_a: plug_a,
             plug_b: plug_b,
             outgoing_a: FuturesUnordered::new(),
@@ -46,7 +46,7 @@ impl<T: fmt::Debug + 'static> Latency<T> {
             min_latency: min_latency,
             mean_additional_latency: mean_additional_latency,
         };
-        handle.spawn(latency.infallible());
+        handle.spawn(latency);
     }
 }
 

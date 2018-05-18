@@ -23,7 +23,7 @@ where
 
     fn build(
         self,
-        handle: &Handle,
+        handle: &NetworkHandle,
         ipv4_range: Ipv4Range,
     ) -> (SpawnComplete<N::Output>, Ipv4Plug) {
         let (spawn_complete, plug) = self.node.build(handle, ipv4_range);

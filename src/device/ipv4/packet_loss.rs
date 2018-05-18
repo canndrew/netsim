@@ -8,7 +8,7 @@ pub struct PacketLossV4 {
 impl PacketLossV4 {
     /// Spawn a `PacketLossV4` directly onto the event loop
     pub fn spawn(
-        handle: &Handle,
+        handle: &NetworkHandle,
         loss_rate: f64,
         mean_loss_duration: Duration,
         plug_a: Ipv4Plug,

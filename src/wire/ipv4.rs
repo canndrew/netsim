@@ -333,7 +333,7 @@ impl Ipv4Plug {
     /// Add latency to a connection
     pub fn with_latency(
         self, 
-        handle: &Handle,
+        handle: &NetworkHandle,
         min_latency: Duration,
         mean_additional_latency: Duration,
     ) -> Ipv4Plug {
@@ -345,7 +345,7 @@ impl Ipv4Plug {
     /// Add packet loss to a connection
     pub fn with_packet_loss(
         self,
-        handle: &Handle,
+        handle: &NetworkHandle,
         loss_rate: f64,
         mean_loss_duration: Duration,
     ) -> Ipv4Plug {
@@ -358,7 +358,7 @@ impl Ipv4Plug {
     /// have their TTL decremented by the amount of hops given.
     pub fn with_hops(
         self,
-        handle: &Handle,
+        handle: &NetworkHandle,
         num_hops: u32,
     ) -> Ipv4Plug {
         let mut plug = self;

@@ -7,7 +7,7 @@ pub trait RouterClientsV4 {
     type Output: Send + 'static;
 
     /// Build the set of nodes.
-    fn build(self, handle: &Handle, ipv4_range: Ipv4Range) -> (SpawnComplete<Self::Output>, Ipv4Plug);
+    fn build(self, handle: &NetworkHandle, ipv4_range: Ipv4Range) -> (SpawnComplete<Self::Output>, Ipv4Plug);
 }
 
 struct JoinAll<X, T> {
@@ -23,7 +23,7 @@ macro_rules! tuple_impl {
         {
             type Output = ($($ty::Output,)*);
             
-            fn build(self, handle: &Handle, ipv4_range: Ipv4Range) -> (SpawnComplete<Self::Output>, Ipv4Plug) {
+            fn build(self, handle: &NetworkHandle, ipv4_range: Ipv4Range) -> (SpawnComplete<Self::Output>, Ipv4Plug) {
                 #![allow(non_snake_case)]
                 #![allow(unused_assignments)]
                 #![allow(unused_mut)]
@@ -127,7 +127,7 @@ where
 
     fn build(
         self,
-        handle: &Handle,
+        handle: &NetworkHandle,
         ipv4_range: Ipv4Range,
     ) -> (SpawnComplete<Vec<N::Output>>, Ipv4Plug) {
         let ranges = ipv4_range.split(self.len() as u32 + 1);
@@ -178,7 +178,7 @@ where
 
     fn build(
         self,
-        handle: &Handle,
+        handle: &NetworkHandle,
         ipv4_range: Ipv4Range,
     ) -> (SpawnComplete<C::Output>, Ipv4Plug) {
         self.clients.build(handle, ipv4_range)

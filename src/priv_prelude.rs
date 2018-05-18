@@ -5,6 +5,7 @@ pub use std::collections::{hash_map, HashMap, HashSet, BTreeMap, BTreeSet, VecDe
 pub use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 pub use std::io::{Read, Write, Cursor};
 pub use std::fs::File;
+pub use std::sync::{Arc, Mutex};
 pub use bytes::{Bytes, BytesMut};
 pub use byteorder::{ByteOrder, NativeEndian, NetworkEndian, WriteBytesExt};
 pub use void::{Void, ResultVoidExt};
@@ -42,6 +43,7 @@ pub use node::{IpNode, Ipv4Node, Ipv6Node, EtherNode};
 pub use spawn_complete::SpawnComplete;
 pub use process_handle::ProcessHandle;
 pub use plug::{Latency, PacketLoss, Plug};
+pub use network::{Network, NetworkHandle};
 
 #[cfg(test)]
 pub use test::run_test;
