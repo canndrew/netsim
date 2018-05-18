@@ -1,6 +1,10 @@
 use priv_prelude::*;
 
+mod latency;
+mod packet_loss;
 mod machine;
+pub use self::latency::{latency, LatencyNode};
+pub use self::packet_loss::{packet_loss, PacketLossNode};
 pub use self::machine::{machine, MachineNode};
 
 /// An `IpNode` describes a recipe for constructing a network when given the IP range that the

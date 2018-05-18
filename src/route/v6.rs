@@ -3,15 +3,15 @@ use sys;
 
 /// Represents an IPv6 route.
 #[derive(Debug, Clone, Copy)]
-pub struct RouteV6 {
+pub struct Ipv6Route {
     destination: Ipv6Range,
     next_hop: Ipv6Addr,
 }
 
-impl RouteV6 {
+impl Ipv6Route {
     /// Create a new route with the given destination and next hop.
-    pub fn new(destination: Ipv6Range, next_hop: Ipv6Addr) -> RouteV6 {
-        RouteV6 {
+    pub fn new(destination: Ipv6Range, next_hop: Ipv6Addr) -> Ipv6Route {
+        Ipv6Route {
             destination,
             next_hop,
         }

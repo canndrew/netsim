@@ -13,7 +13,7 @@ pub use self::machine::{machine, MachineNode};
 pub use self::hops::{hops, HopsNode};
 pub use self::latency::{latency, LatencyNode};
 pub use self::packet_loss::{packet_loss, PacketLossNode};
-pub use self::router::{router, RouterClientsV4, RouterNode};
+pub use self::router::{router, Ipv4RouterClients, RouterNode};
 pub use self::ether_adaptor::{ether_adaptor, EtherAdaptorNode};
 
 /// An `Ipv4Node` describes a recipe for constructing a network when given the IP range that the

@@ -2,18 +2,18 @@ use priv_prelude::*;
 
 /// Connects two `Ipv4Plug`s and adds a hop between them. This causes the TTL value of all packets
 /// to be decremented while travelling along the connection (and dropped if the TLL reaches zero).
-pub struct HopV4 {
+pub struct Ipv4Hop {
     plug_a: Ipv4Plug,
     plug_b: Ipv4Plug,
 }
 
-impl HopV4 {
+impl Ipv4Hop {
     /// Create a new hop by connecting the two given plugs.
     pub fn new(
         plug_a: Ipv4Plug,
         plug_b: Ipv4Plug,
-    ) -> HopV4 {
-        HopV4 {
+    ) -> Ipv4Hop {
+        Ipv4Hop {
             plug_a,
             plug_b,
         }
@@ -26,12 +26,12 @@ impl HopV4 {
         plug_a: Ipv4Plug,
         plug_b: Ipv4Plug,
     ) {
-        let hop_v4 = HopV4::new(plug_a, plug_b);
+        let hop_v4 = Ipv4Hop::new(plug_a, plug_b);
         handle.spawn(hop_v4.infallible());
     }
 }
 
-impl Future for HopV4 {
+impl Future for Ipv4Hop {
     type Item = ();
     type Error = Void;
 

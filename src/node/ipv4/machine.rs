@@ -31,7 +31,7 @@ where
         let iface = {
             IpIfaceBuilder::new()
             .ipv4_addr(address, ipv4_range.netmask_prefix_length())
-            .ipv4_route(RouteV4::new(Ipv4Range::global(), None))
+            .ipv4_route(Ipv4Route::new(Ipv4Range::global(), None))
         };
         let (plug_a, plug_b) = IpPlug::new_pair();
 
@@ -72,7 +72,7 @@ mod test {
 
                 let ipv4_range = Ipv4Range::random_local_subnet();
                 let (ipv4_addr_tx, ipv4_addr_rx) = std::sync::mpsc::channel();
-                let (spawn_complete, ipv4_plug) = spawn::network_ipv4(
+                let (spawn_complete, ipv4_plug) = spawn::ipv4_tree(
                     &handle,
                     ipv4_range,
                     node::ipv4::machine(move |ipv4_addr| {
@@ -152,7 +152,7 @@ mod test {
 
                 let ipv4_range = Ipv4Range::random_local_subnet();
                 let (ipv4_addr_tx, ipv4_addr_rx) = std::sync::mpsc::channel();
-                let (spawn_complete, ipv4_plug) = spawn::network_ipv4(
+                let (spawn_complete, ipv4_plug) = spawn::ipv4_tree(
                     &handle,
                     ipv4_range,
                     node::ipv4::machine(move |ipv4_addr| {
@@ -425,7 +425,7 @@ mod test {
 
                 let ipv4_range = Ipv4Range::random_local_subnet();
                 let (ipv4_addr_tx, ipv4_addr_rx) = std::sync::mpsc::channel();
-                let (spawn_complete, ipv4_plug) = spawn::network_ipv4(
+                let (spawn_complete, ipv4_plug) = spawn::ipv4_tree(
                     &handle,
                     ipv4_range,
                     node::ipv4::machine(move |ipv4_addr| {

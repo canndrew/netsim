@@ -159,7 +159,7 @@ fn test() {
 
         let (plug_a, plug_a_pass) = Ipv4Plug::new_pair();
         let (plug_b, plug_b_pass) = Ipv4Plug::new_pair();
-        LatencyV4::spawn(&handle, min_latency, mean_additional_latency, plug_a_pass, plug_b_pass);
+        Ipv4Latency::spawn(&handle, min_latency, mean_additional_latency, plug_a_pass, plug_b_pass);
 
         let res = core.run({
             let start_time_0 = Instant::now();

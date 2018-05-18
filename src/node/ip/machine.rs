@@ -34,7 +34,7 @@ where
             iface = {
                 iface
                 .ipv4_addr(ipv4_addr, range.netmask_prefix_length())
-                .ipv4_route(RouteV4::new(Ipv4Range::global(), None))
+                .ipv4_route(Ipv4Route::new(Ipv4Range::global(), None))
             };
             Some(ipv4_addr)
         } else {
@@ -45,7 +45,7 @@ where
             iface = {
                 iface
                 .ipv6_addr(ipv6_addr, range.netmask_prefix_length())
-                .ipv6_route(RouteV6::new(Ipv6Range::global(), ipv6!("::")))
+                .ipv6_route(Ipv6Route::new(Ipv6Range::global(), ipv6!("::")))
             };
             Some(ipv6_addr)
         } else {

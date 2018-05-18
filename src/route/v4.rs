@@ -4,15 +4,15 @@ use sys;
 
 /// Represents an IPv4 route.
 #[derive(Debug, Clone, Copy)]
-pub struct RouteV4 {
+pub struct Ipv4Route {
     destination: Ipv4Range,
     gateway: Option<Ipv4Addr>,
 }
 
-impl RouteV4 {
+impl Ipv4Route {
     /// Create a new route with the given destination and gateway
-    pub fn new(destination: Ipv4Range, gateway: Option<Ipv4Addr>) -> RouteV4 {
-        RouteV4 {
+    pub fn new(destination: Ipv4Range, gateway: Option<Ipv4Addr>) -> Ipv4Route {
+        Ipv4Route {
             destination,
             gateway,
         }

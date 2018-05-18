@@ -39,7 +39,7 @@ where
                 iface = {
                     iface
                     .ipv4_addr(address, range.netmask_prefix_length())
-                    .ipv4_route(RouteV4::new(Ipv4Range::global(), Some(range.gateway_ip())))
+                    .ipv4_route(Ipv4Route::new(Ipv4Range::global(), Some(range.gateway_ip())))
                 };
                 Some(address)
             },
@@ -51,7 +51,7 @@ where
                 iface = {
                     iface
                     .ipv6_addr(address, range.netmask_prefix_length())
-                    .ipv6_route(RouteV6::new(Ipv6Range::global(), range.next_hop_ip()))
+                    .ipv6_route(Ipv6Route::new(Ipv6Range::global(), range.next_hop_ip()))
                 };
                 Some(address)
             },
@@ -95,7 +95,7 @@ mod test {
                 let gateway_ip = range.gateway_ip();
 
                 let (ipv4_addr_tx, ipv4_addr_rx) = std::sync::mpsc::channel();
-                let (spawn_complete, plug) = spawn::network_eth(
+                let (spawn_complete, plug) = spawn::ether_tree(
                     &handle,
                     Some(range),
                     None,

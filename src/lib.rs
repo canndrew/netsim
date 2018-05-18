@@ -81,7 +81,7 @@
 //!
 //! # Sandboxing network code
 //!
-//! Rather than performing the above two steps individually, you can use the `spawn::network_ipv4`
+//! Rather than performing the above two steps individually, you can use the `spawn::ipv4_tree`
 //! function along with the `node` module to set up a namespace with an IPv4 interface for you.
 //!
 //! ```rust
@@ -95,13 +95,14 @@
 //! use netsim::{spawn, node, Network, Ipv4Range};
 //! use netsim::wire::Ipv4Payload;
 //!
+//! // Create an event loop and a network to bind devices to.
 //! let mut core = Core::new().unwrap();
 //! let network = Network::new(&core.handle());
 //! let handle = network.handle();
 //! 
 //! // Spawn a network with a single node - a machine with an IPv4 interface in the 10.0.0.0/8
 //! // range, running the given callback.
-//! let (spawn_complete, ipv4_plug) = spawn::network_ipv4(
+//! let (spawn_complete, ipv4_plug) = spawn::ipv4_tree(
 //!     &handle,
 //!     Ipv4Range::local_subnet_10(),
 //!     node::ipv4::machine(|ipv4_addr| {
@@ -143,6 +144,7 @@
 //! use tokio_core::reactor::Core;
 //! use netsim::{spawn, node, Network, Ipv4Range};
 //! 
+//! // Create an event loop and a network to bind devices to.
 //! let mut core = Core::new().unwrap();
 //! let network = Network::new(&core.handle());
 //! let handle = network.handle();
@@ -171,7 +173,7 @@
 //!
 //! // Run the network with the router as the top-most node. `_plug` could be used send/receive
 //! // packets from/to outside the network
-//! let (spawn_complete, _plug) = spawn::network_ipv4(&handle, Ipv4Range::global(), router_node);
+//! let (spawn_complete, _plug) = spawn::ipv4_tree(&handle, Ipv4Range::global(), router_node);
 //! 
 //! // Drive the network on the event loop and get the data returned by the receiving node.
 //! let (received, ()) = core.run(spawn_complete).unwrap();
@@ -272,7 +274,7 @@ pub mod spawn;
 mod test;
 
 pub use range::{Ipv4Range, Ipv6Range, IpRangeParseError};
-pub use route::{RouteV4, RouteV6, AddRouteError};
+pub use route::{Ipv4Route, Ipv6Route, AddRouteError};
 pub use spawn_complete::SpawnComplete;
 pub use pcap::IpLog;
 pub use network::{Network, NetworkHandle};

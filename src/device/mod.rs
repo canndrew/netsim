@@ -5,6 +5,8 @@
 mod machine;
 /// IPv4 devices
 pub mod ipv4;
+/// IPv6 devices
+pub mod ipv6;
 /// Ethernet devices
 pub mod ether;
 

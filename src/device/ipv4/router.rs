@@ -1,15 +1,15 @@
 use priv_prelude::*;
 
-/// Builder for creating a `RouterV4`.
-pub struct RouterV4Builder {
+/// Builder for creating a `Ipv4Router`.
+pub struct Ipv4RouterBuilder {
     ipv4_addr: Ipv4Addr,
-    connections: Vec<(Ipv4Plug, Vec<RouteV4>)>,
+    connections: Vec<(Ipv4Plug, Vec<Ipv4Route>)>,
 }
 
-impl RouterV4Builder {
-    /// Start creating a new `RouterV4` with the given IP address.
-    pub fn new(ipv4_addr: Ipv4Addr) -> RouterV4Builder {
-        RouterV4Builder {
+impl Ipv4RouterBuilder {
+    /// Start creating a new `Ipv4Router` with the given IP address.
+    pub fn new(ipv4_addr: Ipv4Addr) -> Ipv4RouterBuilder {
+        Ipv4RouterBuilder {
             ipv4_addr: ipv4_addr,
             connections: Vec::new(),
         }
@@ -17,35 +17,35 @@ impl RouterV4Builder {
 
     /// Connect another client to the router. `routes` indicates what packets from other clients
     /// should be routed down this connection. When determining where to route a packet, the
-    /// `RouterV4` will examine each connection and set of routes in the order they were added
+    /// `Ipv4Router` will examine each connection and set of routes in the order they were added
     /// using this function.
-    pub fn connect(mut self, plug: Ipv4Plug, routes: Vec<RouteV4>) -> RouterV4Builder {
+    pub fn connect(mut self, plug: Ipv4Plug, routes: Vec<Ipv4Route>) -> Ipv4RouterBuilder {
         self.connections.push((plug, routes));
         self
     }
 
-    /// Build the `RouterV4`
-    pub fn build(self) -> RouterV4 {
-        RouterV4::new(self.ipv4_addr, self.connections)
+    /// Build the `Ipv4Router`
+    pub fn build(self) -> Ipv4Router {
+        Ipv4Router::new(self.ipv4_addr, self.connections)
     }
 
-    /// Build the `RouterV4`, spawning it directly onto the tokio event loop.
+    /// Build the `Ipv4Router`, spawning it directly onto the tokio event loop.
     pub fn spawn(self, handle: &NetworkHandle) {
-        RouterV4::spawn(handle, self.ipv4_addr, self.connections)
+        Ipv4Router::spawn(handle, self.ipv4_addr, self.connections)
     }
 }
 
 /// Connects a bunch of Ipv4 networks and routes packets between them.
-pub struct RouterV4 {
+pub struct Ipv4Router {
     rxs: Vec<UnboundedReceiver<Ipv4Packet>>,
-    txs: Vec<(UnboundedSender<Ipv4Packet>, Vec<RouteV4>)>,
+    txs: Vec<(UnboundedSender<Ipv4Packet>, Vec<Ipv4Route>)>,
     ipv4_addr: Ipv4Addr,
 }
 
-impl RouterV4 {
-    /// Create a new router with the given connections. You can also use `RouterV4Builder` to add
+impl Ipv4Router {
+    /// Create a new router with the given connections. You can also use `Ipv4RouterBuilder` to add
     /// connections individually.
-    pub fn new(ipv4_addr: Ipv4Addr, connections: Vec<(Ipv4Plug, Vec<RouteV4>)>) -> RouterV4 {
+    pub fn new(ipv4_addr: Ipv4Addr, connections: Vec<(Ipv4Plug, Vec<Ipv4Route>)>) -> Ipv4Router {
         let mut rxs = Vec::with_capacity(connections.len());
         let mut txs = Vec::with_capacity(connections.len());
         for (plug, routes) in connections {
@@ -54,21 +54,21 @@ impl RouterV4 {
             txs.push((tx, routes));
         }
 
-        RouterV4 { rxs, txs, ipv4_addr }
+        Ipv4Router { rxs, txs, ipv4_addr }
     }
 
-    /// Create a new `RouterV4`, spawning it directly onto the tokio event loop.
+    /// Create a new `Ipv4Router`, spawning it directly onto the tokio event loop.
     pub fn spawn(
         handle: &NetworkHandle,
         ipv4_addr: Ipv4Addr,
-        connections: Vec<(Ipv4Plug, Vec<RouteV4>)>,
+        connections: Vec<(Ipv4Plug, Vec<Ipv4Route>)>,
     ) {
-        let router_v4 = RouterV4::new(ipv4_addr, connections);
+        let router_v4 = Ipv4Router::new(ipv4_addr, connections);
         handle.spawn(router_v4.infallible());
     }
 }
 
-impl Future for RouterV4 {
+impl Future for Ipv4Router {
     type Item = ();
     type Error = Void;
 

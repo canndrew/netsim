@@ -59,13 +59,13 @@ impl EtherIfaceBuilder {
     }
 
     /// Add an IPv4 route to the interface
-    pub fn ipv4_route(mut self, route: RouteV4) -> Self {
+    pub fn ipv4_route(mut self, route: Ipv4Route) -> Self {
         self.builder.ipv4_routes.push(route);
         self
     }
 
     /// Add an IPv6 route to the interface
-    pub fn ipv6_route(mut self, route: RouteV6) -> Self {
+    pub fn ipv6_route(mut self, route: Ipv6Route) -> Self {
         self.builder.ipv6_routes.push(route);
         self
     }

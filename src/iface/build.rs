@@ -75,8 +75,8 @@ pub struct IfaceBuilder {
     pub name: String,
     pub ipv4_addr: Option<(Ipv4Addr, u8)>,
     pub ipv6_addr: Option<(Ipv6Addr, u8)>,
-    pub ipv4_routes: Vec<RouteV4>,
-    pub ipv6_routes: Vec<RouteV6>,
+    pub ipv4_routes: Vec<Ipv4Route>,
+    pub ipv6_routes: Vec<Ipv6Route>,
 }
 
 pub fn build(builder: IfaceBuilder, mac_addr: Option<MacAddr>) -> Result<AsyncFd, IfaceBuildError> {

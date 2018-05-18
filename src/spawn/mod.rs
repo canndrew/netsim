@@ -7,18 +7,12 @@
 //! functions are convenience functions will automatically configure interfaces with common
 //! settings.
 //!
-//! `network_ipv4` can be used to launch a heirarchal network of nodes using the functions in the
-//! `node` module.
+//! The tree functions can be used to launch a heirarchal network of nodes when used in
+//! conjunction with the functions in the `node` module
 
 mod new_namespace;
-mod network_ip;
-mod network_ipv4;
-mod network_ipv6;
-mod network_eth;
+mod tree;
 
 pub use self::new_namespace::new_namespace;
-pub use self::network_ip::network_ip;
-pub use self::network_ipv4::network_ipv4;
-pub use self::network_ipv6::network_ipv6;
-pub use self::network_eth::network_eth;
+pub use self::tree::*;
 

@@ -3,7 +3,7 @@ use rand;
 
 #[derive(Debug)]
 /// An Ipv4 NAT.
-pub struct NatV4 {
+pub struct Ipv4Nat {
     private_plug: Ipv4Plug,
     public_plug: Ipv4Plug,
     public_ip: Ipv4Addr,
@@ -144,15 +144,15 @@ impl PortMap {
     }
 }
 
-impl NatV4 {
+impl Ipv4Nat {
     /// Create a new Ipv4 NAT
     pub fn new(
         public_plug: Ipv4Plug,
         private_plug: Ipv4Plug,
         public_ip: Ipv4Addr,
         subnet: Ipv4Range,
-    ) -> NatV4 {
-        let ret = NatV4 {
+    ) -> Ipv4Nat {
+        let ret = Ipv4Nat {
             private_plug: private_plug,
             public_plug: public_plug,
             public_ip: public_ip,
@@ -175,14 +175,14 @@ impl NatV4 {
         public_ip: Ipv4Addr,
         subnet: Ipv4Range,
     ) {
-        let nat_v4 = NatV4::new(public_plug, private_plug, public_ip, subnet);
+        let nat_v4 = Ipv4Nat::new(public_plug, private_plug, public_ip, subnet);
         handle.spawn(nat_v4.infallible());
     }
 }
 
 #[derive(Default)]
-/// A builder for `NatV4`
-pub struct NatV4Builder {
+/// A builder for `Ipv4Nat`
+pub struct Ipv4NatBuilder {
     subnet: Option<Ipv4Range>,
     hair_pinning: bool,
     udp_map: PortMap,
@@ -190,15 +190,15 @@ pub struct NatV4Builder {
     blacklist_unrecognized_addrs: bool,
 }
 
-impl NatV4Builder {
+impl Ipv4NatBuilder {
     /// Start building an Ipv4 NAT
-    pub fn new() -> NatV4Builder {
-        NatV4Builder::default()
+    pub fn new() -> Ipv4NatBuilder {
+        Ipv4NatBuilder::default()
     }
 
     /// Set the subnet used on the local side of the NAT. If left unset, a random subnet will be
     /// chosen.
-    pub fn subnet(mut self, subnet: Ipv4Range) -> NatV4Builder {
+    pub fn subnet(mut self, subnet: Ipv4Range) -> Ipv4NatBuilder {
         self.subnet = Some(subnet);
         self
     }
@@ -209,40 +209,40 @@ impl NatV4Builder {
     }
 
     /// Enable/disable hair-pinning.
-    pub fn hair_pinning(mut self, hair_pinning: bool) -> NatV4Builder {
+    pub fn hair_pinning(mut self, hair_pinning: bool) -> Ipv4NatBuilder {
         self.hair_pinning = hair_pinning;
         self
     }
 
     /// Manually forward a UDP port.
-    pub fn forward_udp_port(mut self, port: u16, local_addr: SocketAddrV4) -> NatV4Builder {
+    pub fn forward_udp_port(mut self, port: u16, local_addr: SocketAddrV4) -> Ipv4NatBuilder {
         self.udp_map.forward_port(port, local_addr);
         self
     }
 
     /// Manually forward a TCP port.
-    pub fn forward_tcp_port(mut self, port: u16, local_addr: SocketAddrV4) -> NatV4Builder {
+    pub fn forward_tcp_port(mut self, port: u16, local_addr: SocketAddrV4) -> Ipv4NatBuilder {
         self.tcp_map.forward_port(port, local_addr);
         self
     }
 
     /// Causes the NAT to permanently block all traffic from an address A if it receives traffic
     /// from A directed at an endpoint for which is doesn't have a mapping.
-    pub fn blacklist_unrecognized_addrs(mut self) -> NatV4Builder {
+    pub fn blacklist_unrecognized_addrs(mut self) -> Ipv4NatBuilder {
         self.blacklist_unrecognized_addrs = true;
         self
     }
 
     /// Only allow incoming traffic on a port from remote addresses that we have already sent
     /// data to from that port. Makes this a port-restricted NAT.
-    pub fn restrict_endpoints(mut self) -> NatV4Builder {
+    pub fn restrict_endpoints(mut self) -> Ipv4NatBuilder {
         self.tcp_map.allowed_endpoints = Some(HashMap::new());
         self.udp_map.allowed_endpoints = Some(HashMap::new());
         self
     }
 
     /// Use random, rather than sequential (the default) port allocation.
-    pub fn randomize_port_allocation(mut self) -> NatV4Builder {
+    pub fn randomize_port_allocation(mut self) -> Ipv4NatBuilder {
         self.tcp_map.port_allocator = PortAllocator::Random;
         self.udp_map.port_allocator = PortAllocator::Random;
         self
@@ -250,7 +250,7 @@ impl NatV4Builder {
 
     /// Makes this NAT a symmetric NAT, meaning packets sent to different remote addresses from the
     /// same internal address will appear to originate from different external ports.
-    pub fn symmetric(mut self) -> NatV4Builder {
+    pub fn symmetric(mut self) -> Ipv4NatBuilder {
         self.tcp_map.symmetric_map = Some(SymmetricMap::default());
         self.udp_map.symmetric_map = Some(SymmetricMap::default());
         self
@@ -262,9 +262,9 @@ impl NatV4Builder {
         public_plug: Ipv4Plug,
         private_plug: Ipv4Plug,
         public_ip: Ipv4Addr,
-    ) -> NatV4 {
+    ) -> Ipv4Nat {
         let subnet = self.subnet.unwrap_or_else(Ipv4Range::random_local_subnet);
-        let ret = NatV4 {
+        let ret = Ipv4Nat {
             private_plug: private_plug,
             public_plug: public_plug,
             public_ip: public_ip,
@@ -292,7 +292,7 @@ impl NatV4Builder {
     }
 }
 
-impl NatV4 {
+impl Ipv4Nat {
     fn process_outgoing(&mut self) -> bool {
         loop {
             match self.private_plug.poll_incoming() {
@@ -573,7 +573,7 @@ impl NatV4 {
     }
 }
 
-impl Future for NatV4 {
+impl Future for Ipv4Nat {
     type Item = ();
     type Error = Void;
 
@@ -605,7 +605,7 @@ fn test() {
             let public_ip = Ipv4Addr::random_global();
             let subnet = Ipv4Range::random_local_subnet();
 
-            NatV4::spawn(&handle, public_plug_0, private_plug_0, public_ip, subnet);
+            Ipv4Nat::spawn(&handle, public_plug_0, private_plug_0, public_ip, subnet);
 
             let (public_tx, public_rx) = public_plug_1.split();
             let (private_tx, private_rx) = private_plug_1.split();

@@ -31,7 +31,7 @@ where
         let iface = {
             IpIfaceBuilder::new()
             .ipv6_addr(address, ipv6_range.netmask_prefix_length())
-            .ipv6_route(RouteV6::new(Ipv6Range::global(), ipv6!("::")))
+            .ipv6_route(Ipv6Route::new(Ipv6Range::global(), ipv6!("::")))
         };
         let (plug_a, plug_b) = IpPlug::new_pair();
 

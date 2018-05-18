@@ -1,11 +1,11 @@
 use priv_prelude::*;
 
-/// Adds latency to an IPv4 connection
-pub struct Ipv4Latency {
-    //inner: Latency<Ipv4Packet>,
+/// Adds latency to an IPv6 connection
+pub struct Ipv6Latency {
+    //inner: Latency<Ipv6Packet>,
 }
 
-impl Ipv4Latency {
+impl Ipv6Latency {
     /// Connect the two given plugs with latency added to the connection.
     ///
     /// `min_latency` is the baseline for the amount of delay added to packets travelling along
@@ -16,8 +16,8 @@ impl Ipv4Latency {
         handle: &NetworkHandle,
         min_latency: Duration,
         mean_additional_latency: Duration,
-        plug_a: Ipv4Plug,
-        plug_b: Ipv4Plug,
+        plug_a: Ipv6Plug,
+        plug_b: Ipv6Plug,
     ) {
 
         Latency::spawn(

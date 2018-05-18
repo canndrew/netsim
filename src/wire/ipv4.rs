@@ -364,7 +364,7 @@ impl Ipv4Plug {
         let mut plug = self;
         for _ in 0..num_hops {
             let (plug_0, plug_1) = Ipv4Plug::new_pair();
-            HopV4::spawn(handle, plug, plug_0);
+            Ipv4Hop::spawn(handle, plug, plug_0);
             plug = plug_1;
         }
         plug
