@@ -44,7 +44,7 @@ pub fn add_route_v4(
         sys::socket(
             sys::PF_INET as i32,
             sys::__socket_type::SOCK_DGRAM as i32,
-            sys::IPPROTO_IP as i32,
+            libc::IPPROTO_IP as i32,
         )
     };
     if fd < 0 {
@@ -64,25 +64,25 @@ pub fn add_route_v4(
 
     #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
     unsafe {
-        let route_destination = &mut route.rt_dst as *mut _ as *mut sys::sockaddr_in;
+        let route_destination = &mut route.rt_dst as *mut _ as *mut libc::sockaddr_in;
         (*route_destination).sin_family = sys::AF_INET as u16;
-        (*route_destination).sin_addr = sys::in_addr { s_addr: u32::from(destination.base_addr()).to_be() };
+        (*route_destination).sin_addr = libc::in_addr { s_addr: u32::from(destination.base_addr()).to_be() };
     };
 
     #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
     unsafe {
-        let route_genmask = &mut route.rt_genmask as *mut _ as *mut sys::sockaddr_in;
+        let route_genmask = &mut route.rt_genmask as *mut _ as *mut libc::sockaddr_in;
         (*route_genmask).sin_family = sys::AF_INET as u16;
-        (*route_genmask).sin_addr = sys::in_addr { s_addr: u32::from(destination.netmask()).to_be() };
+        (*route_genmask).sin_addr = libc::in_addr { s_addr: u32::from(destination.netmask()).to_be() };
     };
 
     route.rt_flags = sys::RTF_UP as u16;
     if let Some(gateway_addr) = gateway {
         #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
         unsafe {
-            let route_gateway = &mut route.rt_gateway as *mut _ as *mut sys::sockaddr_in;
+            let route_gateway = &mut route.rt_gateway as *mut _ as *mut libc::sockaddr_in;
             (*route_gateway).sin_family = sys::AF_INET as u16;
-            (*route_gateway).sin_addr = sys::in_addr { s_addr: u32::from(gateway_addr).to_be() };
+            (*route_gateway).sin_addr = libc::in_addr { s_addr: u32::from(gateway_addr).to_be() };
         };
     
         route.rt_flags |= sys::RTF_GATEWAY as u16;

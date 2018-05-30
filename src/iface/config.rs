@@ -220,7 +220,7 @@ pub fn set_mac_addr(iface_name: &str, mac_addr: MacAddr) -> Result<(), SetMacAdd
         );
         {
             let addr = &mut req.ifr_ifru.ifru_hwaddr;
-            let addr = addr as *mut sys::sockaddr;
+            let addr = addr as *mut sys::sockaddr as *mut libc::sockaddr;
             let addr = &mut *addr;
             addr.sa_family = sys::ARPHRD_ETHER as u16;
             addr.sa_data[0..6].clone_from_slice(mac_addr);
@@ -273,7 +273,7 @@ pub fn get_mac_addr(iface_name: &str) -> Result<MacAddr, GetMacAddrError> {
 
         let mac_addr = {
             let addr = &mut req.ifr_ifru.ifru_hwaddr;
-            let addr = addr as *mut sys::sockaddr;
+            let addr = addr as *mut sys::sockaddr as *mut libc::sockaddr;
             let addr = &mut *addr;
             assert_eq!(addr.sa_family, sys::ARPHRD_ETHER as u16);
             let mac_addr = &addr.sa_data[0..6];
@@ -313,8 +313,8 @@ pub fn set_ipv4_addr(
         #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
         {
             let addr = &mut req.ifr_ifru.ifru_addr;
-            let addr = addr as *mut sys::sockaddr;
-            let addr = addr as *mut sys::sockaddr_in;
+            let addr = addr as *mut sys::sockaddr as *mut libc::sockaddr;
+            let addr = addr as *mut libc::sockaddr_in;
             let addr = &mut *addr;
             addr.sin_family = sys::AF_INET as sys::sa_family_t;
             addr.sin_port = 0;
@@ -340,8 +340,8 @@ pub fn set_ipv4_addr(
         #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
         {
             let addr = &mut req.ifr_ifru.ifru_addr;
-            let addr = addr as *mut sys::sockaddr;
-            let addr = addr as *mut sys::sockaddr_in;
+            let addr = addr as *mut sys::sockaddr as *mut libc::sockaddr;
+            let addr = addr as *mut libc::sockaddr_in;
             let addr = &mut *addr;
             addr.sin_family = sys::AF_INET as sys::sa_family_t;
             addr.sin_port = 0;
