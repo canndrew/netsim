@@ -131,7 +131,7 @@ where
             };
             let version = unwrap!(version.to_str());
             let passwd = unsafe {
-                sys::getpwuid(uid)
+                libc::getpwuid(uid)
             };
             let user_name = unsafe {
                 CStr::from_ptr((*passwd).pw_name)
