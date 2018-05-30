@@ -1,7 +1,7 @@
 //! Contains utilites for working with virtual (TAP) network interfaces.
 
 use priv_prelude::*;
-use sys;
+use libc;
 use iface::build::{IfaceBuilder, build};
 
 /// This object can be used to set the configuration options for a `EtherIface` before creating the
@@ -121,7 +121,7 @@ impl Stream for EtherIface {
             return Ok(Async::NotReady);
         }
 
-        let mut buffer: [u8; sys::ETH_FRAME_LEN as usize] = unsafe {
+        let mut buffer: [u8; libc::ETH_FRAME_LEN as usize] = unsafe {
             mem::uninitialized()
         };
         match self.fd.read(&mut buffer[..]) {

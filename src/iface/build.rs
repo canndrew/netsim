@@ -119,11 +119,11 @@ pub fn build(builder: IfaceBuilder, mac_addr: Option<MacAddr>) -> Result<AsyncFd
             req.ifr_ifrn.ifrn_name.as_mut_ptr(),
             name.as_bytes().len(),
         );
-        req.ifr_ifru.ifru_flags = sys::IFF_NO_PI as i16;
+        req.ifr_ifru.ifru_flags = libc::IFF_NO_PI as i16;
         if mac_addr.is_some() {
-            req.ifr_ifru.ifru_flags |= sys::IFF_TAP as i16;
+            req.ifr_ifru.ifru_flags |= libc::IFF_TAP as i16;
         } else {
-            req.ifr_ifru.ifru_flags |= sys::IFF_TUN as i16;
+            req.ifr_ifru.ifru_flags |= libc::IFF_TUN as i16;
         }
         req
     };
