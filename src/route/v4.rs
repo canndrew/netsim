@@ -1,6 +1,7 @@
 use priv_prelude::*;
 use super::*;
 use sys;
+use libc;
 
 /// Represents an IPv4 route.
 #[derive(Debug, Clone, Copy)]
@@ -48,9 +49,9 @@ pub fn add_route_v4(
     };
     if fd < 0 {
         let os_err = io::Error::last_os_error();
-        match sys::errno() as u32 {
-            sys::EMFILE => return Err(AddRouteError::ProcessFileDescriptorLimit(os_err)),
-            sys::ENFILE => return Err(AddRouteError::SystemFileDescriptorLimit(os_err)),
+        match sys::errno() {
+            libc::EMFILE => return Err(AddRouteError::ProcessFileDescriptorLimit(os_err)),
+            libc::ENFILE => return Err(AddRouteError::SystemFileDescriptorLimit(os_err)),
             _ => {
                 panic!("unexpected error creating socket: {}", os_err);
             },

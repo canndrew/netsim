@@ -1,6 +1,3 @@
-//#include <unistd.h>
-//#include <fcntl.h>
-#include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>

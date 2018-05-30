@@ -96,14 +96,14 @@ pub fn build(builder: IfaceBuilder, mac_addr: Option<MacAddr>) -> Result<AsyncFd
         };
         if raw_fd < 0 {
             let os_err = io::Error::last_os_error();
-            match sys::errno() as u32 {
-                sys::EACCES => return Err(IfaceBuildError::TunPermissionDenied(os_err)),
-                sys::EINTR => continue,
-                sys::ELOOP => return Err(IfaceBuildError::TunSymbolicLinks(os_err)),
-                sys::EMFILE => return Err(IfaceBuildError::ProcessFileDescriptorLimit(os_err)),
-                sys::ENFILE => return Err(IfaceBuildError::SystemFileDescriptorLimit(os_err)),
-                sys::ENOENT => return Err(IfaceBuildError::TunDoesntExist(os_err)),
-                sys::ENXIO => return Err(IfaceBuildError::TunDeviceNotLoaded(os_err)),
+            match sys::errno() {
+                libc::EACCES => return Err(IfaceBuildError::TunPermissionDenied(os_err)),
+                libc::EINTR => continue,
+                libc::ELOOP => return Err(IfaceBuildError::TunSymbolicLinks(os_err)),
+                libc::EMFILE => return Err(IfaceBuildError::ProcessFileDescriptorLimit(os_err)),
+                libc::ENFILE => return Err(IfaceBuildError::SystemFileDescriptorLimit(os_err)),
+                libc::ENOENT => return Err(IfaceBuildError::TunDoesntExist(os_err)),
+                libc::ENXIO => return Err(IfaceBuildError::TunDeviceNotLoaded(os_err)),
                 _ => {
                     panic!("unexpected error from open(\"/dev/net/tun\"). {}", os_err);
                 },
@@ -133,9 +133,9 @@ pub fn build(builder: IfaceBuilder, mac_addr: Option<MacAddr>) -> Result<AsyncFd
     };
     if res < 0 {
         let os_err = sys::errno();
-        match os_err as u32 {
-            sys::EPERM => return Err(IfaceBuildError::CreateIfacePermissionDenied),
-            sys::EBUSY => {
+        match os_err {
+            libc::EPERM => return Err(IfaceBuildError::CreateIfacePermissionDenied),
+            libc::EBUSY => {
                 for iface in unwrap!(get_if_addrs::get_if_addrs()) {
                     if iface.name == builder.name {
                         return Err(IfaceBuildError::InterfaceAlreadyExists);

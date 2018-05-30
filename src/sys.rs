@@ -11,8 +11,9 @@
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 pub fn errno() -> ::std::os::raw::c_int {
+    use libc;
     unsafe {
-        *__errno_location()
+        *libc::__errno_location()
     }
 }
 

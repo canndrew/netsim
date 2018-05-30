@@ -187,9 +187,9 @@ fn get_socket() -> Result<c_int, GetSocketError> {
         let fd = sys::socket(sys::AF_INET as i32, sys::__socket_type::SOCK_DGRAM as i32, 0);
         if fd < 0 {
             let os_err = io::Error::last_os_error();
-            match sys::errno() as u32 {
-                sys::EMFILE => return Err(GetSocketError::ProcessFileDescriptorLimit(os_err)),
-                sys::ENFILE => return Err(GetSocketError::SystemFileDescriptorLimit(os_err)),
+            match sys::errno() {
+                libc::EMFILE => return Err(GetSocketError::ProcessFileDescriptorLimit(os_err)),
+                libc::ENFILE => return Err(GetSocketError::SystemFileDescriptorLimit(os_err)),
                 _ => {
                     panic!("unexpected error when creating dummy socket: {}", os_err);
                 },
@@ -229,10 +229,10 @@ pub fn set_mac_addr(iface_name: &str, mac_addr: MacAddr) -> Result<(), SetMacAdd
         if ioctl::siocsifhwaddr(fd, &req) < 0 {
             let _ = sys::close(fd);
             let os_err = io::Error::last_os_error();
-            match sys::errno() as u32 {
-                sys::ENODEV => return Err(SetMacAddrError::UnknownInterface),
-                sys::EPERM => return Err(SetMacAddrError::PermissionDenied(os_err)),
-                sys::EADDRNOTAVAIL => return Err(SetMacAddrError::AddrNotAvailable(os_err)),
+            match sys::errno() {
+                libc::ENODEV => return Err(SetMacAddrError::UnknownInterface),
+                libc::EPERM => return Err(SetMacAddrError::PermissionDenied(os_err)),
+                libc::EADDRNOTAVAIL => return Err(SetMacAddrError::AddrNotAvailable(os_err)),
                 _ => {
                     panic!("unexpected error from SIOCSIFHWADDR ioctl: {}", os_err);
                 }
@@ -263,8 +263,8 @@ pub fn get_mac_addr(iface_name: &str) -> Result<MacAddr, GetMacAddrError> {
         if ioctl::siocgifhwaddr(fd, &mut req) < 0 {
             let _ = sys::close(fd);
             let os_err = io::Error::last_os_error();
-            match sys::errno() as u32 {
-                sys::ENODEV => return Err(GetMacAddrError::UnknownInterface),
+            match sys::errno() {
+                libc::ENODEV => return Err(GetMacAddrError::UnknownInterface),
                 _ => {
                     panic!("unexpected error from SIOCGIFHWADDR ioctl: {}", os_err);
                 }
@@ -327,10 +327,10 @@ pub fn set_ipv4_addr(
             //  (a) pick an invalid IP.
             //  (b) pick an IP already in use
             let os_err = io::Error::last_os_error();
-            match sys::errno() as u32 {
-                sys::ENODEV => return Err(SetIpv4AddrError::UnknownInterface),
-                sys::EPERM => return Err(SetIpv4AddrError::PermissionDenied(os_err)),
-                sys::EADDRNOTAVAIL => return Err(SetIpv4AddrError::AddrNotAvailable(os_err)),
+            match sys::errno() {
+                libc::ENODEV => return Err(SetIpv4AddrError::UnknownInterface),
+                libc::EPERM => return Err(SetIpv4AddrError::PermissionDenied(os_err)),
+                libc::EADDRNOTAVAIL => return Err(SetIpv4AddrError::AddrNotAvailable(os_err)),
                 _ => {
                     panic!("unexpected error from SIOCSIFADDR ioctl: {}", os_err);
                 },
@@ -351,9 +351,9 @@ pub fn set_ipv4_addr(
         if ioctl::siocsifnetmask(fd, &req) < 0 {
             let _ = sys::close(fd);
             let os_err = io::Error::last_os_error();
-            match sys::errno() as u32 {
-                sys::ENODEV => return Err(SetIpv4AddrError::UnknownInterface),
-                sys::EADDRNOTAVAIL => return Err(SetIpv4AddrError::AddrNotAvailable(os_err)),
+            match sys::errno() {
+                libc::ENODEV => return Err(SetIpv4AddrError::UnknownInterface),
+                libc::EADDRNOTAVAIL => return Err(SetIpv4AddrError::AddrNotAvailable(os_err)),
                 _ => {
                     panic!("unexpected error from SIOCSIFNETMASK ioctl: {}", os_err);
                 },
@@ -387,8 +387,8 @@ pub fn set_ipv6_addr(
         if ioctl::siocgifindex(fd, &mut req) < 0 {
             let _ = sys::close(fd);
             let os_err = io::Error::last_os_error();
-            match sys::errno() as u32 {
-                sys::ENODEV => return Err(SetIpv6AddrError::UnknownInterface),
+            match sys::errno() {
+                libc::ENODEV => return Err(SetIpv6AddrError::UnknownInterface),
                 _ => {
                     panic!("unexpected error from SIOGIFINDEX ioctl: {}", os_err);
                 },
@@ -399,9 +399,9 @@ pub fn set_ipv6_addr(
         let netlink = sys::socket(sys::AF_NETLINK as i32, libc::SOCK_RAW, sys::NETLINK_ROUTE as i32);
         if netlink < 0 {
             let os_err = io::Error::last_os_error();
-            match sys::errno() as u32 {
-                sys::EMFILE => return Err(SetIpv6AddrError::ProcessFileDescriptorLimit(os_err)),
-                sys::ENFILE => return Err(SetIpv6AddrError::SystemFileDescriptorLimit(os_err)),
+            match sys::errno() {
+                libc::EMFILE => return Err(SetIpv6AddrError::ProcessFileDescriptorLimit(os_err)),
+                libc::ENFILE => return Err(SetIpv6AddrError::SystemFileDescriptorLimit(os_err)),
                 _ => {
                     panic!("unexpected error when creating netlink socket: {}", os_err);
                 },
@@ -515,10 +515,10 @@ pub fn set_ipv6_addr(
                 let nlmsgerr: &sys::nlmsgerr = &*nlmsgerr;
                 if nlmsgerr.error != 0 {
                     let os_err = io::Error::from_raw_os_error(-nlmsgerr.error);
-                    match (-nlmsgerr.error) as u32 {
-                        sys::EPERM
+                    match -nlmsgerr.error {
+                        libc::EPERM
                             => return Err(SetIpv6AddrError::PermissionDenied(os_err)),
-                        sys::EADDRNOTAVAIL
+                        libc::EADDRNOTAVAIL
                             => return Err(SetIpv6AddrError::AddrNotAvailable(os_err)),
                         _ => {
                             panic!(
@@ -558,8 +558,8 @@ pub fn put_up(iface_name: &str) -> Result<(), PutUpError> {
         if ioctl::siocgifflags(fd, &mut req) < 0 {
             let _ = sys::close(fd);
             let os_err = io::Error::last_os_error();
-            match sys::errno() as u32 {
-                sys::ENODEV => return Err(PutUpError::UnknownInterface),
+            match sys::errno() {
+                libc::ENODEV => return Err(PutUpError::UnknownInterface),
                 _ => {
                     panic!("unexpected error from SIOCGIFFLAGS ioctl: {}", os_err);
                 },
@@ -571,9 +571,9 @@ pub fn put_up(iface_name: &str) -> Result<(), PutUpError> {
         if ioctl::siocsifflags(fd, &req) < 0 {
             let _ = sys::close(fd);
             let os_err = io::Error::last_os_error();
-            match sys::errno() as u32 {
-                sys::ENODEV => return Err(PutUpError::UnknownInterface),
-                sys::EPERM => return Err(PutUpError::PermissionDenied(os_err)),
+            match sys::errno() {
+                libc::ENODEV => return Err(PutUpError::UnknownInterface),
+                libc::EPERM => return Err(PutUpError::PermissionDenied(os_err)),
                 _ => {
                     panic!("unexpected error from SIOCSIFFLAGS ioctl: {}", os_err);
                 },
