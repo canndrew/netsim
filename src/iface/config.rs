@@ -168,7 +168,7 @@ enum GetSocketError {
 struct UnknownInterface;
 
 fn get_req(iface_name: &str) -> Result<sys::ifreq, UnknownInterface> {
-    if iface_name.len() > sys::IF_NAMESIZE as usize {
+    if iface_name.len() > libc::IF_NAMESIZE as usize {
         return Err(UnknownInterface);
     }
     unsafe {
@@ -566,7 +566,7 @@ pub fn put_up(iface_name: &str) -> Result<(), PutUpError> {
             };
         }
 
-        req.ifr_ifru.ifru_flags |= (sys::IFF_UP as u32 | sys::IFF_RUNNING as u32) as i16;
+        req.ifr_ifru.ifru_flags |= (libc::IFF_UP as u32 | libc::IFF_RUNNING as u32) as i16;
 
         if ioctl::siocsifflags(fd, &req) < 0 {
             let _ = sys::close(fd);

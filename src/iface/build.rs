@@ -86,7 +86,7 @@ pub fn build(builder: IfaceBuilder, mac_addr: Option<MacAddr>) -> Result<AsyncFd
             return Err(IfaceBuildError::NameContainsNul);
         },
     };
-    if name.as_bytes_with_nul().len() > sys::IF_NAMESIZE as usize {
+    if name.as_bytes_with_nul().len() > libc::IF_NAMESIZE as usize {
         return Err(IfaceBuildError::NameTooLong);
     }
 

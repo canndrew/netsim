@@ -1,7 +1,10 @@
 // needed for SIOCADDRT
 #include <sys/ioctl.h>
 
+// needed for ifreq
 #include <net/if.h>
+
+
 #include <net/if_arp.h>
 #include <net/route.h>
 #include <linux/if_tun.h>
