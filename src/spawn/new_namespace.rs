@@ -138,7 +138,7 @@ where
             };
             let user_name = unwrap!(user_name.to_str());
             let group = unsafe {
-                sys::getgrgid(gid)
+                libc::getgrgid(gid)
             };
             let group_name = unsafe {
                 CStr::from_ptr((*group).gr_name)
