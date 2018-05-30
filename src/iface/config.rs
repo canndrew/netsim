@@ -396,7 +396,7 @@ pub fn set_ipv6_addr(
         }
         let index = req.ifr_ifru.ifru_ivalue as u32;
 
-        let netlink = sys::socket(sys::AF_NETLINK as i32, libc::SOCK_RAW, sys::NETLINK_ROUTE as i32);
+        let netlink = sys::socket(sys::AF_NETLINK as i32, libc::SOCK_RAW, libc::NETLINK_ROUTE as i32);
         if netlink < 0 {
             let os_err = io::Error::last_os_error();
             match sys::errno() {
@@ -411,7 +411,7 @@ pub fn set_ipv6_addr(
         let round_up = |x| (x + sys::NLMSG_ALIGNTO as usize - 1) & !(sys::NLMSG_ALIGNTO as usize - 1);
 
         let header_start = 0;
-        let header_end = header_start + mem::size_of::<sys::nlmsghdr>();
+        let header_end = header_start + mem::size_of::<libc::nlmsghdr>();
         let data_start = round_up(header_end);
         let data_end = data_start + mem::size_of::<sys::ifaddrmsg>();
         let attr_header_start = round_up(data_end);
@@ -422,19 +422,19 @@ pub fn set_ipv6_addr(
 
         let mut buffer: Vec<u8> = Vec::with_capacity(total_size);
         {
-            let nlmsghdr: *mut sys::nlmsghdr = {
+            let nlmsghdr: *mut libc::nlmsghdr = {
                 #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
                 { buffer.as_mut_ptr() as *mut _ }
             };
-            let nlmsghdr: &mut sys::nlmsghdr = &mut *nlmsghdr;
+            let nlmsghdr: &mut libc::nlmsghdr = &mut *nlmsghdr;
 
             nlmsghdr.nlmsg_len = total_size as u32;
             nlmsghdr.nlmsg_type = sys::RTM_NEWADDR as u16;
             nlmsghdr.nlmsg_flags = {
-                sys::NLM_F_REPLACE |
-                sys::NLM_F_CREATE |
-                sys::NLM_F_REQUEST |    // TODO: do I need this one?
-                sys::NLM_F_ACK
+                libc::NLM_F_REPLACE |
+                libc::NLM_F_CREATE |
+                libc::NLM_F_REQUEST |    // TODO: do I need this one?
+                libc::NLM_F_ACK
             } as u16;
             nlmsghdr.nlmsg_seq = 0;
             nlmsghdr.nlmsg_pid = 0;
@@ -478,9 +478,9 @@ pub fn set_ipv6_addr(
         assert_eq!(n as usize, total_size);
 
         let header_start = 0;
-        let header_end = header_start + mem::size_of::<sys::nlmsghdr>();
+        let header_end = header_start + mem::size_of::<libc::nlmsghdr>();
         let error_start = round_up(header_end);
-        let error_end = error_start + mem::size_of::<sys::nlmsgerr>();
+        let error_end = error_start + mem::size_of::<libc::nlmsgerr>();
         let total_size = error_end;
 
         let mut buffer: Vec<u8> = Vec::with_capacity(total_size);
@@ -495,24 +495,24 @@ pub fn set_ipv6_addr(
             assert!(n as usize >= header_end);
 
             {
-                let nlmsghdr: *const sys::nlmsghdr = {
+                let nlmsghdr: *const libc::nlmsghdr = {
                     #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
                     { buffer.as_ptr() as *const _ }
                 };
-                let nlmsghdr: &sys::nlmsghdr = &*nlmsghdr;
-                if nlmsghdr.nlmsg_type == sys::NLMSG_NOOP as u16 {
+                let nlmsghdr: &libc::nlmsghdr = &*nlmsghdr;
+                if nlmsghdr.nlmsg_type == libc::NLMSG_NOOP as u16 {
                     continue;
                 }
                 assert_eq!(n as usize, total_size);
-                assert_eq!(nlmsghdr.nlmsg_type, sys::NLMSG_ERROR as u16);
+                assert_eq!(nlmsghdr.nlmsg_type, libc::NLMSG_ERROR as u16);
             }
 
             {
-                let nlmsgerr: *const sys::nlmsgerr = {
+                let nlmsgerr: *const libc::nlmsgerr = {
                     #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
                     { buffer.as_ptr().offset(error_start as isize) as *const _ }
                 };
-                let nlmsgerr: &sys::nlmsgerr = &*nlmsgerr;
+                let nlmsgerr: &libc::nlmsgerr = &*nlmsgerr;
                 if nlmsgerr.error != 0 {
                     let os_err = io::Error::from_raw_os_error(-nlmsgerr.error);
                     match -nlmsgerr.error {
