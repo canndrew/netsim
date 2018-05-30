@@ -11,7 +11,6 @@
 #include <net/route.h>
 
 
-#include <sys/prctl.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 

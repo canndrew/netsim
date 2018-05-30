@@ -1,5 +1,4 @@
 use priv_prelude::*;
-use sys;
 use libc;
 use libc::{c_int, c_void, pid_t};
 use spawn_complete;
@@ -71,7 +70,7 @@ where
         // two threads.
 
         let res = unsafe {
-            sys::prctl(sys::PR_SET_PDEATHSIG as i32, libc::SIGTERM, 0, 0, 0)
+            libc::prctl(libc::PR_SET_PDEATHSIG as i32, libc::SIGTERM, 0, 0, 0)
         };
         assert_eq!(res, 0);
 
