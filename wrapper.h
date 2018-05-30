@@ -1,4 +1,3 @@
-#include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <net/if_arp.h>
