@@ -227,7 +227,7 @@ pub fn set_mac_addr(iface_name: &str, mac_addr: MacAddr) -> Result<(), SetMacAdd
         }
 
         if ioctl::siocsifhwaddr(fd, &req) < 0 {
-            let _ = sys::close(fd);
+            let _ = libc::close(fd);
             let os_err = io::Error::last_os_error();
             match sys::errno() {
                 libc::ENODEV => return Err(SetMacAddrError::UnknownInterface),
@@ -239,7 +239,7 @@ pub fn set_mac_addr(iface_name: &str, mac_addr: MacAddr) -> Result<(), SetMacAdd
             }
         }
 
-        let _ = sys::close(fd);
+        let _ = libc::close(fd);
     }
 
     Ok(())
@@ -261,7 +261,7 @@ pub fn get_mac_addr(iface_name: &str) -> Result<MacAddr, GetMacAddrError> {
         };
 
         if ioctl::siocgifhwaddr(fd, &mut req) < 0 {
-            let _ = sys::close(fd);
+            let _ = libc::close(fd);
             let os_err = io::Error::last_os_error();
             match sys::errno() {
                 libc::ENODEV => return Err(GetMacAddrError::UnknownInterface),
@@ -284,7 +284,7 @@ pub fn get_mac_addr(iface_name: &str) -> Result<MacAddr, GetMacAddrError> {
             MacAddr::from_bytes(mac_addr)
         };
 
-        let _ = sys::close(fd);
+        let _ = libc::close(fd);
 
         Ok(mac_addr)
     }
@@ -322,7 +322,7 @@ pub fn set_ipv4_addr(
         }
 
         if ioctl::siocsifaddr(fd, &req) < 0 {
-            let _ = sys::close(fd);
+            let _ = libc::close(fd);
             // TODO: what errors occur if we
             //  (a) pick an invalid IP.
             //  (b) pick an IP already in use
@@ -349,7 +349,7 @@ pub fn set_ipv4_addr(
         }
 
         if ioctl::siocsifnetmask(fd, &req) < 0 {
-            let _ = sys::close(fd);
+            let _ = libc::close(fd);
             let os_err = io::Error::last_os_error();
             match sys::errno() {
                 libc::ENODEV => return Err(SetIpv4AddrError::UnknownInterface),
@@ -359,7 +359,7 @@ pub fn set_ipv4_addr(
                 },
             }
         }
-        let _ = sys::close(fd);
+        let _ = libc::close(fd);
     }
 
     Ok(())
@@ -385,7 +385,7 @@ pub fn set_ipv6_addr(
         };
 
         if ioctl::siocgifindex(fd, &mut req) < 0 {
-            let _ = sys::close(fd);
+            let _ = libc::close(fd);
             let os_err = io::Error::last_os_error();
             match sys::errno() {
                 libc::ENODEV => return Err(SetIpv6AddrError::UnknownInterface),
@@ -471,7 +471,7 @@ pub fn set_ipv6_addr(
             addr.clone_from_slice(&ipv6_addr.octets());
         }
 
-        let n = sys::write(netlink, buffer.as_ptr() as *const _, total_size);
+        let n = libc::write(netlink, buffer.as_ptr() as *const _, total_size);
         if n < 0 {
             panic!("unexpected error writing to netlink socket: {}", io::Error::last_os_error());
         }
@@ -485,7 +485,7 @@ pub fn set_ipv6_addr(
 
         let mut buffer: Vec<u8> = Vec::with_capacity(total_size);
         loop {
-            let n = sys::read(netlink, buffer.as_mut_ptr() as *mut _, total_size);
+            let n = libc::read(netlink, buffer.as_mut_ptr() as *mut _, total_size);
             if n < 0 {
                 panic!(
                     "unexpected error reading from netlink socket: {}",
@@ -533,8 +533,8 @@ pub fn set_ipv6_addr(
             break;
         }
 
-        let _ = sys::close(netlink);
-        let _ = sys::close(fd);
+        let _ = libc::close(netlink);
+        let _ = libc::close(fd);
     }
 
     Ok(())
@@ -556,7 +556,7 @@ pub fn put_up(iface_name: &str) -> Result<(), PutUpError> {
         };
 
         if ioctl::siocgifflags(fd, &mut req) < 0 {
-            let _ = sys::close(fd);
+            let _ = libc::close(fd);
             let os_err = io::Error::last_os_error();
             match sys::errno() {
                 libc::ENODEV => return Err(PutUpError::UnknownInterface),
@@ -569,7 +569,7 @@ pub fn put_up(iface_name: &str) -> Result<(), PutUpError> {
         req.ifr_ifru.ifru_flags |= (libc::IFF_UP as u32 | libc::IFF_RUNNING as u32) as i16;
 
         if ioctl::siocsifflags(fd, &req) < 0 {
-            let _ = sys::close(fd);
+            let _ = libc::close(fd);
             let os_err = io::Error::last_os_error();
             match sys::errno() {
                 libc::ENODEV => return Err(PutUpError::UnknownInterface),
@@ -579,7 +579,7 @@ pub fn put_up(iface_name: &str) -> Result<(), PutUpError> {
                 },
             }
         }
-        let _ = sys::close(fd);
+        let _ = libc::close(fd);
     }
 
     Ok(())

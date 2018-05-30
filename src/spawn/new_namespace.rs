@@ -29,7 +29,7 @@ where
     F: Send + 'static,
     R: Send + 'static,
 {
-    let stack_size = unsafe { sys::getpagesize() } as usize;
+    let stack_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) } as usize;
     let stack_size = cmp::max(stack_size, 4096);
 
     let mut stack = Vec::<u8>::with_capacity(stack_size + STACK_ALIGN);
@@ -98,8 +98,8 @@ where
         0
     }
 
-    let uid = unsafe { sys::geteuid() };
-    let gid = unsafe { sys::getegid() };
+    let uid = unsafe { libc::geteuid() };
+    let gid = unsafe { libc::getegid() };
     let (ret_tx, ret_rx) = oneshot::channel();
     let stack_head = ((stack_base as usize + stack_size + STACK_ALIGN) & !(STACK_ALIGN - 1)) as *mut c_void;
     let func = Box::new(func);

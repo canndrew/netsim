@@ -11,7 +11,6 @@
 #include <net/route.h>
 
 
-#include <unistd.h>
 #include <sys/syscall.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
