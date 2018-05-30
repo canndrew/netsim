@@ -71,7 +71,7 @@ where
         // two threads.
 
         let res = unsafe {
-            sys::prctl(sys::PR_SET_PDEATHSIG as i32, sys::SIGTERM, 0, 0, 0)
+            sys::prctl(sys::PR_SET_PDEATHSIG as i32, libc::SIGTERM, 0, 0, 0)
         };
         assert_eq!(res, 0);
 
