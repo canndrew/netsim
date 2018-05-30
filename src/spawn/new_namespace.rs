@@ -121,9 +121,9 @@ where
     if pid == -1 {
         let err = io::Error::last_os_error();
         if err.kind() == io::ErrorKind::PermissionDenied {
-            let mut utsname: sys::utsname = unsafe { mem::zeroed() };
+            let mut utsname: libc::utsname = unsafe { mem::zeroed() };
             let res = unsafe {
-                sys::uname(&mut utsname)
+                libc::uname(&mut utsname)
             };
             assert_eq!(res, 0);
             let version = unsafe {
