@@ -94,7 +94,7 @@ pub fn add_route_v6(
     route.rt_dev = name.as_ptr() as *mut _;
 
     let res = unsafe {
-        sys::ioctl(fd, u64::from(sys::SIOCADDRT), &route)
+        libc::ioctl(fd, u64::from(sys::SIOCADDRT), &route)
     };
     if res != 0 {
         let os_err = io::Error::last_os_error();
