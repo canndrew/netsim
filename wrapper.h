@@ -11,7 +11,6 @@
 #include <net/route.h>
 
 
-#include <sys/syscall.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
 #include <pwd.h>
