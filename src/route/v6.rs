@@ -40,9 +40,9 @@ pub fn add_route_v6(
     iface_name: &str,
 ) -> Result<(), AddRouteError> {
     let fd = unsafe {
-        sys::socket(
-            sys::PF_INET6 as i32,
-            sys::__socket_type::SOCK_DGRAM as i32,
+        libc::socket(
+            libc::PF_INET6 as i32,
+            libc::SOCK_DGRAM as i32,
             libc::IPPROTO_IP as i32,
         )
     };
@@ -64,14 +64,14 @@ pub fn add_route_v6(
     #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
     unsafe {
         let route_destination = &mut route.rt_dst as *mut _ as *mut libc::sockaddr_in6;
-        (*route_destination).sin6_family = sys::AF_INET6 as u16;
+        (*route_destination).sin6_family = libc::AF_INET6 as u16;
         (*route_destination).sin6_addr = mem::transmute(u128::from(destination.base_addr()).to_be());
     };
 
     #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
     unsafe {
         let route_genmask = &mut route.rt_genmask as *mut _ as *mut libc::sockaddr_in6;
-        (*route_genmask).sin6_family = sys::AF_INET6 as u16;
+        (*route_genmask).sin6_family = libc::AF_INET6 as u16;
         (*route_genmask).sin6_addr = mem::transmute(u128::from(destination.netmask()).to_be());
     };
 
@@ -79,7 +79,7 @@ pub fn add_route_v6(
     #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
     unsafe {
         let route_gateway = &mut route.rt_gateway as *mut _ as *mut libc::sockaddr_in6;
-        (*route_gateway).sin6_family = sys::AF_INET6 as u16;
+        (*route_gateway).sin6_family = libc::AF_INET6 as u16;
         (*route_gateway).sin6_addr = mem::transmute(u128::from(next_hop).to_be());
     };
     

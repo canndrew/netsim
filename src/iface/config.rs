@@ -184,7 +184,7 @@ fn get_req(iface_name: &str) -> Result<sys::ifreq, UnknownInterface> {
 
 fn get_socket() -> Result<c_int, GetSocketError> {
     unsafe {
-        let fd = sys::socket(sys::AF_INET as i32, sys::__socket_type::SOCK_DGRAM as i32, 0);
+        let fd = libc::socket(libc::AF_INET as i32, libc::SOCK_DGRAM as i32, 0);
         if fd < 0 {
             let os_err = io::Error::last_os_error();
             match sys::errno() {
@@ -220,7 +220,7 @@ pub fn set_mac_addr(iface_name: &str, mac_addr: MacAddr) -> Result<(), SetMacAdd
         );
         {
             let addr = &mut req.ifr_ifru.ifru_hwaddr;
-            let addr = addr as *mut sys::sockaddr as *mut libc::sockaddr;
+            let addr = addr as *mut libc::sockaddr;
             let addr = &mut *addr;
             addr.sa_family = sys::ARPHRD_ETHER as u16;
             addr.sa_data[0..6].clone_from_slice(mac_addr);
@@ -273,7 +273,7 @@ pub fn get_mac_addr(iface_name: &str) -> Result<MacAddr, GetMacAddrError> {
 
         let mac_addr = {
             let addr = &mut req.ifr_ifru.ifru_hwaddr;
-            let addr = addr as *mut sys::sockaddr as *mut libc::sockaddr;
+            let addr = addr as *mut libc::sockaddr;
             let addr = &mut *addr;
             assert_eq!(addr.sa_family, sys::ARPHRD_ETHER as u16);
             let mac_addr = &addr.sa_data[0..6];
@@ -313,10 +313,10 @@ pub fn set_ipv4_addr(
         #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
         {
             let addr = &mut req.ifr_ifru.ifru_addr;
-            let addr = addr as *mut sys::sockaddr as *mut libc::sockaddr;
+            let addr = addr as *mut libc::sockaddr;
             let addr = addr as *mut libc::sockaddr_in;
             let addr = &mut *addr;
-            addr.sin_family = sys::AF_INET as sys::sa_family_t;
+            addr.sin_family = libc::AF_INET as libc::sa_family_t;
             addr.sin_port = 0;
             addr.sin_addr.s_addr = u32::from(ipv4_addr).to_be();
         }
@@ -340,10 +340,10 @@ pub fn set_ipv4_addr(
         #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
         {
             let addr = &mut req.ifr_ifru.ifru_addr;
-            let addr = addr as *mut sys::sockaddr as *mut libc::sockaddr;
+            let addr = addr as *mut libc::sockaddr;
             let addr = addr as *mut libc::sockaddr_in;
             let addr = &mut *addr;
-            addr.sin_family = sys::AF_INET as sys::sa_family_t;
+            addr.sin_family = libc::AF_INET as libc::sa_family_t;
             addr.sin_port = 0;
             addr.sin_addr.s_addr = u32::from(netmask).to_be();
         }
@@ -396,7 +396,7 @@ pub fn set_ipv6_addr(
         }
         let index = req.ifr_ifru.ifru_ivalue as u32;
 
-        let netlink = sys::socket(sys::AF_NETLINK as i32, libc::SOCK_RAW, libc::NETLINK_ROUTE as i32);
+        let netlink = libc::socket(libc::AF_NETLINK as i32, libc::SOCK_RAW, libc::NETLINK_ROUTE as i32);
         if netlink < 0 {
             let os_err = io::Error::last_os_error();
             match sys::errno() {
@@ -446,7 +446,7 @@ pub fn set_ipv6_addr(
                 { buffer.as_mut_ptr().offset(data_start as isize) as *mut _ }
             };
             let ifaddrmsg: &mut sys::ifaddrmsg = &mut *ifaddrmsg;
-            ifaddrmsg.ifa_family = sys::AF_INET6 as u8;
+            ifaddrmsg.ifa_family = libc::AF_INET6 as u8;
             ifaddrmsg.ifa_prefixlen = netmask_bits;
             ifaddrmsg.ifa_flags = 0;    // TODO: what is IFA_F_PERMANENT here?
             ifaddrmsg.ifa_scope = 0;
