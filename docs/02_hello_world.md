@@ -161,3 +161,11 @@ See [complete example](../examples/hello_world.rs) from netsim:
 ```shell
 cargo run --example hello_world
 ```
+
+## Next
+
+Usually we won't be constructing and sending packets to our devices manually.
+Instead we want to create multiple network devices and run our Rust code on
+them. To communicate between two devices we need some sort of packet routing.
+Next example demonstrates how to do that -
+[route packets between devices](03_routing.md).
