@@ -67,5 +67,5 @@ fn main() {
     let router = node::ipv4::router((server, client));
     let (spawn_complete, _ipv4_plug) =
         spawn::ipv4_tree(&network.handle(), Ipv4Range::global(), router);
-    let _ = unwrap!(evloop.run(spawn_complete));
+    unwrap!(evloop.run(spawn_complete));
 }

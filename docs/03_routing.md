@@ -108,3 +108,10 @@ See [complete example](../examples/routing.rs) from netsim:
 ```shell
 cargo run --example routing
 ```
+
+## Next
+
+This tutorial covered routing network packets between multiple devices.
+All simualted devices were publicly accessible - had an external IP.
+In [NAT tutorial](04_nat.md) we will see how we can simulate LANs connected
+to the internet with the help of NAT (Network Address Translation) devices.
