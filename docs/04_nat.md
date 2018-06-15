@@ -336,7 +336,7 @@ Also, if we turn on logging, along the lines we can see something like:
 TRACE 2018-06-14T13:13:54Z: netsim::device::ipv4::nat: NAT dropping packet from restricted address 187.12.97.136:46129. allowed endpoints: {1000: {72.92.30.39:35868}}
 ```
 
-More on logging see at [logging tutorial](05_logging.md).
+More on logging see at [logging tutorial](08_logging.md).
 
 ## Other options
 
