@@ -6,7 +6,7 @@ hierarchies, introduce packet loss, latency, create different types of NAT and
 test the robustness of our NAT traversal mechanisms and all within Rust.
 Under the hood netsim uses Linux network namespaces and virtual devices
 to create and simulate virtual IPv4/IPv6 networks and [Tokio](https://tokio.rs/)
-to schedule the work. More on this at [architecture overview](architecture.md).
+to schedule the work. More on this at [architecture overview](09_architecture.md).
 
 To start with see [hello world](02_hello_world.md) example.
 
