@@ -19,9 +19,9 @@ where
     }
 }
 
-/// Run the function `func` in its own network namespace. This namespace will not have any network
-/// interfaces. You can create virtual interfaces using `Tap`, or use one of the other functions in
-/// the `spawn` module which do this for you.
+/// Run the function `func` in its own network namespace on a separate thread. This namespace will
+/// not have any network interfaces. You can create virtual interfaces using `Tap`, or use one of
+/// the other functions in the `spawn` module which do this for you.
 pub fn new_namespace<F, R>(func: F) -> SpawnComplete<R>
 where
     F: FnOnce() -> R,
@@ -34,7 +34,7 @@ where
     let mut stack = Vec::<u8>::with_capacity(stack_size + STACK_ALIGN);
     let stack_base = stack.as_mut_ptr();
 
-    let flags = 
+    let flags =
         libc::CLONE_CHILD_CLEARTID |
         libc::CLONE_FILES |
         libc::CLONE_IO |
@@ -52,7 +52,7 @@ where
         uid: u32,
         gid: u32,
     }
-    
+
     extern "C" fn clone_cb<R: Send + 'static>(arg: *mut c_void) -> c_int {
         let data: *mut CbData<R> = arg as *mut _;
         let data: Box<CbData<R>> = unsafe { Box::from_raw(data) };
@@ -62,7 +62,7 @@ where
         let CbData { func, ret_tx, uid, gid } = data;
 
         // WARNING: HACKERY
-        // 
+        //
         // This should ideally be done without spawning another thread. We're already inside a
         // thread (spawned by clone), but that thread doesn't respect rust's thread-local
         // storage for some reason. So we spawn a thread in a thread in order to get our own
@@ -105,7 +105,7 @@ where
     let arg: Box<CbData<R>> = Box::new(CbData { func, ret_tx, uid, gid });
     let arg = Box::into_raw(arg) as *mut c_void;
     let child_tid = Box::new(!0);
-    
+
     let pid = unsafe {
         libc::clone(
             clone_cb::<R>,

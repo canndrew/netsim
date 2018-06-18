@@ -6,7 +6,7 @@ pub struct MachineNode<F> {
 }
 
 /// Create a node for an Ipv4 machine. This node will run the given function in a network
-/// namespace with a single interface.
+/// namespace with a single interface in a separate thread of it's own.
 pub fn machine<R, F>(func: F) -> MachineNode<F>
 where
     R: Send + 'static,
@@ -262,7 +262,7 @@ mod test {
                                         next_seq_num_1,
                                     ))).into_boxed();
                                 }
-                                
+
                                 let ack_packet = Ipv4Packet::new_from_fields_recursive(
                                     Ipv4Fields {
                                         source_ip: remote_ip,
@@ -468,7 +468,7 @@ mod test {
                             payload => panic!("unexpected ipv4 payload kind in reply: {:?}", payload),
                         };
                         match icmp.kind() {
-                            Icmpv4PacketKind::EchoReply { 
+                            Icmpv4PacketKind::EchoReply {
                                 id: reply_id,
                                 seq_num: reply_seq_num,
                                 payload: reply_payload,
