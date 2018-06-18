@@ -8,6 +8,8 @@ pub use self::latency::*;
 pub use self::packet_loss::*;
 
 #[derive(Debug)]
+/// Bidirectional network plug that can be used to exchange data between two devices.
+/// Anything written to the plub will be readable on the other side.
 pub struct Plug<T: fmt::Debug + 'static> {
     /// The sender
     pub tx: UnboundedSender<T>,
@@ -38,7 +40,7 @@ impl<T: fmt::Debug + 'static> Plug<T> {
     /// any given packet on this connection. A non-zero `mean_additional_latency` can cause packets
     /// to be re-ordered.
     pub fn with_latency(
-        self, 
+        self,
         handle: &NetworkHandle,
         min_latency: Duration,
         mean_additional_latency: Duration,
@@ -61,6 +63,7 @@ impl<T: fmt::Debug + 'static> Plug<T> {
         plug_1
     }
 
+    /// Returns sender and receiver handles used to interact with the other side of the plug.
     pub fn split(self) -> (UnboundedSender<T>, UnboundedReceiver<T>) {
         (self.tx, self.rx)
     }
