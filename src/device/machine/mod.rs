@@ -9,7 +9,8 @@ mod tap;
 mod tun;
 
 #[derive(Default)]
-/// A builder for creating a machine.
+/// A builder for creating a virtual network machine.
+/// Machines are simulated using Linux TUN/TAP devices and network namespaces.
 pub struct MachineBuilder {
     ether_ifaces: Vec<(EtherIfaceBuilder, EtherPlug)>,
     ip_ifaces: Vec<(IpIfaceBuilder, IpPlug)>,

@@ -79,6 +79,8 @@ pub struct IfaceBuilder {
     pub ipv6_routes: Vec<Ipv6Route>,
 }
 
+/// Builds TUN/TAP device.
+/// See: https://www.kernel.org/doc/Documentation/networking/tuntap.txt
 pub fn build(builder: IfaceBuilder, mac_addr: Option<MacAddr>) -> Result<AsyncFd, IfaceBuildError> {
     let name = match CString::new(builder.name.clone()) {
         Ok(name) => name,

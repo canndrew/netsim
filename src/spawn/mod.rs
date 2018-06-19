@@ -7,7 +7,7 @@
 //! functions are convenience functions will automatically configure interfaces with common
 //! settings.
 //!
-//! The tree functions can be used to launch a heirarchal network of nodes when used in
+//! The tree functions can be used to launch a hierarchical network of nodes when used in
 //! conjunction with the functions in the `node` module
 
 mod new_namespace;
@@ -15,4 +15,3 @@ mod tree;
 
 pub use self::new_namespace::new_namespace;
 pub use self::tree::*;
-

@@ -18,7 +18,7 @@ pub use self::ether_adaptor::{ether_adaptor, EtherAdaptorNode};
 
 /// An `Ipv4Node` describes a recipe for constructing a network when given the IP range that the
 /// network should operate on. The functions in the `node::ipv4` module return `Ipv4Node`s that you
-/// can run as a network with the `spawn::network_v4` function.
+/// can run as a network with the `spawn::ipv4_tree` function.
 pub trait Ipv4Node: Sized {
     /// The type returned by the thread spawned by this node.
     type Output: Send + 'static;
@@ -52,7 +52,7 @@ pub trait Ipv4Node: Sized {
     }
 
     /// Add packet loss to a node. Loss happens in burst, rather than on an individual packet
-    /// basis. `mean_loss_duration` controls the burstiness of the loss. 
+    /// basis. `mean_loss_duration` controls the burstiness of the loss.
     fn packet_loss(
         self,
         loss_rate: f64,

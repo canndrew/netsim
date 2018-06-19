@@ -1,4 +1,4 @@
-//! This module is for use with the `spawn::network_v4` function. The functions herein provide a
+//! This module is for use with the `spawn::xxx_tree` functions. The functions herein provide a
 //! simple way to define a hierarchical network with routes automatically configured. If you need
 //! more flexibility in the configuration of a virtual network then you should use the `device`
 //! module types directly.
