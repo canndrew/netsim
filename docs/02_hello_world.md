@@ -1,13 +1,13 @@
 # Hello world
 
-Let's take baby steps before we run and do the hello world of netsim.
-We will simulate networking device and send "hello world" message to it.
+Let's take baby steps before we run by doing the hello world of netsim.
+We will simulate a networked device and send a "hello world" message to it.
 
-First of all, let's setup new project and install netsim.
+First of all, let's setup a new project and install netsim.
 
 ```shell
-cargo new --bin hello-world
-cd hello-world
+$ cargo new --bin hello-world
+$ cd hello-world
 ```
 
 Add netsim and other dependencies to your `Cargo.toml`:
@@ -22,9 +22,9 @@ bytes = "0.4.8"
 
 Note that netsim doesn't work with new Tokio after
 [Tokio reform](https://github.com/tokio-rs/tokio-rfcs/blob/master/text/0001-tokio-reform.md)
-yet. So we'll be using deprecated `tokio-core` crate for now.
+yet. So we'll be using the deprecated `tokio-core` crate for now.
 
-Bring crates into scope in your `main.rs`:
+Bring the crates into scope in your `main.rs`:
 
 ```rust
 extern crate netsim;
@@ -33,14 +33,14 @@ extern crate bytes;
 extern crate futures;
 ```
 
-See if everything compiles:
+Check that everything compiles:
 ```shell
-cargo run
+$ cargo run
 ```
 
 ## Server device
 
-We will create a virtual network with a single networking device on it.
+Let's create a virtual network with a single networked device on it.
 
 First, some boilerplate:
 
@@ -54,11 +54,11 @@ fn main() {
 }
 ```
 
-`Network` object manages Tokio futures that are running during simulation. When
-`network` is dropped, those futures will be dropped too.  We use
-`network.handle()` to spawn any tasks on simulated network.
+The `Network` object manages Tokio futures that are running during simulation. When
+`network` is dropped, those futures will be dropped too, destroying the network. We use
+`network.handle()` to spawn tasks onto the simulated network.
 
-Then, we'll create IPv4 networking device:
+Then let's create an IPv4 networked device:
 
 ```rust
 use netsim::node;
@@ -69,14 +69,14 @@ let server_recipe = node::ipv4::machine(|ip| {
 ```
 
 `node::ipv4::machine()` takes single argument which is a function that will
-be executed once virtual device is ready. This function takes single argument -
-IP address assigned to newly created device. Also note that this function
-will be run in a separate thread. So anything you do here won't block
-the main thread or other virtual devices.
-Also, `node::ipv4::machine()` does not create networking device right away.
-It creates a recipe that later will be used to build virtual device.
+be executed on the simulated machine. This function takes single argument -
+the IP address assigned to the machine's network interface. Also note that this function
+will run in a separate thread. So anything you do here won't block
+the main thread or other simulated devices.
+Also, `node::ipv4::machine()` does not create the networked device right away.
+It creates a recipe that later will be used to build the device.
 
-Now we'll build and run simulated device:
+Now we'll build and run the simulated device:
 
 ```rust
 use netsim::{spawn, Ipv4Range};
@@ -86,14 +86,14 @@ let (spawn_complete, ipv4_plug) =
 ```
 
 `spawn::ipv4_tree()` takes hierarchical network recipe (in this example it's a
-single device), builds and runs it on Tokio event loop.
-Returned `spawn_complete` is a future that completes when thread serving
-virtual devices finishes. `ipv4_plug` is a network plug that we can use to
-exchange data with our virtual device which we'll use next.
+single device), builds it, and runs it on the Tokio event loop.
+The returned `spawn_complete` is a future that completes when the callback running on the simulated machine
+finishes. `ipv4_plug` is a network plug that we can use to
+exchange data with our simulated device. We'll use this next.
 
 ## Data exchange
 
-Now we will make our server device to listen for incoming UDP datagrams.
+Now let's modify our server device to make it listen for incoming UDP datagrams.
 
 ```rust
 use futures::sync::oneshot;
@@ -115,7 +115,7 @@ let (spawn_complete, ipv4_plug) =
     spawn::ipv4_tree(&network.handle(), Ipv4Range::global(), server_recipe);
 ```
 
-When server device starts it binds UDP socket to given IP address and waits
+When this device starts it binds a UDP socket to the given IP address and waits
 for incoming UDP datagrams.
 Now we will use `ipv4_plug` to send raw IP packets to this device:
 
@@ -145,8 +145,8 @@ let _ = packet_tx.unbounded_send(datagram).unwrap();
 ```
 
 Building UDP datagram by hand is a little cumbersome but other than that it
-should be pretty straightforward: we receive servers address, construct
-IP packet and send it over the plug.
+should be pretty straightforward: we receive the server's address, construct
+the IP packet and send it over through the plug.
 
 Finally we will block until server device thread is done:
 
@@ -154,12 +154,15 @@ Finally we will block until server device thread is done:
 evloop.run(spawn_complete).unwrap();
 ```
 
+If everything went well you should see `[server] received: hello world!`
+printed to your screen.
+
 ## Complete example
 
 See [complete example](../examples/hello_world.rs) from netsim:
 
 ```shell
-cargo run --example hello_world
+$ cargo run --example hello_world
 ```
 
 ## Next
@@ -167,5 +170,5 @@ cargo run --example hello_world
 Usually we won't be constructing and sending packets to our devices manually.
 Instead we want to create multiple network devices and run our Rust code on
 them. To communicate between two devices we need some sort of packet routing.
-Next example demonstrates how to do that -
+The next example demonstrates how to do that -
 [route packets between devices](03_routing.md).

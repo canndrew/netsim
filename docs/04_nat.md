@@ -2,21 +2,22 @@
 
 ![NAT](imgs/nat.svg)
 
-When we use routers at home, office, etc. they use
+When we use routers at home, the office, etc. they use
 [Network Address Translation](https://en.wikipedia.org/wiki/Network_address_translation)
-to change your local IP address to public one.
+to translate your local IP addresses to a public one.
 
-Peer-to-peer systems employ [NAT traversal](https://en.wikipedia.org/wiki/NAT_traversal)
-techniques to expose nodes on Internet, even if they run behind a router.
-Testing NAT traversal is hard. Therefore netsim allows us to simulate NAT
-and test how our code behaves in such network.
+Peer-to-peer systems employ [NAT
+traversal](https://en.wikipedia.org/wiki/NAT_traversal) techniques to expose
+nodes to the Internet, even if they run behind a router.  Testing NAT traversal
+is hard, but netsim allows us to simulate NATs and test how our code behaves on
+such a network.
 
-In this tutorial we will leverage [routing example](03_routing.md) and put
-client node under NAT.
+In this tutorial we will leverage the [routing example](03_routing.md) and put
+our client node behind a NAT.
 
 ## Dependencies
 
-As in previous example we need to install some dependency libraries. Put this
+As in the previous example we need to install some dependency libraries. Put this
 into your Cargo.toml:
 
 ```toml
@@ -36,7 +37,7 @@ extern crate futures;
 
 ## Simple network
 
-We will reuse 2 node network from routing tutorial:
+We will reuse the two node network from the routing tutorial:
 
 ```rust
 use futures::Future;
@@ -76,13 +77,13 @@ fn main() {
 }
 ```
 
-Up until this point everything is the same: we have server node listening
-for incoming UDP datagrams and client node that will send a message
-to server.
+Up until this point everything is the same: we have a server node listening
+for incoming UDP datagrams, and a client node that will send a message
+to the server.
 
 ## NAT
 
-Now we will put client node under virtual NAT device.
+Now we will put our client node behind a virtual NAT device.
 
 ```rust
 use netsim::device::ipv4::Ipv4NatBuilder;
@@ -94,12 +95,12 @@ let (spawn_complete, _ipv4_plug) =
     spawn::ipv4_tree(&network.handle(), Ipv4Range::global(), router_recipe);
 ```
 
-`node::ipv4::nat()` creates a recipe to construct virtual NAT device that
-manages another virtual networking device. `Ipv4NatBuilder::default()`
-configures NAT with convenient default values: NAT has no port forwarding
-rules, it picks random local subnet,
-[hairpinning](https://en.wikipedia.org/wiki/Hairpinning) disabled, etc. Later
-we will see how to use `Ipv4NatBuilder` to setup different NAT types.
+`node::ipv4::nat()` creates a recipe to construct a simulated NAT device that
+sits in front of another simulated device. `Ipv4NatBuilder::default()`
+configures the NAT with convenient default values: no port forwarding rules, on
+a random local subnet, [hairpinning](https://en.wikipedia.org/wiki/Hairpinning)
+disabled, etc. Later we will see how to use `Ipv4NatBuilder` to setup different
+NAT types.
 
 If we run this example now, we should see something like this:
 
@@ -111,21 +112,23 @@ $ cargo run
 [server] received: hello world!, from: 59.41.45.45:1000
 ```
 
-Notice how server nodee has public IP `65.199.115.13` whereas client node
-gets private IP `10.72.190.150` since it's behind NAT. Also notice that
-server sees client's public IP.
+Notice how the server node has public IP of `65.199.115.13` whereas the client
+node gets a private IP of `10.72.190.150` since it's behind a NAT. Also notice
+that the server sees the client's external, public IP. In your case, the
+precise the IPs will be different (since they are chosen randomly) but you
+should still get the same behaviour regarding public and private IP addresses.
 
 ## Complete example
 
 See [complete example](../examples/nat.rs) from netsim:
 
 ```shell
-cargo run --example nat
+$ cargo run --example nat
 ```
 
 ## Specify private subnet
 
-Default `Ipv4NatBuilder` chooses a random private subnet. We can specify one
+The default `Ipv4NatBuilder` chooses a random private subnet. We can specify one
 manually though:
 
 ```rust
@@ -136,8 +139,8 @@ let nat_builder = Ipv4NatBuilder::new()
 let client_under_nat_recipe = node::ipv4::nat(nat_builder, client_recipe);
 ```
 
-Try to rerun the example. Client node should always get IP address in the
-`192.168.2.0/24` subnet:
+Try to rerun the example with this change. The client node should always get an
+IP address in the `192.168.2.0/24` range:
 
 ```shell
 $ cargo run
@@ -150,7 +153,7 @@ $ cargo run
 ## Different NAT types
 
 netsim is able to simulate different [NAT
-types](https://docs.rs/p2p/0.5.1/p2p/#general). By default full cone NAT is
+types](https://docs.rs/p2p/0.5.1/p2p/#general). By default a full cone NAT is
 simulated.
 
 ### Full cone NAT
@@ -179,17 +182,17 @@ simulated.
 ```
 
 A full cone NAT maps a public `IP:port` to a LAN `IP:port` pair. Any external
-host can send data to the LAN IP through the mapped NAT IP and port.  For
-example when `client1` connects to server using local source address
-`192.168.1.46:12345`, NAT assings new port mappings, stores in them in the table
-and changes packet's source address to `53.198.141.83:1000` - that's the address
-that `server` sees `client1`. Now if `client2` somehow gets to know those
-mappings it can use `client1` public IP and external port to send packets to
-`client1` behind NAT. So when `client2` sends a packet to `53.198.141.83:1000`,
-full conet NAT will forward this packet to `192.168.1.46:12345`.
+host can send data to the LAN IP through the mapped NAT IP and port. For
+example when `client1` connects to a server from it's internal address
+`192.168.1.46:12345`, the NAT assings a new port mapping, stores it in the table
+and changes the outgoing packet's source address to `53.198.141.83:1000` - that's the address
+that `server` sees `client1` as. Now if `client2` somehow gets to know those
+mappings it can use `client1`'s public IP and external port to send packets to
+`client1` behind the NAT. So when `client2` sends a packet to `53.198.141.83:1000`,
+the full cone NAT will forward this packet to `192.168.1.46:12345`.
 
 We can simulate this behavior with netsim. First of all, we will update
-`server` node to send `client1`'s address over in-memory channel:
+`server` node to send `client1`'s address over an in-memory channel:
 
 ```rust
 let (server_addr_tx, server_addr_rx) = oneshot::channel();
@@ -246,7 +249,7 @@ let client2_recipe = node::ipv4::machine(|ip| {
 });
 ```
 
-Finally we build and run virtual network:
+Finally we build and run the simulated network:
 
 ```rust
 let router_recipe = node::ipv4::router((server_recipe, client1_under_nat_recipe, client2_recipe));
@@ -258,7 +261,7 @@ evloop.run(spawn_complete).unwrap();
 
 After we run this example we should see something like this:
 
-```shell
+```
 [server] ip = 72.92.30.39
 [client1] ip = 192.168.1.46
 [client1] Got server addr: 72.92.30.39:35868
@@ -271,7 +274,7 @@ After we run this example we should see something like this:
 You can also try [complete example](../examples/full_cone_nat.rs) from netsim:
 
 ```shell
-cargo run --example full_cone_nat
+$ cargo run --example full_cone_nat
 ```
 
 ### Port restricted NAT
@@ -299,10 +302,11 @@ cargo run --example full_cone_nat
             +---------+
 ```
 
-Port restricted NAT in addition stores destination `IP:port` pair.
-So when `client1` connects to `server`, NAT will save destination address
-and if `client2` tries to send packets to `client1` with address
-`53:198:141:83:1000`, this packet will be dropped by port restricted NAT.
+A port-restricted NAT additionally stores a destination `IP:port` pair in it's
+table.  So when `client1` connects to `server`, the NAT will save `server`'s
+address, if `client2` then tries to send packets to `client1` with address
+`53:198:141:83:1000`, this packet will be dropped by the NAT for having come
+from the wrong address.
 
 To simulate this NAT we use the same example is in "Full cone NAT" except
 we choose port restricted NAT with `Ipv4NatBuilder::restrict_endpoints()`:
@@ -316,7 +320,7 @@ let client1_under_nat_recipe = node::ipv4::nat(nat_builder, client1_recipe);
 
 If we run modified NAT example, we should see something like this:
 
-```shell
+```
 [server] ip = 72.92.30.39
 [client1] ip = 192.168.1.46
 [client1] Got server addr: 72.92.30.39:35868
@@ -330,7 +334,7 @@ incoming packet from `client2`.
 
 Also, if we turn on logging, along the lines we can see something like:
 
-```shell
+```
  INFO 2018-06-14T13:13:54Z: netsim::iface::tun: TUN emitting frame: Ipv4Packet { source_ip: 187.12.97.136, dest_ip: 53.198.141.83, ttl: 64, payload: UdpPacket { source_port: 46129, dest_port: 1000, payload: b"this is client2!" } }
  INFO 2018-06-14T13:13:54Z: netsim::device::ipv4::router: router 128.0.0.0 routing packet on route Ipv4Route { destination: 32.0.0.0/3, gateway: None } Ipv4Packet { source_ip: 187.12.97.136, dest_ip: 53.198.141.83, ttl: 64, payload: UdpPacket { source_port: 46129, dest_port: 1000, payload: b"this is client2!" } }
 TRACE 2018-06-14T13:13:54Z: netsim::device::ipv4::nat: NAT dropping packet from restricted address 187.12.97.136:46129. allowed endpoints: {1000: {72.92.30.39:35868}}
@@ -340,7 +344,7 @@ More on logging see at [logging tutorial](08_logging.md).
 
 ## Other options
 
-netsim supports various other NAT types and options like hairpinning, manual
-port forwarding, endpoint blacklisting, etc. For more detailed view consult
-[Ipv4NatBuilder](https://docs.rs/netsim/0.2.2/netsim/device/ipv4/struct.Ipv4NatBuilder.html#method.forward_udp_port).
-docs.
+netsim supports various other NAT types and options such as hairpinning, manual
+port forwarding, endpoint blacklisting, etc. For more details, consult the
+[Ipv4NatBuilder
+docs](https://docs.rs/netsim/0.2.2/netsim/device/ipv4/struct.Ipv4NatBuilder.html).

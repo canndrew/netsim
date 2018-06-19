@@ -1,11 +1,11 @@
 # Latency
 
 In this tutorial we will create a test network, introduce artificial latency
-on some virtual devices and see how this affects packet delivery.
+on some simulated devices and see how this affects packet delivery.
 
 ## Sample network
 
-We will take an example from [NAT tutorial](04_nat.md) as a basis:
+We will take the [NAT tutorial](04_nat.md) example as a basis:
 
 ```rust
 extern crate netsim;
@@ -57,8 +57,8 @@ fn main() {
 }
 ```
 
-This virtual network had two nodes connected together with the router and
-client node is under NAT device:
+This virtual network has two nodes connected together via a router, with the
+client node behind a NAT:
 
 ```
                       +--------+
@@ -75,7 +75,7 @@ client node is under NAT device:
       +--------+
 ```
 
-`client` node sends a message to server node. First we will measure how
+The `client` node sends a message to server node. First we will measure how
 long this simulation takes withouth any latency.
 
 ## Measure network performance
@@ -115,12 +115,12 @@ $ cargo run
 [server] received: hello world!, from: 42.88.82.84:1000, latency: 7.303436ms
 ```
 
-Notice the latency is around 7ms. Now we will introduce some latency on
-`client` node.
+Notice that the latency is small (around 7ms in this example). Now we will
+introduce some latency on the `client` node.
 
 ## Introduce latency
 
-All we have to do is chain `.latency()` function with `client` node recipe:
+All we have to do is chain the `.latency()` method to the `client` node recipe:
 
 ```rust
 use netsim::node::Ipv4Node;
@@ -150,11 +150,11 @@ Now if we rerun the example we should see the increased latency:
 [.latency()](https://docs.rs/netsim/0.2.2/netsim/node/ipv4/trait.Ipv4Node.html#method.latency)
 takes two parameters:
 1. minimal latency that will always be introduced
-2. some additional random latency with given average value
+2. some additional, random, per-packet latency with given average value
 
-Actually, we can introduce latency on any virtual device, in this case client,
+Actually, we can introduce latency on any virtual device, in this case the client,
 server, NAT or even all of them. For example let's introduce some latency
-on NAT device:
+on the NAT device:
 
 ```rust
 let client_under_nat_recipe = node::ipv4::nat(Ipv4NatBuilder::default(), client_recipe)
@@ -166,5 +166,5 @@ let client_under_nat_recipe = node::ipv4::nat(Ipv4NatBuilder::default(), client_
 See [complete example](../examples/latency.rs) from netsim:
 
 ```shell
-cargo run --example latency
+$ cargo run --example latency
 ```

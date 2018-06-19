@@ -1,8 +1,8 @@
 # Packet routing
 
-In [hello world](02_hellow_world.md) example we created one virtual network
+In the [hello world](02_hellow_world.md) example we created one virtual network
 device and sent some data to it. Now we will create two devices, connect them
-together and exchange "hello world" message.
+together and exchange a "hello world" message.
 
 To connect multiple virtual devices together we use
 [Ipv4Router](https://docs.rs/netsim/0.2.2/netsim/device/ipv4/struct.Ipv4Router.html).
@@ -11,7 +11,7 @@ to appropriate devices according to destination IP address.
 
 ## Dependencies
 
-As in previous example we need to install some dependency libraries. Put this
+As in the previous example we need to install some dependencies. Put this
 into your Cargo.toml:
 
 ```toml
@@ -31,8 +31,8 @@ extern crate futures;
 
 ## Server node
 
-First we'll create virtual server device that will be listening for incoming
-UDP datagrams - identical to what we've done in [hello world](02_hello_world.md)
+First we'll create a simulated server device that will be listening for incoming
+UDP datagrams - identical to what we did in the [hello world](02_hello_world.md)
 example.
 
 ```rust
@@ -63,11 +63,11 @@ fn main() {
 
 ## Client node
 
-In this example instead of constructing and sending packet manually we will
-create another virtual device and make it send packets to the server.
-From netsim perspective client node is identical to server node, so API is
-the same. Except client behaves differently, so it's device function is
-also different:
+In this example instead of constructing and sending a packet manually we will
+create another virtual device and make it send packets to the server. From
+netsim's perspective the client node is identical to the server node, so the
+API is the same. The client behaves differently though, so the callback it's
+given is also different:
 
 ```rust
 let client_recipe = node::ipv4::machine(|ip| {
@@ -81,14 +81,14 @@ let client_recipe = node::ipv4::machine(|ip| {
 });
 ```
 
-In this case when client virtual device runs it waits to receive server
-address and sends UDP datagram to server with "hello world!" message.
+In this case, when the client virtual device runs it waits to receive the server's
+address, then sends a UDP datagram containing "hello world!" to the server.
 
 ## Connecting nodes
 
-We have only wrote recipes to build server and client nodes, but we still need
-to connect them together and spawn on the virtual network. As mentioned earlier
-`Ipv4Router` connects multiple devices together. But instead of constructing
+We have only wrote recipes to build the server and client nodes, but we still need
+to connect them together and spawn them on a virtual network. As mentioned earlier
+`Ipv4Router` connects multiple devices together. But instead of constructing an
 `Ipv4Router` manually, we'll use a recipe for that too:
 
 ```rust
@@ -97,21 +97,22 @@ let (spawn_complete, _ipv4_plug) =
     spawn::ipv4_tree(&network.handle(), Ipv4Range::global(), router_recipe);
 ```
 
-`node::ipv4::router()` is a recipe that takes a tuple of virtual devices that
-will be connected together. And then we use this recipe to run our virtual
-network.
+`node::ipv4::router()` is a recipe that takes a tuple (or `Vec`) of simulated
+devices that will be connected together via a simulated router. We then use
+this recipe as the basis for our virtual network.
 
 ## Complete example
 
 See [complete example](../examples/routing.rs) from netsim:
 
 ```shell
-cargo run --example routing
+$ cargo run --example routing
 ```
 
 ## Next
 
-This tutorial covered routing network packets between multiple devices.
-All simualted devices were publicly accessible - had an external IP.
-In [NAT tutorial](04_nat.md) we will see how we can simulate LANs connected
-to the internet with the help of NAT (Network Address Translation) devices.
+This tutorial covered routing network packets between multiple devices.  All
+simualted devices were publicly accessible - ie they had an
+externally-addressable IP. In the [NAT tutorial](04_nat.md) we will see how we
+can simulate LANs connected to the internet with the help of simluated NAT
+(Network Address Translation) devices.

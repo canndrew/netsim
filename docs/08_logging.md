@@ -4,9 +4,9 @@ Sometimes we need to debug something or to better understand what is going on
 under the hood. netsim uses [Rust log](https://docs.rs/log/) and writes some
 helpful messages.
 
-The easiest way to start with logger is to use
+The easiest way to start with logging is to use
 [env_logger](https://crates.io/crates/env_logger) which is configured via
-environment variable `RUST_LOG` and by default logs to stderr.
+the `RUST_LOG` environment variable and by default logs to stderr.
 
 Add this to you Cargo.toml:
 
@@ -27,7 +27,7 @@ fn main() {
 }
 ```
 
-When you run the example prefix the command with `RUST_LOG`:
+When you run the example, set `RUST_LOG`:
 
 ```shell
 $ RUST_LOG=netsim=debug cargo run --example full_cone_nat
