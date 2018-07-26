@@ -17,7 +17,7 @@ pub enum Ipv6AddrClass {
     Global,
 }
 
-/// Extension methods for IPv4 addresses
+/// Extension methods for IPv6 addresses
 pub trait Ipv6AddrExt {
     /// Get a random, global IPv6 address.
     fn random_global() -> Ipv6Addr;
