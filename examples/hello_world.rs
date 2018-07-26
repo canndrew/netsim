@@ -59,7 +59,7 @@ fn main() {
         },
     );
     // Send datagram to our server via IPv4 plug
-    let _ = packet_tx.unbounded_send(datagram).unwrap();
+    packet_tx.unbounded_send(datagram);
 
     // Wait till server node is finished
     evloop.run(spawn_complete).unwrap();

@@ -116,10 +116,8 @@ impl IpPlug {
                 .map(move |(ip_packet_opt, ip_rx)| {
                     match ip_packet_opt {
                         Some(IpPacket::V4(ipv4_packet)) => {
-                            match ipv4_tx.unbounded_send(ipv4_packet) {
-                                Ok(()) => Loop::Continue((ipv4_tx, ip_rx)),
-                                Err(..) => Loop::Break(()),
-                            }
+                            ipv4_tx.unbounded_send(ipv4_packet);
+                            Loop::Continue((ipv4_tx, ip_rx))
                         },
                         Some(..) => Loop::Continue((ipv4_tx, ip_rx)),
                         None => Loop::Break(()),
@@ -137,10 +135,8 @@ impl IpPlug {
                     match ipv4_packet_opt {
                         Some(ipv4_packet) => {
                             let ip_packet = IpPacket::V4(ipv4_packet);
-                            match ip_tx.unbounded_send(ip_packet) {
-                                Ok(()) => Loop::Continue((ip_tx, ipv4_rx)),
-                                Err(..) => Loop::Break(()),
-                            }
+                            ip_tx.unbounded_send(ip_packet);
+                            Loop::Continue((ip_tx, ipv4_rx))
                         },
                         None => Loop::Break(()),
                     }
@@ -165,10 +161,8 @@ impl IpPlug {
                 .map(move |(ip_packet_opt, ip_rx)| {
                     match ip_packet_opt {
                         Some(IpPacket::V6(ipv6_packet)) => {
-                            match ipv6_tx.unbounded_send(ipv6_packet) {
-                                Ok(()) => Loop::Continue((ipv6_tx, ip_rx)),
-                                Err(..) => Loop::Break(()),
-                            }
+                            ipv6_tx.unbounded_send(ipv6_packet);
+                            Loop::Continue((ipv6_tx, ip_rx))
                         },
                         Some(..) => Loop::Continue((ipv6_tx, ip_rx)),
                         None => Loop::Break(()),
@@ -186,10 +180,8 @@ impl IpPlug {
                     match ipv6_packet_opt {
                         Some(ipv6_packet) => {
                             let ip_packet = IpPacket::V6(ipv6_packet);
-                            match ip_tx.unbounded_send(ip_packet) {
-                                Ok(()) => Loop::Continue((ip_tx, ipv6_rx)),
-                                Err(..) => Loop::Break(()),
-                            }
+                            ip_tx.unbounded_send(ip_packet);
+                            Loop::Continue((ip_tx, ipv6_rx))
                         },
                         None => Loop::Break(()),
                     }
@@ -201,8 +193,11 @@ impl IpPlug {
     }
 
     /// Split into sending and receiving halves
-    pub fn split(self) -> (UnboundedSender<IpPacket>, UnboundedReceiver<IpPacket>) {
-        self.inner.split()
+    pub fn split(self) -> (IpSender, IpReceiver) {
+        let (tx, rx) = self.inner.split();
+        let tx = IpSender { tx };
+        let rx = IpReceiver { rx };
+        (tx, rx)
     }
 
     /// Poll for incoming packets
@@ -219,6 +214,89 @@ impl IpPlug {
 impl From<IpPlug> for Plug<IpPacket> {
     fn from(plug: IpPlug) -> Plug<IpPacket> {
         plug.inner
+    }
+}
+
+impl Stream for IpPlug {
+    type Item = IpPacket;
+    type Error = Void;
+
+    fn poll(&mut self) -> Result<Async<Option<IpPacket>>, Void> {
+        self.inner.poll()
+    }
+}
+
+impl Sink for IpPlug {
+    type SinkItem = IpPacket;
+    type SinkError = Void;
+
+    fn start_send(&mut self, packet: IpPacket) -> Result<AsyncSink<IpPacket>, Void> {
+        self.inner.start_send(packet)
+    }
+
+    fn poll_complete(&mut self) -> Result<Async<()>, Void> {
+        self.inner.poll_complete()
+    }
+}
+
+/// A trait for types that can be converted into an `IpPlug`
+pub trait IntoIpPlug {
+    /// Convert into an `IpPlug`
+    fn into_ip_plug(self, handle: &NetworkHandle) -> IpPlug;
+}
+
+impl<S> IntoIpPlug for S
+where
+    S: Stream<Item = IpPacket, Error = Void>,
+    S: Sink<SinkItem = IpPacket, SinkError = Void>,
+    S: 'static,
+{
+    fn into_ip_plug(self, handle: &NetworkHandle) -> IpPlug {
+        let (self_tx, self_rx) = self.split();
+        let (plug_a, plug_b) = IpPlug::new_pair();
+        let (plug_tx, plug_rx) = plug_a.split();
+        handle.spawn(self_rx.forward(plug_tx).map(|(_rx, _tx)| ()));
+        handle.spawn(plug_rx.forward(self_tx).map(|(_rx, _tx)| ()));
+        plug_b
+    }
+}
+
+/// The sending half of an `IpPlug`
+pub struct IpSender {
+    tx: UnboundedSender<IpPacket>,
+}
+
+impl IpSender {
+    /// Send a packet down the wire
+    pub fn unbounded_send(&self, packet: IpPacket) {
+        let _ = self.tx.unbounded_send(packet);
+    }
+}
+
+impl Sink for IpSender {
+    type SinkItem = IpPacket;
+    type SinkError = Void;
+
+    fn start_send(&mut self, packet: IpPacket) -> Result<AsyncSink<IpPacket>, Void> {
+        Ok(self.tx.start_send(packet).unwrap_or(AsyncSink::Ready))
+    }
+
+    fn poll_complete(&mut self) -> Result<Async<()>, Void> {
+        Ok(self.tx.poll_complete().unwrap_or(Async::Ready(())))
+    }
+}
+
+/// The receiving half of an `IpPlug`
+pub struct IpReceiver {
+    rx: UnboundedReceiver<IpPacket>,
+}
+
+impl Stream for IpReceiver {
+    type Item = IpPacket;
+    type Error = Void;
+
+    fn poll(&mut self) -> Result<Async<Option<IpPacket>>, Void> {
+        self.rx.poll()
     }
 }
 

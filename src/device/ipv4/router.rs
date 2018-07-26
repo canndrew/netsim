@@ -37,8 +37,8 @@ impl Ipv4RouterBuilder {
 
 /// Connects a bunch of Ipv4 networks and routes packets between them.
 pub struct Ipv4Router {
-    rxs: Vec<UnboundedReceiver<Ipv4Packet>>,
-    txs: Vec<(UnboundedSender<Ipv4Packet>, Vec<Ipv4Route>)>,
+    rxs: Vec<Ipv4Receiver>,
+    txs: Vec<(Ipv4Sender, Vec<Ipv4Route>)>,
     ipv4_addr: Ipv4Addr,
 }
 

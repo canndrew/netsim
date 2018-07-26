@@ -17,13 +17,19 @@ pub enum Ipv6AddrClass {
     Global,
 }
 
+/// Extension methods for IPv4 addresses
 pub trait Ipv6AddrExt {
     /// Get a random, global IPv6 address.
     fn random_global() -> Ipv6Addr;
+    /// Check if this is a unicast global address
     fn is_unicast_global(&self) -> bool;
+    /// Check if this is a unicast link local address
     fn is_unicast_link_local(&self) -> bool;
+    /// Check if this is a unicast site local address
     fn is_unicast_site_local(&self) -> bool;
+    /// Check if this is a unique local address
     fn is_unique_local(&self) -> bool;
+    /// Check if this is a documentation address
     fn is_documentation(&self) -> bool;
     /// Clasify the address.
     fn class(&self) -> Ipv6AddrClass;

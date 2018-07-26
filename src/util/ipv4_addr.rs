@@ -19,6 +19,7 @@ pub enum Ipv4AddrClass {
     Global,
 }
 
+/// Extension methods for IPv4 addresses
 pub trait Ipv4AddrExt {
     /// Get a random, global IPv4 address.
     fn random_global() -> Ipv4Addr;

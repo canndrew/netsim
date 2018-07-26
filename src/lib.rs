@@ -278,4 +278,5 @@ pub use route::{Ipv4Route, Ipv6Route, AddRouteError};
 pub use spawn_complete::SpawnComplete;
 pub use pcap::IpLog;
 pub use network::{Network, NetworkHandle};
+pub use util::{ipv4_addr::Ipv4AddrExt, ipv6_addr::Ipv6AddrExt};
 

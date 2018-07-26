@@ -274,8 +274,11 @@ impl Ipv6Plug {
     }
 
     /// Split into sending and receiving halves
-    pub fn split(self) -> (UnboundedSender<Ipv6Packet>, UnboundedReceiver<Ipv6Packet>) {
-        self.inner.split()
+    pub fn split(self) -> (Ipv6Sender, Ipv6Receiver) {
+        let (tx, rx) = self.inner.split();
+        let tx = Ipv6Sender { tx };
+        let rx = Ipv6Receiver { rx };
+        (tx, rx)
     }
 
     /// Poll for incoming packets
@@ -292,6 +295,67 @@ impl Ipv6Plug {
 impl From<Ipv6Plug> for Plug<Ipv6Packet> {
     fn from(plug: Ipv6Plug) -> Plug<Ipv6Packet> {
         plug.inner
+    }
+}
+
+/// A trait for types that can be converted into an `Ipv6Plug`
+pub trait IntoIpv6Plug {
+    /// Convert into an `Ipv6Plug`
+    fn into_ipv6_plug(self, handle: &NetworkHandle) -> Ipv6Plug;
+}
+
+impl<S> IntoIpv6Plug for S
+where
+    S: Stream<Item = Ipv6Packet, Error = Void>,
+    S: Sink<SinkItem = Ipv6Packet, SinkError = Void>,
+    S: 'static,
+{
+    fn into_ipv6_plug(self, handle: &NetworkHandle) -> Ipv6Plug {
+        let (self_tx, self_rx) = self.split();
+        let (plug_a, plug_b) = Ipv6Plug::new_pair();
+        let (plug_tx, plug_rx) = plug_a.split();
+        handle.spawn(self_rx.forward(plug_tx).map(|(_rx, _tx)| ()));
+        handle.spawn(plug_rx.forward(self_tx).map(|(_rx, _tx)| ()));
+        plug_b
+    }
+}
+
+/// The sending half of an `Ipv6Plug`
+pub struct Ipv6Sender {
+    tx: UnboundedSender<Ipv6Packet>,
+}
+
+impl Ipv6Sender {
+    /// Send a packet down the wire
+    pub fn unbounded_send(&self, packet: Ipv6Packet) {
+        let _ = self.tx.unbounded_send(packet);
+    }
+}
+
+impl Sink for Ipv6Sender {
+    type SinkItem = Ipv6Packet;
+    type SinkError = Void;
+
+    fn start_send(&mut self, packet: Ipv6Packet) -> Result<AsyncSink<Ipv6Packet>, Void> {
+        Ok(self.tx.start_send(packet).unwrap_or(AsyncSink::Ready))
+    }
+
+    fn poll_complete(&mut self) -> Result<Async<()>, Void> {
+        Ok(self.tx.poll_complete().unwrap_or(Async::Ready(())))
+    }
+}
+
+/// The receiving half of an `Ipv6Plug`
+pub struct Ipv6Receiver {
+    rx: UnboundedReceiver<Ipv6Packet>,
+}
+
+impl Stream for Ipv6Receiver {
+    type Item = Ipv6Packet;
+    type Error = Void;
+
+    fn poll(&mut self) -> Result<Async<Option<Ipv6Packet>>, Void> {
+        self.rx.poll()
     }
 }
 

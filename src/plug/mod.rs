@@ -69,3 +69,25 @@ impl<T: fmt::Debug + 'static> Plug<T> {
     }
 }
 
+impl<T: fmt::Debug + 'static> Stream for Plug<T> {
+    type Item = T;
+    type Error = Void;
+
+    fn poll(&mut self) -> Result<Async<Option<T>>, Void> {
+        self.rx.poll()
+    }
+}
+
+impl<T: fmt::Debug + 'static> Sink for Plug<T> {
+    type SinkItem = T;
+    type SinkError = Void;
+
+    fn start_send(&mut self, item: T) -> Result<AsyncSink<T>, Void> {
+        Ok(self.tx.start_send(item).unwrap_or(AsyncSink::Ready))
+    }
+
+    fn poll_complete(&mut self) -> Result<Async<()>, Void> {
+        Ok(self.tx.poll_complete().unwrap_or(Async::Ready(())))
+    }
+}
+

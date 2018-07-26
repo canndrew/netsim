@@ -15,11 +15,11 @@ mod ip;
 
 pub use self::arp::*;
 pub use self::ether::*;
-pub use self::ipv4::{Ipv4Packet, Ipv4Fields, Ipv4Payload, Ipv4PayloadFields, Ipv4Plug};
 pub use self::mac::*;
 pub use self::udp::*;
 pub use self::tcp::*;
 pub use self::icmpv4::*;
-pub use self::ipv6::{Ipv6Packet, Ipv6Fields, Ipv6Payload, Ipv6PayloadFields, Ipv6Plug};
-pub use self::ip::{IpPacket, IpPlug};
+pub use self::ipv4::{Ipv4Packet, Ipv4Fields, Ipv4Payload, Ipv4PayloadFields, Ipv4Plug, Ipv4Sender, Ipv4Receiver, IntoIpv4Plug};
+pub use self::ipv6::{Ipv6Packet, Ipv6Fields, Ipv6Payload, Ipv6PayloadFields, Ipv6Plug, Ipv6Sender, Ipv6Receiver, IntoIpv6Plug};
+pub use self::ip::{IpPacket, IpPlug, IpSender, IpReceiver, IntoIpPlug};
 

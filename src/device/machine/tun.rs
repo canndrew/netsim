@@ -2,8 +2,8 @@ use priv_prelude::*;
 
 pub struct TunTask {
     tun: IpIface,
-    packet_tx: UnboundedSender<IpPacket>,
-    packet_rx: UnboundedReceiver<IpPacket>,
+    packet_tx: IpSender,
+    packet_rx: IpReceiver,
     sending_packet: Option<IpPacket>,
     handle: NetworkHandle,
     state: TunTaskState,

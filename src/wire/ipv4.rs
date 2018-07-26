@@ -354,6 +354,14 @@ impl Ipv4Plug {
         }
     }
 
+    /// Split into sending and receiving halves
+    pub fn split(self) -> (Ipv4Sender, Ipv4Receiver) {
+        let (tx, rx) = self.inner.split();
+        let tx = Ipv4Sender { tx };
+        let rx = Ipv4Receiver { rx };
+        (tx, rx)
+    }
+
     /// Add extra hops to the end of this connection. Packets travelling through this plug will
     /// have their TTL decremented by the amount of hops given.
     pub fn with_hops(
@@ -370,11 +378,6 @@ impl Ipv4Plug {
         plug
     }
 
-    /// Split into sending and receiving halves
-    pub fn split(self) -> (UnboundedSender<Ipv4Packet>, UnboundedReceiver<Ipv4Packet>) {
-        self.inner.split()
-    }
-
     /// Poll for incoming packets
     pub fn poll_incoming(&mut self) -> Async<Option<Ipv4Packet>> {
         self.inner.rx.poll().void_unwrap()
@@ -389,6 +392,89 @@ impl Ipv4Plug {
 impl From<Ipv4Plug> for Plug<Ipv4Packet> {
     fn from(plug: Ipv4Plug) -> Plug<Ipv4Packet> {
         plug.inner
+    }
+}
+
+impl Stream for Ipv4Plug {
+    type Item = Ipv4Packet;
+    type Error = Void;
+
+    fn poll(&mut self) -> Result<Async<Option<Ipv4Packet>>, Void> {
+        self.inner.poll()
+    }
+}
+
+impl Sink for Ipv4Plug {
+    type SinkItem = Ipv4Packet;
+    type SinkError = Void;
+
+    fn start_send(&mut self, packet: Ipv4Packet) -> Result<AsyncSink<Ipv4Packet>, Void> {
+        self.inner.start_send(packet)
+    }
+
+    fn poll_complete(&mut self) -> Result<Async<()>, Void> {
+        self.inner.poll_complete()
+    }
+}
+
+/// A trait for types that can be converted into an `Ipv4Plug`
+pub trait IntoIpv4Plug {
+    /// Convert into an `Ipv4Plug`
+    fn into_ipv4_plug(self, handle: &NetworkHandle) -> Ipv4Plug;
+}
+
+impl<S> IntoIpv4Plug for S
+where
+    S: Stream<Item = Ipv4Packet, Error = Void>,
+    S: Sink<SinkItem = Ipv4Packet, SinkError = Void>,
+    S: 'static,
+{
+    fn into_ipv4_plug(self, handle: &NetworkHandle) -> Ipv4Plug {
+        let (self_tx, self_rx) = self.split();
+        let (plug_a, plug_b) = Ipv4Plug::new_pair();
+        let (plug_tx, plug_rx) = plug_a.split();
+        handle.spawn(self_rx.forward(plug_tx).map(|(_rx, _tx)| ()));
+        handle.spawn(plug_rx.forward(self_tx).map(|(_rx, _tx)| ()));
+        plug_b
+    }
+}
+
+/// The sending half of an `Ipv4Plug`
+pub struct Ipv4Sender {
+    tx: UnboundedSender<Ipv4Packet>,
+}
+
+impl Ipv4Sender {
+    /// Send a packet down the wire
+    pub fn unbounded_send(&self, packet: Ipv4Packet) {
+        let _ = self.tx.unbounded_send(packet);
+    }
+}
+
+impl Sink for Ipv4Sender {
+    type SinkItem = Ipv4Packet;
+    type SinkError = Void;
+
+    fn start_send(&mut self, packet: Ipv4Packet) -> Result<AsyncSink<Ipv4Packet>, Void> {
+        Ok(self.tx.start_send(packet).unwrap_or(AsyncSink::Ready))
+    }
+
+    fn poll_complete(&mut self) -> Result<Async<()>, Void> {
+        Ok(self.tx.poll_complete().unwrap_or(Async::Ready(())))
+    }
+}
+
+/// The receiving half of an `Ipv4Plug`
+pub struct Ipv4Receiver {
+    rx: UnboundedReceiver<Ipv4Packet>,
+}
+
+impl Stream for Ipv4Receiver {
+    type Item = Ipv4Packet;
+    type Error = Void;
+
+    fn poll(&mut self) -> Result<Async<Option<Ipv4Packet>>, Void> {
+        self.rx.poll()
     }
 }
 
