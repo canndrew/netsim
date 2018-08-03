@@ -207,3 +207,24 @@ impl FromStr for Ipv4Range {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod ipv4range {
+        use super::*;
+
+        mod new {
+            use super::*;
+
+            #[test]
+            fn it_creates_address_range() {
+                let addrs = Ipv4Range::new(ipv4!("1.2.3.0"), 24);
+
+                assert!(addrs.contains(ipv4!("1.2.3.5")));
+                assert!(addrs.contains(ipv4!("1.2.3.255")));
+                assert!(!addrs.contains(ipv4!("1.2.4.5")));
+            }
+        }
+    }
+}
