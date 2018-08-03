@@ -19,7 +19,7 @@ example.
 At [MaidSafe](https://maidsafe.net/) we're working on autonomous privacy
 oriented peer-to-peer data-sharing network - the [SAFE
 Network](https://safenetwork.org/). Every piece of code must be bullet proof.
-However p2p networks are hard to test which is why we created netsim.  Netsim
+However p2p networks are hard to test which is why we created netsim. Netsim
 allows us to simulate networks under various conditions with various kinds of
 network-address-translation and test our code on them.
 

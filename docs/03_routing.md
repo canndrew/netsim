@@ -114,5 +114,5 @@ $ cargo run --example routing
 This tutorial covered routing network packets between multiple devices.  All
 simualted devices were publicly accessible - ie they had an
 externally-addressable IP. In the [NAT tutorial](04_nat.md) we will see how we
-can simulate LANs connected to the internet with the help of simluated NAT
+can simulate LANs connected to the internet with the help of simulated NAT
 (Network Address Translation) devices.
