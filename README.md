@@ -4,6 +4,14 @@
 code. You can use it to run Rust functions in network-isolated containers, and assemble
 virtual networks for these functions to communicate over.
 
+# Dependencies
+
+POSIX capabilities library:
+```
+$ apt install libcap-dev
+$ dnf install libcap-devel # Fedora
+```
+
 # Spawning threads into isolated network namespaces
 
 Network namespaces are a linux feature which can provide a thread or process with its own view
