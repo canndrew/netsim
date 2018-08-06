@@ -313,6 +313,30 @@ impl Ipv4Packet {
         let header_len = self.header_len();
         checksum::data(&self.buffer[..header_len]) == !0
     }
+
+    /// Unwrap's this Ipv4 packet's inner TCP packet if possible.
+    pub fn to_tcp_packet(&self) -> Option<TcpPacket> {
+        match self.payload() {
+            Ipv4Payload::Tcp(tcp_packet) => Some(tcp_packet),
+            _ => None,
+        }
+    }
+
+    /// Unwrap's this Ipv4 packet's inner UDP packet if possible.
+    pub fn to_udp_packet(&self) -> Option<UdpPacket> {
+        match self.payload() {
+            Ipv4Payload::Udp(udp_packet) => Some(udp_packet),
+            _ => None,
+        }
+    }
+
+    /// Unwrap's this Ipv4 packet's inner ICMP packet if possible.
+    pub fn to_icmpv4_packet(&self) -> Option<Icmpv4Packet> {
+        match self.payload() {
+            Ipv4Payload::Icmp(icmpv4_packet) => Some(icmpv4_packet),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug)]

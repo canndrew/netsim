@@ -61,6 +61,22 @@ impl IpPacket {
             IpPacket::V6(packet) => IpAddr::V6(packet.dest_ip()),
         }
     }
+
+    /// Unwrap this IP packet's inner IPv4Packet if possible.
+    pub fn to_ipv4_packet(&self) -> Option<Ipv4Packet> {
+        match self {
+            IpPacket::V4(packet) => Some(packet.clone()),
+            _ => None,
+        }
+    }
+
+    /// Unwrap this IP packet's inner IPv6Packet if possible.
+    pub fn to_ipv6_packet(&self) -> Option<Ipv6Packet> {
+        match self {
+            IpPacket::V6(packet) => Some(packet.clone()),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug)]

@@ -232,6 +232,22 @@ impl Ipv6Packet {
     pub fn into_bytes(self) -> Bytes {
         self.buffer
     }
+
+    /// Unwrap's this Ipv6 packet's inner TCP packet if possible.
+    pub fn to_tcp_packet(&self) -> Option<TcpPacket> {
+        match self.payload() {
+            Ipv6Payload::Tcp(tcp_packet) => Some(tcp_packet),
+            _ => None,
+        }
+    }
+
+    /// Unwrap's this Ipv6 packet's inner UDP packet if possible.
+    pub fn to_udp_packet(&self) -> Option<UdpPacket> {
+        match self.payload() {
+            Ipv6Payload::Udp(udp_packet) => Some(udp_packet),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug)]
