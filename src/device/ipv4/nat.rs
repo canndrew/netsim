@@ -45,7 +45,7 @@ impl PortAllocator {
 struct PortMap {
     map_out: HashMap<SocketAddrV4, u16>,
     map_in: HashMap<u16, SocketAddrV4>,
-    allowed_endpoints: Option<HashMap<u16, HashSet<SocketAddrV4>>>,
+    allowed_endpoints: Option<HashMap<u16, SocketAddrV4>>,
     symmetric_map: Option<SymmetricMap>,
     port_allocator: PortAllocator,
 }
@@ -80,7 +80,7 @@ impl PortMap {
 
     pub fn get_inbound_addr(&self, remote_addr: SocketAddrV4, port: u16) -> Option<SocketAddrV4> {
         if let Some(ref allowed_endpoints) = self.allowed_endpoints {
-            if !allowed_endpoints.get(&port).map(|set| set.contains(&remote_addr)).unwrap_or(false) {
+            if !allowed_endpoints.get(&port).map(|allowed| *allowed == remote_addr).unwrap_or(false) {
                 trace!("NAT dropping packet from restricted address {}. allowed endpoints: {:?}", remote_addr, allowed_endpoints);
                 return None;
             }
@@ -138,7 +138,7 @@ impl PortMap {
             },
         };
         if let Some(ref mut allowed_endpoints) = self.allowed_endpoints {
-            allowed_endpoints.entry(port).or_insert_with(HashSet::new).insert(remote_addr);
+            allowed_endpoints.insert(port, remote_addr);
         }
         port
     }

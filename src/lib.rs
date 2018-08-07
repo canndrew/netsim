@@ -118,6 +118,7 @@
 //! core.run({
 //!     packet_rx
 //!     .into_future()
+//!     .map_err(|(v, _)| v)
 //!     .map(|(packet_opt, _)| {
 //!         let packet = packet_opt.unwrap();
 //!         match packet.payload() {
