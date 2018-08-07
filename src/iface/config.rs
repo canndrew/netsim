@@ -665,8 +665,8 @@ mod test {
 
                 drop(tap);
             });
-            let mut core = unwrap!(Core::new());
-            unwrap!(core.run(spawn_complete))
+            let mut runtime = unwrap!(Runtime::new());
+            unwrap!(runtime.block_on(spawn_complete))
         })
     }
 }

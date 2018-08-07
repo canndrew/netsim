@@ -5,21 +5,18 @@ pub struct TunTask {
     packet_tx: IpSender,
     packet_rx: IpReceiver,
     sending_packet: Option<IpPacket>,
-    handle: NetworkHandle,
     state: TunTaskState,
 }
 
 impl TunTask {
     pub fn new(
         tun: IpIface,
-        handle: &NetworkHandle,
         plug: IpPlug,
         drop_rx: DropNotice,
     ) -> TunTask {
         let (tx, rx) = plug.split();
         TunTask {
             tun,
-            handle: handle.clone(),
             packet_tx: tx,
             packet_rx: rx,
             sending_packet: None,
@@ -32,7 +29,7 @@ enum TunTaskState {
     Receiving {
         drop_rx: DropNotice,
     },
-    Dying(Timeout),
+    Dying(Delay),
     Invalid,
 }
 
@@ -105,7 +102,7 @@ impl Future for TunTask {
                     trace!("state == receiving");
                     match drop_rx.poll().void_unwrap() {
                         Async::Ready(()) => {
-                            state = TunTaskState::Dying(Timeout::new(grace_period, self.handle.event_loop()));
+                            state = TunTaskState::Dying(Delay::new(Instant::now() + grace_period));
                             continue;
                         },
                         Async::NotReady => {

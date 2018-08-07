@@ -183,8 +183,8 @@ mod test {
                     v.set(456);
                 });
             });
-            let mut core = unwrap!(Core::new());
-            unwrap!(core.run(spawn_complete));
+            let mut runtime = unwrap!(Runtime::new());
+            unwrap!(runtime.block_on(spawn_complete));
             TEST.with(|v| assert_eq!(v.get(), 123));
         })
     }
@@ -196,8 +196,8 @@ mod test {
             let spawn_complete = new_namespace(|| {
                 panic!("this is supposed to panic");
             });
-            let mut core = unwrap!(Core::new());
-            unwrap!(core.run(spawn_complete));
+            let mut runtime = unwrap!(Runtime::new());
+            unwrap!(runtime.block_on(spawn_complete));
         })
     }
 }

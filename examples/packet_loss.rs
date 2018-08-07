@@ -1,22 +1,22 @@
 //! This example demonstrates how to simulate packet loss on some parts of the network.
 
 extern crate netsim;
-extern crate tokio_core;
+extern crate tokio;
 extern crate futures;
 
 use futures::Future;
 use futures::sync::oneshot;
 use netsim::{node, spawn, Ipv4Range, Network};
 use netsim::node::Ipv4Node;
-use tokio_core::reactor::Core;
+use tokio::runtime::Runtime;
 
 use std::net::{SocketAddr, SocketAddrV4, UdpSocket};
 use std::time::Duration;
 use std::thread::sleep;
 
 fn main() {
-    let mut evloop = Core::new().unwrap();
-    let network = Network::new(&evloop.handle());
+    let mut evloop = Runtime::new().unwrap();
+    let network = Network::new();
 
     let (server_addr_tx, server_addr_rx) = oneshot::channel();
     let server_recipe = node::ipv4::machine(move |ip| {
@@ -50,5 +50,5 @@ fn main() {
     let (spawn_complete, _ipv4_plug) =
         spawn::ipv4_tree(&network.handle(), Ipv4Range::global(), router_recipe);
 
-    evloop.run(spawn_complete).unwrap();
+    evloop.block_on(spawn_complete).unwrap();
 }

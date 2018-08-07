@@ -81,14 +81,14 @@ impl MachineBuilder {
         });
 
         for (tap_unbound, plug, drop_rx) in ether_rx {
-            let tap = tap_unbound.bind(&handle.event_loop());
-            let task = TapTask::new(tap, handle, plug, drop_rx);
+            let tap = tap_unbound.bind();
+            let task = TapTask::new(tap, plug, drop_rx);
             handle.spawn(task.infallible());
         }
 
         for (tun_unbound, plug, drop_rx) in ip_rx {
-            let tun = tun_unbound.bind(&handle.event_loop());
-            let task = TunTask::new(tun, handle, plug, drop_rx);
+            let tun = tun_unbound.bind();
+            let task = TunTask::new(tun, plug, drop_rx);
             handle.spawn(task.infallible());
         }
 

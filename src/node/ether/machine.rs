@@ -82,10 +82,10 @@ mod test {
     #[test]
     fn one_interface_send_udp_ipv4() {
         run_test(3, || {
-            let mut core = unwrap!(Core::new());
-            let network = Network::new(&core.handle());
+            let mut runtime = unwrap!(Runtime::new());
+            let network = Network::new();
             let handle = network.handle();
-            let res = core.run(future::lazy(|| {
+            let res = runtime.block_on(future::lazy(move || {
                 trace!("starting");
                 let payload: [u8; 8] = rand::random();
                 let target_ip = Ipv4Addr::random_global();

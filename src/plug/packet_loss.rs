@@ -13,7 +13,7 @@ pub struct PacketLoss<T: fmt::Debug + 'static> {
     state_toggle_time: Instant,
 }
 
-impl<T: fmt::Debug + 'static> PacketLoss<T> {
+impl<T: fmt::Debug + Send + 'static> PacketLoss<T> {
     /// Spawn a `PacketLoss` directly onto the event loop
     pub fn spawn(
         handle: &NetworkHandle,

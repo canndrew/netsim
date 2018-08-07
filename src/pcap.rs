@@ -1,9 +1,9 @@
 use priv_prelude::*;
-use tokio_io;
+use tokio;
 
 /// A sink for IP packets which writes the packets to a pcap file.
 pub struct IpLog {
-    fd: PollEvented<AsyncFd>,
+    fd: PollEvented2<AsyncFd>,
     state: LogState,
 }
 
@@ -23,7 +23,7 @@ enum LogState {
 
 impl IpLog {
     /// Create a new log file.
-    pub fn new(handle: &Handle, path: &Path) -> IoFuture<IpLog> {
+    pub fn new(path: &Path) -> IoFuture<IpLog> {
         const MAGIC: u32 = 0xa1b2_3c4d;
         const VERSION_MAJOR: u16 = 2;
         const VERSION_MINOR: u16 = 4;
@@ -33,7 +33,7 @@ impl IpLog {
             let file = File::open(path)?;
             let raw_fd = file.into_raw_fd();
             let async_fd = AsyncFd::new(raw_fd)?;
-            let fd = PollEvented::new(async_fd, handle)?;
+            let fd = PollEvented2::new(async_fd);
 
             let mut header = [0u8; 24];
             {
@@ -48,7 +48,7 @@ impl IpLog {
             }
 
             Ok({
-                tokio_io::io::write_all(fd, header)
+                tokio::io::write_all(fd, header)
                 .map(|(fd, _header)| {
                     IpLog {
                         fd,
@@ -67,7 +67,7 @@ impl Sink for IpLog {
     type SinkError = io::Error;
 
     fn start_send(&mut self, packet: IpPacket) -> io::Result<AsyncSink<IpPacket>> {
-        if let Async::NotReady = self.fd.poll_write() {
+        if let Async::NotReady = self.fd.poll_write_ready()? {
             return Ok(AsyncSink::NotReady(packet));
         }
 
@@ -131,7 +131,7 @@ impl Sink for IpLog {
                         },
                         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                             self.state = LogState::WritingHeader { header, bytes, written };
-                            self.fd.need_write();
+                            self.fd.clear_write_ready()?;
                             return Ok(Async::NotReady);
                         }
                         Err(e) => return Err(e),
@@ -153,7 +153,7 @@ impl Sink for IpLog {
                         },
                         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                             self.state = LogState::WritingPayload { bytes, written };
-                            self.fd.need_write();
+                            self.fd.clear_write_ready()?;
                             return Ok(Async::NotReady);
                         }
                         Err(e) => return Err(e),

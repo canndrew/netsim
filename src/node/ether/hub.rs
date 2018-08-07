@@ -24,7 +24,7 @@ macro_rules! tuple_impl {
     ($($ty:ident,)*) => {
         impl<$($ty),*> HubClients for ($($ty,)*)
         where
-            $($ty: EtherNode + 'static,)*
+            $($ty: EtherNode + Send + 'static,)*
         {
             type Output = ($($ty::Output,)*);
 
