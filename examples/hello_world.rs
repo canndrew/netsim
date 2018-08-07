@@ -3,7 +3,7 @@
 //! to it over UDP.
 
 extern crate netsim;
-extern crate tokio_core;
+extern crate tokio;
 extern crate bytes;
 extern crate futures;
 
@@ -12,13 +12,13 @@ use futures::Future;
 use futures::sync::oneshot;
 use netsim::{node, spawn, Ipv4Range, Network};
 use netsim::wire::{Ipv4Fields, Ipv4Packet, Ipv4PayloadFields, UdpFields};
-use tokio_core::reactor::Core;
+use tokio::runtime::Runtime;
 
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 
 fn main() {
-    let mut evloop = Core::new().unwrap();
-    let network = Network::new(&evloop.handle());
+    let mut evloop = Runtime::new().unwrap();
+    let network = Network::new();
 
     let (server_addr_tx, server_addr_rx) = oneshot::channel();
     let server_recipe = node::ipv4::machine(|ip| {
@@ -62,5 +62,5 @@ fn main() {
     packet_tx.unbounded_send(datagram);
 
     // Wait till server node is finished
-    evloop.run(spawn_complete).unwrap();
+    evloop.block_on(spawn_complete).unwrap();
 }

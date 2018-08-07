@@ -613,11 +613,11 @@ fn test() {
         use rand;
         use void;
 
-        let mut core = unwrap!(Core::new());
-        let network = Network::new(&core.handle());
+        let mut runtime = unwrap!(Runtime::new());
+        let network = Network::new();
         let handle = network.handle();
 
-        let res = core.run(future::lazy(move || {
+        let res = runtime.block_on(future::lazy(move || {
             let (public_plug_0, public_plug_1) = Ipv4Plug::new_pair();
             let (private_plug_0, private_plug_1) = Ipv4Plug::new_pair();
             let public_ip = Ipv4Addr::random_global();

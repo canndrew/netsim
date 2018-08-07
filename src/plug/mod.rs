@@ -17,7 +17,7 @@ pub struct Plug<T: fmt::Debug + 'static> {
     pub rx: UnboundedReceiver<T>,
 }
 
-impl<T: fmt::Debug + 'static> Plug<T> {
+impl<T: fmt::Debug + Send + 'static> Plug<T> {
     /// Create a new connection connecting the two returned plugs.
     pub fn new_pair() -> (Plug<T>, Plug<T>) {
         let (a_tx, b_rx) = future_utils::mpsc::unbounded();

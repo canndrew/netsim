@@ -13,9 +13,9 @@
 //! ```rust
 //! extern crate netsim;
 //! extern crate get_if_addrs;
-//! extern crate tokio_core;
+//! extern crate tokio;
 //! use netsim::spawn;
-//! use tokio_core::reactor::Core;
+//! use tokio::runtime::Runtime;
 //! use get_if_addrs::get_if_addrs;
 //!
 //! // First, check that there is more than one network interface. This will generally be true
@@ -28,8 +28,8 @@
 //! let spawn_complete = spawn::new_namespace(|| {
 //!     get_if_addrs().unwrap()
 //! });
-//! let mut core = Core::new().unwrap();
-//! let interfaces = core.run(spawn_complete).unwrap();
+//! let mut runtime = Runtime::new().unwrap();
+//! let interfaces = runtime.block_on(spawn_complete).unwrap();
 //! assert!(interfaces.is_empty());
 //! ```
 //!
@@ -44,17 +44,16 @@
 //!
 //! ```rust,should_panic
 //! extern crate netsim;
-//! extern crate tokio_core;
+//! extern crate tokio;
 //! extern crate futures;
 //!
 //! use std::net::Ipv4Addr;
-//! use tokio_core::reactor::Core;
+//! use tokio::runtime::Runtime;
 //! use futures::{Future, Stream};
 //! use netsim::iface::IpIfaceBuilder;
 //! use netsim::spawn;
 //!
-//! let mut core = Core::new().unwrap();
-//! let handle = core.handle();
+//! let mut runtime = Runtime::new().unwrap();
 //!
 //! // Create a network interface named "netsim"
 //! // Note: This will likely fail with "permission denied" unless we run it in a fresh network
@@ -63,12 +62,12 @@
 //!     IpIfaceBuilder::new()
 //!     .name("netsim")
 //!     .ipv4_addr(Ipv4Addr::new(192, 168, 0, 24), 24)
-//!     .build(&handle)
+//!     .build()
 //!     .unwrap()
 //! };
 //!
 //! // Read the first `Ipv4Packet` sent from the interface.
-//! let packet = core.run({
+//! let packet = runtime.block_on({
 //!     iface
 //!     .into_future()
 //!     .map_err(|(e, _)| e)
@@ -86,36 +85,38 @@
 //!
 //! ```rust
 //! extern crate netsim;
-//! extern crate tokio_core;
+//! extern crate tokio;
 //! extern crate futures;
+//! extern crate void;
 //!
 //! use std::net::UdpSocket;
-//! use tokio_core::reactor::Core;
+//! use tokio::runtime::Runtime;
 //! use futures::{Future, Stream};
 //! use netsim::{spawn, node, Network, Ipv4Range};
 //! use netsim::wire::Ipv4Payload;
+//! use void::{self, ResultVoidExt};
 //!
 //! // Create an event loop and a network to bind devices to.
-//! let mut core = Core::new().unwrap();
-//! let network = Network::new(&core.handle());
+//! let mut runtime = Runtime::new().unwrap();
+//! let network = Network::new();
 //! let handle = network.handle();
 //!
-//! // Spawn a network with a single node - a machine with an IPv4 interface in the 10.0.0.0/8
-//! // range, running the given callback.
-//! let (spawn_complete, ipv4_plug) = spawn::ipv4_tree(
-//!     &handle,
-//!     Ipv4Range::local_subnet_10(),
-//!     node::ipv4::machine(|ipv4_addr| {
-//!         // Send a packet out the interface
-//!         let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
-//!         socket.send_to(b"hello world", "10.1.2.3:4567").unwrap();
-//!     }),
-//! );
+//! runtime.block_on(futures::future::lazy(move || {
+//!     // Spawn a network with a single node - a machine with an IPv4 interface in the 10.0.0.0/8
+//!     // range, running the given callback.
+//!     let (spawn_complete, ipv4_plug) = spawn::ipv4_tree(
+//!         &handle,
+//!         Ipv4Range::local_subnet_10(),
+//!         node::ipv4::machine(|ipv4_addr| {
+//!             // Send a packet out the interface
+//!             let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
+//!             socket.send_to(b"hello world", "10.1.2.3:4567").unwrap();
+//!         }),
+//!     );
 //!
-//! let (packet_tx, packet_rx) = ipv4_plug.split();
+//!     let (packet_tx, packet_rx) = ipv4_plug.split();
 //!
-//! // Inspect the packet sent out the interface.
-//! core.run({
+//!     // Inspect the packet sent out the interface.
 //!     packet_rx
 //!     .into_future()
 //!     .map_err(|(v, _)| v)
@@ -128,7 +129,7 @@
 //!             _ => panic!("unexpected payload"),
 //!         }
 //!     })
-//! }).unwrap()
+//! })).void_unwrap();
 //! ```
 //!
 //! # Simulating networks of communicating nodes
@@ -137,47 +138,50 @@
 //! network.
 //!
 //! ```rust
-//! extern crate tokio_core;
+//! extern crate tokio;
+//! extern crate futures;
 //! extern crate future_utils;
 //! extern crate netsim;
 //!
 //! use std::net::UdpSocket;
-//! use tokio_core::reactor::Core;
+//! use tokio::runtime::Runtime;
 //! use netsim::{spawn, node, Network, Ipv4Range};
 //!
 //! // Create an event loop and a network to bind devices to.
-//! let mut core = Core::new().unwrap();
-//! let network = Network::new(&core.handle());
+//! let mut runtime = Runtime::new().unwrap();
+//! let network = Network::new();
 //! let handle = network.handle();
 //!
-//! let (tx, rx) = std::sync::mpsc::channel();
-//!
-//! // Create a machine which will receive a UDP packet and return its contents
-//! let receiver_node = node::ipv4::machine(move |ipv4_addr| {
-//!     let socket = UdpSocket::bind(("0.0.0.0", 1234)).unwrap();
-//!     /// Tell the sending node our IP address
-//!     tx.send(ipv4_addr).unwrap();
-//!     let mut buffer = [0; 1024];
-//!     let (n, _sender_addr) = socket.recv_from(&mut buffer).unwrap();
-//!     buffer[..n].to_owned()
-//! });
-//!
-//! // Create the machine which will send the UDP packet
-//! let sender_node = node::ipv4::machine(move |_ipv4_addr| {
-//!     let receiver_ip = rx.recv().unwrap();
-//!     let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
-//!     socket.send_to(b"hello world", (receiver_ip, 1234)).unwrap();
-//! });
-//!
-//! // Connect the sending and receiving nodes via a router
-//! let router_node = node::ipv4::router((receiver_node, sender_node));
-//!
-//! // Run the network with the router as the top-most node. `_plug` could be used send/receive
-//! // packets from/to outside the network
-//! let (spawn_complete, _plug) = spawn::ipv4_tree(&handle, Ipv4Range::global(), router_node);
-//!
 //! // Drive the network on the event loop and get the data returned by the receiving node.
-//! let (received, ()) = core.run(spawn_complete).unwrap();
+//! let (received, ()) = runtime.block_on(futures::future::lazy(move || {
+//!     let (tx, rx) = std::sync::mpsc::channel();
+//!
+//!     // Create a machine which will receive a UDP packet and return its contents
+//!     let receiver_node = node::ipv4::machine(move |ipv4_addr| {
+//!         let socket = UdpSocket::bind(("0.0.0.0", 1234)).unwrap();
+//!         /// Tell the sending node our IP address
+//!         tx.send(ipv4_addr).unwrap();
+//!         let mut buffer = [0; 1024];
+//!         let (n, _sender_addr) = socket.recv_from(&mut buffer).unwrap();
+//!         buffer[..n].to_owned()
+//!     });
+//!
+//!     // Create the machine which will send the UDP packet
+//!     let sender_node = node::ipv4::machine(move |_ipv4_addr| {
+//!         let receiver_ip = rx.recv().unwrap();
+//!         let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
+//!         socket.send_to(b"hello world", (receiver_ip, 1234)).unwrap();
+//!     });
+//!
+//!     // Connect the sending and receiving nodes via a router
+//!     let router_node = node::ipv4::router((receiver_node, sender_node));
+//!
+//!     // Run the network with the router as the top-most node. `_plug` could be used send/receive
+//!     // packets from/to outside the network
+//!     let (spawn_complete, _plug) = spawn::ipv4_tree(&handle, Ipv4Range::global(), router_node);
+//!
+//!     spawn_complete
+//! })).unwrap();
 //! assert_eq!(&received[..], b"hello world");
 //! ```
 //!
@@ -212,8 +216,7 @@ extern crate ioctl_sys;
 extern crate log;
 extern crate mio;
 extern crate futures;
-extern crate tokio_io;
-extern crate tokio_core;
+extern crate tokio;
 #[macro_use]
 extern crate rand_derive;
 extern crate future_utils;

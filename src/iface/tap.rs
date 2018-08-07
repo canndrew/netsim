@@ -83,10 +83,10 @@ impl EtherIfaceBuilder {
     }
 
     /// Consume this `EtherIfaceBuilder` and build the TAP interface. The returned `EtherIface` object can be
-    /// used to read/write ethernet frames from this interface. `handle` is a handle to a tokio
+    /// used to read/write ethernet frames from this interface.
     /// event loop which will be used for reading/writing.
-    pub fn build(self, handle: &Handle) -> Result<EtherIface, IfaceBuildError> {
-        Ok(self.build_unbound()?.bind(handle))
+    pub fn build(self) -> Result<EtherIface, IfaceBuildError> {
+        Ok(self.build_unbound()?.bind())
     }
 }
 
@@ -99,9 +99,9 @@ pub struct UnboundEtherIface {
 impl UnboundEtherIface {
     /// Bind the tap device to the event loop, creating a `EtherIface` which you can read/write ethernet
     /// frames with.
-    pub fn bind(self, handle: &Handle) -> EtherIface {
+    pub fn bind(self) -> EtherIface {
         let UnboundEtherIface { fd } = self;
-        let fd = unwrap!(PollEvented::new(fd, handle));
+        let fd = PollEvented2::new(fd);
         EtherIface { fd }
     }
 }
@@ -109,7 +109,7 @@ impl UnboundEtherIface {
 /// A handle to a virtual (TAP) network interface. Can be used to read/write ethernet frames
 /// directly to the device.
 pub struct EtherIface {
-    fd: PollEvented<AsyncFd>,
+    fd: PollEvented2<AsyncFd>,
 }
 
 impl Stream for EtherIface {
@@ -117,7 +117,7 @@ impl Stream for EtherIface {
     type Error = io::Error;
 
     fn poll(&mut self) -> io::Result<Async<Option<EtherFrame>>> {
-        if let Async::NotReady = self.fd.poll_read() {
+        if let Async::NotReady = self.fd.poll_read_ready(Ready::readable())? {
             return Ok(Async::NotReady);
         }
 
@@ -149,7 +149,7 @@ impl Stream for EtherIface {
                 Ok(Async::Ready(Some(frame)))
             },
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.fd.need_read();
+                self.fd.clear_read_ready(Ready::readable())?;
                 Ok(Async::NotReady)
             },
             Err(e) => Err(e),
@@ -163,7 +163,7 @@ impl Sink for EtherIface {
 
     fn start_send(&mut self, item: EtherFrame) -> io::Result<AsyncSink<EtherFrame>> {
         info!("TAP received frame: {:?}", item);
-        if let Async::NotReady = self.fd.poll_write() {
+        if let Async::NotReady = self.fd.poll_write_ready()? {
             return Ok(AsyncSink::NotReady(item));
         }
 
@@ -182,7 +182,7 @@ impl Sink for EtherIface {
         match self.fd.write(item.as_bytes()) {
             Ok(n) => assert_eq!(n, item.as_bytes().len()),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.fd.need_write();
+                self.fd.clear_write_ready()?;
                 return Ok(AsyncSink::NotReady(item));
             }
             Err(e) => return Err(e),
@@ -263,8 +263,8 @@ mod test {
 
                 drop(tap);
             });
-            let mut core = unwrap!(Core::new());
-            unwrap!(core.run(spawn_complete))
+            let mut runtime = unwrap!(Runtime::new());
+            unwrap!(runtime.block_on(spawn_complete))
         })
     }
 
@@ -308,8 +308,8 @@ mod test {
                 }
                 trace!("build_tap_duplicate_name: done");
             });
-            let mut core = unwrap!(Core::new());
-            unwrap!(core.run(spawn_complete))
+            let mut runtime = unwrap!(Runtime::new());
+            unwrap!(runtime.block_on(spawn_complete))
         });
     }
 
@@ -325,8 +325,8 @@ mod test {
                     res => panic!("unexpected result: {:?}", res),
                 }
             });
-            let mut core = unwrap!(Core::new());
-            unwrap!(core.run(spawn_complete))
+            let mut runtime = unwrap!(Runtime::new());
+            unwrap!(runtime.block_on(spawn_complete))
         })
     }
 }

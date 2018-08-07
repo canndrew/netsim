@@ -5,21 +5,18 @@ pub struct TapTask {
     frame_tx: UnboundedSender<EtherFrame>,
     frame_rx: UnboundedReceiver<EtherFrame>,
     sending_frame: Option<EtherFrame>,
-    handle: NetworkHandle,
     state: TapTaskState,
 }
 
 impl TapTask {
     pub fn new(
         tap: EtherIface,
-        handle: &NetworkHandle,
         plug: EtherPlug,
         drop_rx: DropNotice,
     ) -> TapTask {
         let (tx, rx) = plug.split();
         TapTask {
             tap,
-            handle: handle.clone(),
             frame_tx: tx,
             frame_rx: rx,
             sending_frame: None,
@@ -32,7 +29,7 @@ enum TapTaskState {
     Receiving {
         drop_rx: DropNotice,
     },
-    Dying(Timeout),
+    Dying(Delay),
     Invalid,
 }
 
@@ -99,7 +96,7 @@ impl Future for TapTask {
                     trace!("state == receiving");
                     match drop_rx.poll().void_unwrap() {
                         Async::Ready(()) => {
-                            state = TapTaskState::Dying(Timeout::new(grace_period, self.handle.event_loop()));
+                            state = TapTaskState::Dying(Delay::new(Instant::now() + grace_period));
                             continue;
                         },
                         Async::NotReady => {

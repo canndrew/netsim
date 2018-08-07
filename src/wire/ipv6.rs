@@ -324,7 +324,7 @@ impl<S> IntoIpv6Plug for S
 where
     S: Stream<Item = Ipv6Packet, Error = Void>,
     S: Sink<SinkItem = Ipv6Packet, SinkError = Void>,
-    S: 'static,
+    S: Send + 'static,
 {
     fn into_ipv6_plug(self, handle: &NetworkHandle) -> Ipv6Plug {
         let (self_tx, self_rx) = self.split();

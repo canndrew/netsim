@@ -62,11 +62,11 @@ mod test {
     #[test]
     fn test_udp() {
         run_test(3, || {
-            let mut core = unwrap!(Core::new());
-            let network = Network::new(&core.handle());
+            let mut runtime = unwrap!(Runtime::new());
+            let network = Network::new();
             let handle = network.handle();
 
-            let res = core.run(future::lazy(move || {
+            let res = runtime.block_on(future::lazy(move || {
                 let remote_ip = Ipv4Addr::random_global();
                 let remote_port = rand::random::<u16>() / 2 + 1000;
                 let remote_addr = SocketAddrV4::new(remote_ip, remote_port);
@@ -142,11 +142,11 @@ mod test {
     #[test]
     fn test_tcp_connect() {
         run_test(3, || {
-            let mut core = unwrap!(Core::new());
-            let network = Network::new(&core.handle());
+            let mut runtime = unwrap!(Runtime::new());
+            let network = Network::new();
             let handle = network.handle();
 
-            let res = core.run(future::lazy(move || {
+            let res = runtime.block_on(future::lazy(move || {
                 let remote_ip = Ipv4Addr::random_global();
                 let remote_port = rand::random::<u16>() / 2 + 1000;
                 let remote_addr = SocketAddrV4::new(remote_ip, remote_port);
@@ -261,7 +261,7 @@ mod test {
                                         plug_rx,
                                         next_seq_num_0,
                                         next_seq_num_1,
-                                    ))).into_boxed();
+                                    ))).into_send_boxed();
                                 }
 
                                 let ack_packet = Ipv4Packet::new_from_fields_recursive(
@@ -307,7 +307,7 @@ mod test {
                                         next_seq_num_1,
                                     ))
                                 })
-                                .into_boxed()
+                                .into_send_boxed()
                             })
                         })
                         .and_then(move |(plug_tx, plug_rx, seq_num_0, seq_num_1)| {
@@ -415,11 +415,11 @@ mod test {
     #[test]
     fn test_ping_reply() {
         run_test(3, || {
-            let mut core = unwrap!(Core::new());
-            let network = Network::new(&core.handle());
+            let mut runtime = unwrap!(Runtime::new());
+            let network = Network::new();
             let handle = network.handle();
 
-            let res = core.run(future::lazy(move || {
+            let res = runtime.block_on(future::lazy(move || {
                 let (done_tx, done_rx) = std::sync::mpsc::channel();
 
                 let client_ip = Ipv4Addr::random_global();

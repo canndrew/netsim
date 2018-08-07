@@ -19,7 +19,7 @@ macro_rules! tuple_impl {
     ($($ty:ident,)*) => {
         impl<$($ty),*> Ipv4RouterClients for ($($ty,)*)
         where
-            $($ty: Ipv4Node + 'static,)*
+            $($ty: Ipv4Node + Send + 'static,)*
         {
             type Output = ($($ty::Output,)*);
             
