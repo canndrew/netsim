@@ -17,12 +17,12 @@
 //! use netsim::spawn;
 //! use tokio_core::reactor::Core;
 //! use get_if_addrs::get_if_addrs;
-//! 
+//!
 //! // First, check that there is more than one network interface. This will generally be true
 //! // since there will at least be the loopback interface.
 //! let interfaces = get_if_addrs().unwrap();
 //! assert!(interfaces.len() > 0);
-//! 
+//!
 //! // Now check how many network interfaces we can see inside a fresh network namespace. There
 //! // should be zero.
 //! let spawn_complete = spawn::new_namespace(|| {
@@ -52,10 +52,10 @@
 //! use futures::{Future, Stream};
 //! use netsim::iface::IpIfaceBuilder;
 //! use netsim::spawn;
-//! 
+//!
 //! let mut core = Core::new().unwrap();
 //! let handle = core.handle();
-//! 
+//!
 //! // Create a network interface named "netsim"
 //! // Note: This will likely fail with "permission denied" unless we run it in a fresh network
 //! // environment
@@ -66,7 +66,7 @@
 //!     .build(&handle)
 //!     .unwrap()
 //! };
-//! 
+//!
 //! // Read the first `Ipv4Packet` sent from the interface.
 //! let packet = core.run({
 //!     iface
@@ -99,7 +99,7 @@
 //! let mut core = Core::new().unwrap();
 //! let network = Network::new(&core.handle());
 //! let handle = network.handle();
-//! 
+//!
 //! // Spawn a network with a single node - a machine with an IPv4 interface in the 10.0.0.0/8
 //! // range, running the given callback.
 //! let (spawn_complete, ipv4_plug) = spawn::ipv4_tree(
@@ -140,11 +140,11 @@
 //! extern crate tokio_core;
 //! extern crate future_utils;
 //! extern crate netsim;
-//! 
+//!
 //! use std::net::UdpSocket;
 //! use tokio_core::reactor::Core;
 //! use netsim::{spawn, node, Network, Ipv4Range};
-//! 
+//!
 //! // Create an event loop and a network to bind devices to.
 //! let mut core = Core::new().unwrap();
 //! let network = Network::new(&core.handle());
@@ -168,14 +168,14 @@
 //!     let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 //!     socket.send_to(b"hello world", (receiver_ip, 1234)).unwrap();
 //! });
-//! 
+//!
 //! // Connect the sending and receiving nodes via a router
 //! let router_node = node::ipv4::router((receiver_node, sender_node));
 //!
 //! // Run the network with the router as the top-most node. `_plug` could be used send/receive
 //! // packets from/to outside the network
 //! let (spawn_complete, _plug) = spawn::ipv4_tree(&handle, Ipv4Range::global(), router_node);
-//! 
+//!
 //! // Drive the network on the event loop and get the data returned by the receiving node.
 //! let (received, ()) = core.run(spawn_complete).unwrap();
 //! assert_eq!(&received[..], b"hello world");
@@ -188,14 +188,11 @@
 //! `device` module. Have an explore of the API, and if anything needs clarification or could be
 //! better designed then let us know on the bug tracker :)
 
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
-
 #![deny(missing_docs)]
-#![cfg_attr(feature="clippy", allow(redundant_field_names))]
-#![cfg_attr(feature="clippy", allow(single_match))]
-#![cfg_attr(feature="clippy", allow(match_same_arms))]
-#![cfg_attr(feature="clippy", allow(decimal_literal_representation))]
+#![cfg_attr(feature="cargo-clippy", allow(redundant_field_names))]
+#![cfg_attr(feature="cargo-clippy", allow(single_match))]
+#![cfg_attr(feature="cargo-clippy", allow(match_same_arms))]
+#![cfg_attr(feature="cargo-clippy", allow(decimal_literal_representation))]
 
 extern crate libc;
 extern crate rand;
@@ -238,7 +235,7 @@ macro_rules! slice_assert_len {
             init: T,
             uninit: (),
         }
-        
+
         assert_eq!($slice.len(), $len);
         let mut array: MaybeUninit<[_; $len]> = MaybeUninit { uninit: () };
         let slice: &[_] = $slice;

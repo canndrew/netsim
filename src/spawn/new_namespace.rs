@@ -13,7 +13,7 @@ impl<F, R> FnBox<R> for F
 where
     F: FnOnce() -> R
 {
-    #[cfg_attr(feature="clippy", allow(boxed_local))]
+    #[cfg_attr(feature="cargo-clippy", allow(boxed_local))]
     fn call_box(self: Box<Self>) -> R {
         (*self)()
     }
