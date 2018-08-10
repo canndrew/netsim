@@ -1,11 +1,11 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
-#![cfg_attr(feature="clippy", allow(unreadable_literal))]
-#![cfg_attr(feature="clippy", allow(const_static_lifetime))]
-#![cfg_attr(feature="clippy", allow(useless_transmute))]
-#![cfg_attr(feature="clippy", allow(expl_impl_clone_on_copy))]
-#![cfg_attr(feature="clippy", allow(zero_ptr))]
+#![cfg_attr(feature="cargo-clippy", allow(unreadable_literal))]
+#![cfg_attr(feature="cargo-clippy", allow(const_static_lifetime))]
+#![cfg_attr(feature="cargo-clippy", allow(useless_transmute))]
+#![cfg_attr(feature="cargo-clippy", allow(expl_impl_clone_on_copy))]
+#![cfg_attr(feature="cargo-clippy", allow(zero_ptr))]
 
 pub use libc::*;
 

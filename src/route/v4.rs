@@ -62,14 +62,14 @@ pub fn add_route_v4(
         mem::zeroed()
     };
 
-    #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
+    #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
     unsafe {
         let route_destination = &mut route.rt_dst as *mut _ as *mut libc::sockaddr_in;
         (*route_destination).sin_family = libc::AF_INET as u16;
         (*route_destination).sin_addr = libc::in_addr { s_addr: u32::from(destination.base_addr()).to_be() };
     };
 
-    #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
+    #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
     unsafe {
         let route_genmask = &mut route.rt_genmask as *mut _ as *mut libc::sockaddr_in;
         (*route_genmask).sin_family = libc::AF_INET as u16;
@@ -78,7 +78,7 @@ pub fn add_route_v4(
 
     route.rt_flags = sys::RTF_UP as u16;
     if let Some(gateway_addr) = gateway {
-        #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
+        #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
         unsafe {
             let route_gateway = &mut route.rt_gateway as *mut _ as *mut libc::sockaddr_in;
             (*route_gateway).sin_family = libc::AF_INET as u16;
