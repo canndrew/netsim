@@ -24,7 +24,7 @@ impl Ipv6Range {
         let mask = !((!0u128).checked_shr(u32::from(bits)).unwrap_or(0));
         Ipv6Range {
             addr: Ipv6Addr::from(u128::from(addr) & mask),
-            bits: bits,
+            bits,
         }
     }
 

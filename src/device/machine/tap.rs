@@ -18,7 +18,7 @@ impl TapTask {
     ) -> TapTask {
         let (tx, rx) = plug.split();
         TapTask {
-            tap: tap,
+            tap,
             handle: handle.clone(),
             frame_tx: tx,
             frame_rx: rx,

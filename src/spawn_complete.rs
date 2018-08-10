@@ -30,7 +30,7 @@ pub fn from_parts<R>(
     process_handle: ProcessHandle,
 ) -> SpawnComplete<R> {
     SpawnComplete {
-        ret_rx: ret_rx,
+        ret_rx,
         process_handle: Some(process_handle),
     }
 }
@@ -39,7 +39,7 @@ pub fn from_receiver<R>(
     ret_rx: oneshot::Receiver<thread::Result<R>>,
 ) -> SpawnComplete<R> {
     SpawnComplete {
-        ret_rx: ret_rx,
+        ret_rx,
         process_handle: None,
     }
 }

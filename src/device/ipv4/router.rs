@@ -10,7 +10,7 @@ impl Ipv4RouterBuilder {
     /// Start creating a new `Ipv4Router` with the given IP address.
     pub fn new(ipv4_addr: Ipv4Addr) -> Ipv4RouterBuilder {
         Ipv4RouterBuilder {
-            ipv4_addr: ipv4_addr,
+            ipv4_addr,
             connections: Vec::new(),
         }
     }

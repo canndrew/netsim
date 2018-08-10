@@ -25,7 +25,7 @@ impl Ipv4Range {
         let mask = !((!0u32).checked_shr(u32::from(bits)).unwrap_or(0));
         Ipv4Range {
             addr: Ipv4Addr::from(u32::from(addr) & mask),
-            bits: bits,
+            bits,
         }
     }
 
