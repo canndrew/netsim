@@ -51,7 +51,7 @@ impl IpLog {
                 tokio_io::io::write_all(fd, header)
                 .map(|(fd, _header)| {
                     IpLog {
-                        fd: fd,
+                        fd,
                         state: LogState::Ready,
                     }
                 })
@@ -87,8 +87,8 @@ impl Sink for IpLog {
                     unwrap!(cursor.write_u32::<NativeEndian>(bytes.len() as u32));
                 }
                 self.state = LogState::WritingHeader {
-                    header: header,
-                    bytes: bytes,
+                    header,
+                    bytes,
                     written: 0,
                 };
                 self.poll_complete()?;
@@ -117,13 +117,13 @@ impl Sink for IpLog {
                             let new_written = written + n;
                             if new_written == header.len() {
                                 state = LogState::WritingPayload {
-                                    bytes: bytes,
+                                    bytes,
                                     written: 0,
                                 };
                             } else {
                                 state = LogState::WritingHeader {
-                                    header: header,
-                                    bytes: bytes,
+                                    header,
+                                    bytes,
                                     written: new_written,
                                 };
                             }
@@ -145,7 +145,7 @@ impl Sink for IpLog {
                                 state = LogState::Ready;
                             } else {
                                 state = LogState::WritingPayload {
-                                    bytes: bytes,
+                                    bytes,
                                     written: new_written,
                                 };
                             }

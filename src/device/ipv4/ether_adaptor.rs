@@ -20,7 +20,7 @@ impl EtherAdaptorV4 {
             ether_plug: ether,
             ipv4_plug: ipv4,
             ipv4_addr: addr,
-            mac_addr: mac_addr,
+            mac_addr,
             arp_table: HashMap::new(),
             arp_pending: HashMap::new(),
         };
@@ -168,7 +168,7 @@ impl Future for EtherAdaptorV4 {
                                     fields: ArpFields::Request {
                                         source_mac: self.mac_addr,
                                         source_ip: self.ipv4_addr,
-                                        dest_ip: dest_ip,
+                                        dest_ip,
                                     },
                                 },
                             );
@@ -185,7 +185,7 @@ impl Future for EtherAdaptorV4 {
                     let frame = EtherFrame::new_from_fields(
                         EtherFields {
                             source_mac: self.mac_addr,
-                            dest_mac: dest_mac,
+                            dest_mac,
                         },
                         &EtherPayload::Ipv4(packet),
                     );

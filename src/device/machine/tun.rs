@@ -18,7 +18,7 @@ impl TunTask {
     ) -> TunTask {
         let (tx, rx) = plug.split();
         TunTask {
-            tun: tun,
+            tun,
             handle: handle.clone(),
             packet_tx: tx,
             packet_rx: rx,
