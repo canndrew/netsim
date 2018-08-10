@@ -90,7 +90,7 @@ impl Future for Ipv4Router {
                                 for route in routes {
                                     if route.destination().contains(dest_ip) {
                                         info!("router {} routing packet on route {:?} {:?}", self.ipv4_addr, route, packet);
-                                        let _ = tx.unbounded_send(packet);
+                                        tx.unbounded_send(packet);
                                         continue 'next_packet;
                                     }
                                 }
