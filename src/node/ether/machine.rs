@@ -69,6 +69,7 @@ where
     }
 }
 
+#[cfg(feature = "linux_host")]
 #[cfg(test)]
 mod test {
     use priv_prelude::*;
@@ -109,7 +110,7 @@ mod test {
                     }),
                 );
                 let (tx, rx) = plug.split();
-                
+
                 let iface_ip = unwrap!(ipv4_addr_rx.recv());
 
                 let gateway_mac = MacAddr::random();

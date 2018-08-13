@@ -585,6 +585,7 @@ pub fn put_up(iface_name: &str) -> Result<(), PutUpError> {
     Ok(())
 }
 
+#[cfg(feature = "linux_host")]
 #[cfg(test)]
 mod test {
     use super::*;
