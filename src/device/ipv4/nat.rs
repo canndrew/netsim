@@ -17,17 +17,34 @@ pub struct Ipv4Nat {
 
 #[derive(Debug)]
 enum PortAllocator {
-    Sequential(u16),
+    Sequential {
+        next_original_port: u16,
+        next_for_local_endpoint: HashMap<SocketAddrV4, u16>,
+    },
     Random,
 }
 
 impl PortAllocator {
-    pub fn next_port(&mut self) -> u16 {
+    pub fn next_port(&mut self, local_endpoint: SocketAddrV4) -> u16 {
         match *self {
-            PortAllocator::Sequential(ref mut next_port) => {
-                let ret = *next_port;
-                *next_port = next_port.checked_add(1).unwrap_or(1000);
-                ret
+            PortAllocator::Sequential {
+                ref mut next_original_port,
+                ref mut next_for_local_endpoint,
+            } => {
+                match next_for_local_endpoint.entry(local_endpoint) {
+                    hash_map::Entry::Occupied(mut oe) => {
+                        let port = *oe.get();
+                        *oe.get_mut() = oe.get().checked_add(1).unwrap_or(49152);
+                        port
+                    },
+                    hash_map::Entry::Vacant(mut ve) => {
+                        let port = *next_original_port;
+                        *next_original_port = next_original_port.wrapping_add(16);
+                        if *next_original_port < 49152 { *next_original_port += 49153 };
+                        ve.insert(port);
+                        port
+                    },
+                }
             },
             PortAllocator::Random => {
                 loop {
@@ -41,7 +58,16 @@ impl PortAllocator {
     }
 }
 
-#[derive(Debug)]
+impl Default for PortAllocator {
+    fn default() -> PortAllocator {
+        PortAllocator::Sequential {
+            next_original_port: 49152,
+            next_for_local_endpoint: HashMap::new(),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
 struct PortMap {
     map_out: HashMap<SocketAddrV4, u16>,
     map_in: HashMap<u16, SocketAddrV4>,
@@ -54,18 +80,6 @@ struct PortMap {
 struct SymmetricMap {
     map_out: HashMap<(SocketAddrV4, SocketAddrV4), u16>,
     map_in: HashMap<u16, (SocketAddrV4, SocketAddrV4)>,
-}
-
-impl Default for PortMap {
-    fn default() -> PortMap {
-        PortMap {
-            map_out: HashMap::new(),
-            map_in: HashMap::new(),
-            allowed_endpoints: None,
-            symmetric_map: None,
-            port_allocator: PortAllocator::Sequential(1000),
-        }
-    }
 }
 
 impl PortMap {
@@ -98,16 +112,16 @@ impl PortMap {
         None
     }
 
-    pub fn map_port(&mut self, remote_addr: SocketAddrV4, addr: SocketAddrV4) -> u16 {
-        let port = match self.map_out.entry(addr) {
+    pub fn map_port(&mut self, remote_addr: SocketAddrV4, source_addr: SocketAddrV4) -> u16 {
+        let port = match self.map_out.entry(source_addr) {
             hash_map::Entry::Occupied(oe) => *oe.get(),
             hash_map::Entry::Vacant(ve) => {
                 if let Some(ref mut symmetric_map) = self.symmetric_map {
-                    match symmetric_map.map_out.entry((addr, remote_addr)) {
+                    match symmetric_map.map_out.entry((source_addr, remote_addr)) {
                         hash_map::Entry::Occupied(oe) => *oe.get(),
                         hash_map::Entry::Vacant(ve) => {
                             let port = loop {
-                                let port = self.port_allocator.next_port();
+                                let port = self.port_allocator.next_port(source_addr);
                                 if self.map_in.contains_key(&port) {
                                     continue;
                                 }
@@ -118,13 +132,13 @@ impl PortMap {
                             };
 
                             ve.insert(port);
-                            symmetric_map.map_in.insert(port, (addr, remote_addr));
+                            symmetric_map.map_in.insert(port, (source_addr, remote_addr));
                             port
                         },
                     }
                 } else {
                     let port = loop {
-                        let port = self.port_allocator.next_port();
+                        let port = self.port_allocator.next_port(source_addr);
                         if self.map_in.contains_key(&port) {
                             continue;
                         }
@@ -132,7 +146,7 @@ impl PortMap {
                     };
 
                     ve.insert(port);
-                    self.map_in.insert(port, addr);
+                    self.map_in.insert(port, source_addr);
                     port
                 }
             },
@@ -419,7 +433,8 @@ impl Ipv4Nat {
                             );
 
                             info!(
-                                "nat {} rewrote packet source address: {:?}",
+                                "nat {} rewrote packet source address: {} => {}: {:?}",
+                                source_addr, SocketAddrV4::new(self.public_ip, mapped_source_port),
                                 self.public_ip, natted_packet,
                             );
 
@@ -467,6 +482,7 @@ impl Ipv4Nat {
                 Async::NotReady => return false,
                 Async::Ready(None) => return true,
                 Async::Ready(Some(packet)) => {
+                    trace!("nat {} received packet from public side: {:?}", self.public_ip, packet);
                     let ipv4_fields = packet.fields();
                     let source_ip = packet.source_ip();
                     if packet.dest_ip() != self.public_ip {
@@ -492,6 +508,7 @@ impl Ipv4Nat {
                             let source_port = udp.source_port();
                             let source_addr = SocketAddrV4::new(source_ip, source_port);
                             if self.blacklisted_addrs.contains(&source_addr) {
+                                info!("nat {} dropped packet from blacklisted addr {}", self.public_ip, source_addr);
                                 continue;
                             }
                             let dest_port = udp.dest_port();
@@ -521,6 +538,7 @@ impl Ipv4Nat {
                                 },
                                 None => {
                                     if self.blacklist_unrecognized_addrs {
+                                        trace!("nat {} blacklisting unknown address {}", self.public_ip, source_addr);
                                         self.blacklisted_addrs.insert(source_addr);
                                     }
                                 },
