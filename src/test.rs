@@ -3,6 +3,7 @@ use std::sync::mpsc;
 use void;
 use env_logger;
 
+/// Runs callback in a new thread with the given timeout. Panics, if `func()` panics.
 pub fn run_test<F: FnOnce() + Send + 'static>(seconds: u64, func: F) {
     let _ = env_logger::init();
 
@@ -19,7 +20,6 @@ pub fn run_test<F: FnOnce() + Send + 'static>(seconds: u64, func: F) {
         Err(mpsc::RecvTimeoutError::Disconnected) => (),
     };
 
-    // TODO: Why the hell does this sometimes panic?
     unwrap!(join_handle.join());
 }
 
