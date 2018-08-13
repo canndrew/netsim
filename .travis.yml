@@ -1,0 +1,39 @@
+env:
+  global:
+    - RUST_BACKTRACE=1
+    - PATH=$PATH:$HOME/.cargo/bin
+    - RUST_STABLE=1.26.2
+    - RUST_NIGHTLY=nightly-2018-06-10
+    - RUST_CLIPPY=0.0.207
+os:
+  - linux
+language: rust
+rust:
+  - 1.26.2
+  - nightly-2018-06-10
+sudo: false
+cache:
+  cargo: true
+before_script:
+  - sudo apt-get update
+  - sudo apt-get install -y libcap-dev
+  - curl -sSL https://github.com/maidsafe/QA/raw/master/travis/cargo_install.sh > cargo_install.sh
+  - bash cargo_install.sh cargo-prune;
+    if [ "$TRAVIS_RUST_VERSION" = "$RUST_NIGHTLY" ] && [ "$TRAVIS_OS_NAME" = linux ]; then
+      bash cargo_install.sh clippy "$RUST_CLIPPY";
+    fi
+script:
+  - if [ "$TRAVIS_RUST_VERSION" = "$RUST_STABLE" ]; then
+      (
+        set -x;
+        cargo test --release --verbose --no-default-features
+      );
+    elif [ "$TRAVIS_OS_NAME" = linux ]; then
+      (
+        set -x;
+        cargo clippy --profile=test
+      );
+    fi
+  - cargo check --examples
+before_cache:
+  - cargo prune

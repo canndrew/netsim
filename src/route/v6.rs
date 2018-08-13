@@ -61,14 +61,14 @@ pub fn add_route_v6(
         mem::zeroed()
     };
 
-    #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
+    #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
     unsafe {
         let route_destination = &mut route.rt_dst as *mut _ as *mut libc::sockaddr_in6;
         (*route_destination).sin6_family = libc::AF_INET6 as u16;
         (*route_destination).sin6_addr = mem::transmute(u128::from(destination.base_addr()).to_be());
     };
 
-    #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
+    #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
     unsafe {
         let route_genmask = &mut route.rt_genmask as *mut _ as *mut libc::sockaddr_in6;
         (*route_genmask).sin6_family = libc::AF_INET6 as u16;
@@ -76,7 +76,7 @@ pub fn add_route_v6(
     };
 
     route.rt_flags = sys::RTF_UP as u16;
-    #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
+    #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
     unsafe {
         let route_gateway = &mut route.rt_gateway as *mut _ as *mut libc::sockaddr_in6;
         (*route_gateway).sin6_family = libc::AF_INET6 as u16;

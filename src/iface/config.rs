@@ -310,7 +310,7 @@ pub fn set_ipv4_addr(
                 => return Err(SetIpv4AddrError::SystemFileDescriptorLimit(e)),
         };
 
-        #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
+        #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
         {
             let addr = &mut req.ifr_ifru.ifru_addr;
             let addr = addr as *mut libc::sockaddr;
@@ -337,7 +337,7 @@ pub fn set_ipv4_addr(
             }
         }
 
-        #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
+        #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
         {
             let addr = &mut req.ifr_ifru.ifru_addr;
             let addr = addr as *mut libc::sockaddr;
@@ -423,7 +423,7 @@ pub fn set_ipv6_addr(
         let mut buffer: Vec<u8> = Vec::with_capacity(total_size);
         {
             let nlmsghdr: *mut libc::nlmsghdr = {
-                #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
+                #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
                 { buffer.as_mut_ptr() as *mut _ }
             };
             let nlmsghdr: &mut libc::nlmsghdr = &mut *nlmsghdr;
@@ -442,7 +442,7 @@ pub fn set_ipv6_addr(
 
         {
             let ifaddrmsg: *mut sys::ifaddrmsg = {
-                #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
+                #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
                 { buffer.as_mut_ptr().offset(data_start as isize) as *mut _ }
             };
             let ifaddrmsg: &mut sys::ifaddrmsg = &mut *ifaddrmsg;
@@ -455,7 +455,7 @@ pub fn set_ipv6_addr(
 
         {
             let rtattr: *mut sys::rtattr = {
-                #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
+                #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
                 { buffer.as_mut_ptr().offset(attr_header_start as isize) as *mut _ }
             };
             let rtattr: &mut sys::rtattr = &mut *rtattr;
@@ -496,7 +496,7 @@ pub fn set_ipv6_addr(
 
             {
                 let nlmsghdr: *const libc::nlmsghdr = {
-                    #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
+                    #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
                     { buffer.as_ptr() as *const _ }
                 };
                 let nlmsghdr: &libc::nlmsghdr = &*nlmsghdr;
@@ -509,7 +509,7 @@ pub fn set_ipv6_addr(
 
             {
                 let nlmsgerr: *const libc::nlmsgerr = {
-                    #[cfg_attr(feature="clippy", allow(cast_ptr_alignment))]
+                    #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
                     { buffer.as_ptr().offset(error_start as isize) as *const _ }
                 };
                 let nlmsgerr: &libc::nlmsgerr = &*nlmsgerr;
@@ -585,6 +585,7 @@ pub fn put_up(iface_name: &str) -> Result<(), PutUpError> {
     Ok(())
 }
 
+#[cfg(feature = "linux_host")]
 #[cfg(test)]
 mod test {
     use super::*;

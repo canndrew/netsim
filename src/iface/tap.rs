@@ -115,7 +115,7 @@ pub struct EtherIface {
 impl Stream for EtherIface {
     type Item = EtherFrame;
     type Error = io::Error;
-    
+
     fn poll(&mut self) -> io::Result<Async<Option<EtherFrame>>> {
         if let Async::NotReady = self.fd.poll_read() {
             return Ok(Async::NotReady);
@@ -160,7 +160,7 @@ impl Stream for EtherIface {
 impl Sink for EtherIface {
     type SinkItem = EtherFrame;
     type SinkError = io::Error;
-    
+
     fn start_send(&mut self, item: EtherFrame) -> io::Result<AsyncSink<EtherFrame>> {
         info!("TAP received frame: {:?}", item);
         if let Async::NotReady = self.fd.poll_write() {
@@ -196,6 +196,7 @@ impl Sink for EtherIface {
     }
 }
 
+#[cfg(feature = "linux_host")]
 #[cfg(test)]
 mod test {
     use priv_prelude::*;
@@ -294,7 +295,7 @@ mod test {
                 };
                 trace!("build_tap_duplicate_name: building first interface");
                 let _tap = unwrap!(tap_builder.build_unbound());
-                
+
                 let tap_builder = {
                     EtherIfaceBuilder::new()
                     .ipv4_addr(Ipv4Addr::random_global(), 0)

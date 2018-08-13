@@ -10,7 +10,7 @@ impl Ipv4RouterBuilder {
     /// Start creating a new `Ipv4Router` with the given IP address.
     pub fn new(ipv4_addr: Ipv4Addr) -> Ipv4RouterBuilder {
         Ipv4RouterBuilder {
-            ipv4_addr: ipv4_addr,
+            ipv4_addr,
             connections: Vec::new(),
         }
     }
@@ -90,7 +90,7 @@ impl Future for Ipv4Router {
                                 for route in routes {
                                     if route.destination().contains(dest_ip) {
                                         info!("router {} routing packet on route {:?} {:?}", self.ipv4_addr, route, packet);
-                                        let _ = tx.unbounded_send(packet);
+                                        tx.unbounded_send(packet);
                                         continue 'next_packet;
                                     }
                                 }

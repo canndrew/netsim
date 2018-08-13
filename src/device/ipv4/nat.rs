@@ -7,7 +7,7 @@ pub struct Ipv4Nat {
     private_plug: Ipv4Plug,
     public_plug: Ipv4Plug,
     public_ip: Ipv4Addr,
-    subnet: Ipv4Range, 
+    subnet: Ipv4Range,
     hair_pinning: bool,
     udp_map: PortMap,
     tcp_map: PortMap,
@@ -153,10 +153,10 @@ impl Ipv4Nat {
         subnet: Ipv4Range,
     ) -> Ipv4Nat {
         let ret = Ipv4Nat {
-            private_plug: private_plug,
-            public_plug: public_plug,
-            public_ip: public_ip,
-            subnet: subnet,
+            private_plug,
+            public_plug,
+            public_ip,
+            subnet,
             hair_pinning: false,
             udp_map: PortMap::new(),
             tcp_map: PortMap::new(),
@@ -258,17 +258,17 @@ impl Ipv4NatBuilder {
 
     /// Build the NAT
     pub fn build(
-        self, 
+        self,
         public_plug: Ipv4Plug,
         private_plug: Ipv4Plug,
         public_ip: Ipv4Addr,
     ) -> Ipv4Nat {
         let subnet = self.subnet.unwrap_or_else(Ipv4Range::random_local_subnet);
         let ret = Ipv4Nat {
-            private_plug: private_plug,
-            public_plug: public_plug,
-            public_ip: public_ip,
-            subnet: subnet, 
+            private_plug,
+            public_plug,
+            public_ip,
+            subnet,
             hair_pinning: self.hair_pinning,
             udp_map: self.udp_map,
             tcp_map: self.tcp_map,
@@ -742,7 +742,7 @@ fn test_symmetric_map() {
     let external_port_0 = asymmetric.map_port(remote_addr_0, internal_addr);
     let external_port_1 = asymmetric.map_port(remote_addr_1, internal_addr);
     assert_eq!(external_port_0, external_port_1);
-    
+
     let external_port_0 = symmetric.map_port(remote_addr_0, internal_addr);
     let external_port_1 = symmetric.map_port(remote_addr_1, internal_addr);
     assert!(external_port_0 != external_port_1);

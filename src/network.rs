@@ -16,7 +16,7 @@ impl Network {
         let (drop_tx_tx, drop_tx_rx) = std::sync::mpsc::channel();
         Network {
             handle: handle.clone(),
-            drop_tx_tx: drop_tx_tx,
+            drop_tx_tx,
             _drop_tx_rx: drop_tx_rx,
         }
     }

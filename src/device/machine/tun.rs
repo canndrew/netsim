@@ -18,7 +18,7 @@ impl TunTask {
     ) -> TunTask {
         let (tx, rx) = plug.split();
         TunTask {
-            tun: tun,
+            tun,
             handle: handle.clone(),
             packet_tx: tx,
             packet_rx: rx,
@@ -48,7 +48,7 @@ impl Future for TunTask {
         loop {
             match self.tun.poll() {
                 Ok(Async::Ready(Some(frame))) => {
-                    let _ = self.packet_tx.unbounded_send(frame);
+                    self.packet_tx.unbounded_send(frame);
                     received_frames = true;
                 },
                 Ok(Async::Ready(None)) => {

@@ -13,7 +13,7 @@ impl<F, R> FnBox<R> for F
 where
     F: FnOnce() -> R
 {
-    #[cfg_attr(feature="clippy", allow(boxed_local))]
+    #[cfg_attr(feature="cargo-clippy", allow(boxed_local))]
     fn call_box(self: Box<Self>) -> R {
         (*self)()
     }
@@ -163,6 +163,7 @@ where
     spawn_complete::from_parts(ret_rx, process_handle)
 }
 
+#[cfg(feature = "linux_host")]
 #[cfg(test)]
 mod test {
     use super::*;

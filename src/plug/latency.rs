@@ -39,12 +39,12 @@ impl<T: fmt::Debug + 'static> Latency<T> {
     ) {
         let latency = Latency {
             handle: handle.event_loop().clone(),
-            plug_a: plug_a,
-            plug_b: plug_b,
+            plug_a,
+            plug_b,
             outgoing_a: FuturesUnordered::new(),
             outgoing_b: FuturesUnordered::new(),
-            min_latency: min_latency,
-            mean_additional_latency: mean_additional_latency,
+            min_latency,
+            mean_additional_latency,
         };
         handle.spawn(latency);
     }
