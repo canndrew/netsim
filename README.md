@@ -197,6 +197,25 @@ networks, namespaces with multiple interfaces etc. by directly using the primiti
 `device` module. Have an explore of the API, and if anything needs clarification or could be
 better designed then let us know on the bug tracker :)
 
+## Testing
+
+netsim has it's own unit/integration tests. Dependending on the environment
+you run netsim tests, there are different ways to do so.
+
+If you're on Linux host machine, use:
+
+```
+$ cargo test
+```
+
+If you're inside Linux container, say running tests on travis CI, you can't
+use some Linux features like create namespaces, hence some tests won't run.
+In such cases disable `linux_host` Rust feature:
+
+```
+$ cargo test --no-default-features
+```
+
 ## License
 
 This library is dual-licensed under the Modified BSD ([LICENSE-BSD](LICENSE-BSD) https://opensource.org/licenses/BSD-3-Clause) or the MIT license ([LICENSE-MIT](LICENSE-MIT) https://opensource.org/licenses/MIT) at your option.

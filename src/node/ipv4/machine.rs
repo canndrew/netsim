@@ -47,6 +47,7 @@ where
     }
 }
 
+#[cfg(feature = "linux_host")]
 #[cfg(test)]
 mod test {
     use super::*;

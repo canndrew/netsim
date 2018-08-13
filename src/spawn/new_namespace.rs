@@ -163,6 +163,7 @@ where
     spawn_complete::from_parts(ret_rx, process_handle)
 }
 
+#[cfg(feature = "linux_host")]
 #[cfg(test)]
 mod test {
     use super::*;
