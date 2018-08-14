@@ -4,15 +4,7 @@
 code. You can use it to run Rust functions in network-isolated containers, and assemble
 virtual networks for these functions to communicate over.
 
-# Dependencies
-
-POSIX capabilities library:
-```
-$ apt install libcap-dev
-$ dnf install libcap-devel # Fedora
-```
-
-# Spawning threads into isolated network namespaces
+## Spawning threads into isolated network namespaces
 
 Network namespaces are a linux feature which can provide a thread or process with its own view
 of the system's network interfaces and routing table. This crate's `spawn` module provides the
@@ -46,7 +38,7 @@ assert!(interfaces.is_empty());
 This demonstrates how to launch a thread - perhaps running an automated test - into a sandboxed
 environment. However an environment with no network interfaces is pretty useless...
 
-# Creating virtual interfaces
+## Creating virtual interfaces
 
 We can create virtual IP and Ethernet interfaces using the types in the `iface` module. For
 example, `IpIface` lets you create a new IP (TUN) interface and implements `futures::{Stream,
@@ -89,7 +81,7 @@ let packet = core.run({
 However, for simply testing network code, you don't need to create interfaces manually like
 this.
 
-# Sandboxing network code
+## Sandboxing network code
 
 Rather than performing the above two steps individually, you can use the `spawn::ipv4_tree`
 function along with the `node` module to set up a namespace with an IPv4 interface for you.
@@ -140,7 +132,7 @@ core.run({
 }).unwrap()
 ```
 
-# Simulating networks of communicating nodes
+## Simulating networks of communicating nodes
 
 Using the `spawn` and `node` modules you can set up a bunch of nodes connected over a virtual
 network.
@@ -190,27 +182,33 @@ let (received, ()) = core.run(spawn_complete).unwrap();
 assert_eq!(&received[..], b"hello world");
 ```
 
-# All the rest
+## All the rest
 
 It's possible to set up more complicated (non-hierarchical) network topologies, ethernet
 networks, namespaces with multiple interfaces etc. by directly using the primitives in the
 `device` module. Have an explore of the API, and if anything needs clarification or could be
 better designed then let us know on the bug tracker :)
 
+# Dependencies
+
+`netsim` only runs on Linux as it makes use of the Linux namespaces APIs.
+`netsim` depends on the POSIX capabilities library, usually called `libcap-dev`
+or `libcap-devel` on most distros.
+
 ## Testing
 
-netsim has it's own unit/integration tests. Dependending on the environment
-you run netsim tests, there are different ways to do so.
+netsim has it's own unit/integration tests. There are different ways to run
+these tests depending on the environment you're in.
 
-If you're on Linux host machine, use:
+If you're on a Linux host machine, you can just use `cargo test` like normal:
 
 ```
 $ cargo test
 ```
 
-If you're inside Linux container, say running tests on travis CI, you can't
-use some Linux features like create namespaces, hence some tests won't run.
-In such cases disable `linux_host` Rust feature:
+If you're inside a Linux container, say running tests on travis CI, the Linux
+namespace APIs probably won't be available. In this case you need to disable
+the `linux_host` feature of this crate:
 
 ```
 $ cargo test --no-default-features
@@ -218,4 +216,8 @@ $ cargo test --no-default-features
 
 ## License
 
-This library is dual-licensed under the Modified BSD ([LICENSE-BSD](LICENSE-BSD) https://opensource.org/licenses/BSD-3-Clause) or the MIT license ([LICENSE-MIT](LICENSE-MIT) https://opensource.org/licenses/MIT) at your option.
+This library is dual-licensed under the Modified BSD
+([LICENSE-BSD](LICENSE-BSD) https://opensource.org/licenses/BSD-3-Clause) or
+the MIT license ([LICENSE-MIT](LICENSE-MIT)
+https://opensource.org/licenses/MIT) at your option.
+

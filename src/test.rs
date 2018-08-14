@@ -20,6 +20,7 @@ pub fn run_test<F: FnOnce() + Send + 'static>(seconds: u64, func: F) {
         Err(mpsc::RecvTimeoutError::Disconnected) => (),
     };
 
+    // FIXME: this sometimes panics, even if the thread of join_handle didn't.
     unwrap!(join_handle.join());
 }
 
