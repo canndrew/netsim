@@ -14,6 +14,7 @@ impl TunTask {
         plug: IpPlug,
         drop_rx: DropNotice,
     ) -> TunTask {
+        trace!("TunTask: creating");
         let (tx, rx) = plug.split();
         TunTask {
             tun,
@@ -38,7 +39,7 @@ impl Future for TunTask {
     type Error = Void;
 
     fn poll(&mut self) -> Result<Async<()>, Void> {
-        trace!("polling TunTask");
+        trace!("TunTask: polling");
         let grace_period: Duration = Duration::from_millis(100);
 
         let mut received_frames = false;
@@ -59,13 +60,13 @@ impl Future for TunTask {
         }
 
         loop {
-            trace!("looping receiver ...");
+            trace!("TunTask: looping receiver ...");
             if let Some(frame) = self.sending_packet.take() {
-                trace!("we have a frame ready to send");
+                trace!("TunTask: we have a frame ready to send");
                 match self.tun.start_send(frame) {
                     Ok(AsyncSink::Ready) => (),
                     Ok(AsyncSink::NotReady(frame)) => {
-                        trace!("couldn't send the frame ;(");
+                        trace!("TunTask: couldn't send the frame ;(");
                         self.sending_packet = Some(frame);
                         break;
                     },
@@ -77,14 +78,14 @@ impl Future for TunTask {
 
             match self.packet_rx.poll().void_unwrap() {
                 Async::Ready(Some(frame)) => {
-                    trace!("we received a frame");
+                    trace!("TunTask: we received a frame");
                     self.sending_packet = Some(frame);
                     continue;
                 },
                 _ => break,
             }
         }
-        trace!("done looping");
+        trace!("TunTask: done looping receiver");
 
         match self.tun.poll_complete() {
             Ok(..) => (),
@@ -99,7 +100,7 @@ impl Future for TunTask {
                 TunTaskState::Receiving {
                     mut drop_rx,
                 } => {
-                    trace!("state == receiving");
+                    trace!("TunTask: state == receiving");
                     match drop_rx.poll().void_unwrap() {
                         Async::Ready(()) => {
                             state = TunTaskState::Dying(Delay::new(Instant::now() + grace_period));
@@ -112,7 +113,7 @@ impl Future for TunTask {
                     }
                 },
                 TunTaskState::Dying(mut timeout) => {
-                    trace!("state == dying");
+                    trace!("TunTask: state == dying");
                     if received_frames {
                         timeout.reset(Instant::now() + grace_period);
                     }
@@ -133,6 +134,7 @@ impl Future for TunTask {
         }
         self.state = state;
 
+        trace!("TunTask: exiting");
         Ok(Async::NotReady)
     }
 }

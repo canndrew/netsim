@@ -4,43 +4,61 @@
 extern crate netsim;
 extern crate tokio;
 extern crate futures;
+#[macro_use]
+extern crate unwrap;
+#[macro_use]
+extern crate net_literals;
 
-use futures::Future;
+use futures::{future, Future};
 use futures::sync::oneshot;
 use netsim::{node, Ipv4Range, Network};
 use tokio::runtime::Runtime;
+use tokio::net::UdpSocket;
 
-use std::net::{SocketAddr, SocketAddrV4, UdpSocket};
+use std::net::{SocketAddr, SocketAddrV4};
+use std::str;
 
 fn main() {
-    let mut evloop = Runtime::new().unwrap();
     let network = Network::new();
 
-    let (server_addr_tx, server_addr_rx) = oneshot::channel();
-    let server_recipe = node::ipv4::machine(|ip| {
-        println!("[server] ip = {}", ip);
+    let mut runtime = unwrap!(Runtime::new());
+    let res = runtime.block_on(future::lazy(move || {
+        let (server_addr_tx, server_addr_rx) = oneshot::channel();
+        let server_node = node::ipv4::machine(|ip| {
+            println!("[server] ip = {}", ip);
 
-        let bind_addr = SocketAddr::V4(SocketAddrV4::new(ip, 0));
-        let sock = UdpSocket::bind(bind_addr).unwrap();
-        let _ = server_addr_tx.send(sock.local_addr().unwrap());
+            let bind_addr = SocketAddr::V4(SocketAddrV4::new(ip, 0));
+            let socket = unwrap!(UdpSocket::bind(&bind_addr));
+            unwrap!(server_addr_tx.send(unwrap!(socket.local_addr())));
 
-        let mut buf = [0; 4096];
-        let (_bytes_received, addr) = sock.recv_from(&mut buf).unwrap();
-        println!("[server] received: {}, from: {}", String::from_utf8(buf.to_vec()).unwrap(), addr);
-    });
+            socket
+            .recv_dgram(vec![0u8; 1024])
+            .map_err(|e| panic!("error receiving: {}", e))
+            .map(|(_socket, buf, len, addr)| {
+                let s = unwrap!(str::from_utf8(&buf[..len]));
+                println!("[server] received: {}, from: {}", s, addr);
+            })
+        });
 
-    let client_recipe = node::ipv4::machine(|ip| {
-        println!("[client] ip = {}", ip);
+        let client_node = node::ipv4::machine(|ip| {
+            println!("[client] ip = {}", ip);
 
-        let server_addr = server_addr_rx.wait().unwrap();
-        println!("[client] Got server addr: {}", server_addr);
+            server_addr_rx
+            .map_err(|e| panic!("failed to receive server addr: {}", e))
+            .and_then(|server_addr| {
+                println!("[client] Got server addr: {}", server_addr);
 
-        let sock = UdpSocket::bind("0.0.0.0:0").unwrap();
-        let _ = sock.send_to(b"hello world!", server_addr).unwrap();
-    });
+                let socket = unwrap!(UdpSocket::bind(&addr!("0.0.0.0:0")));
+                socket
+                .send_dgram(b"hello world!", &server_addr)
+                .map_err(|e| panic!("error sending: {}", e))
+                .map(|(_socket, _buf)| ())
+            })
+        });
 
-    let router_recipe = node::ipv4::router((server_recipe, client_recipe));
-    let (spawn_complete, _ipv4_plug) = network.spawn_ipv4_tree(Ipv4Range::global(), router_recipe);
-
-    evloop.block_on(spawn_complete).unwrap();
+        let router_node = node::ipv4::router((server_node, client_node));
+        let (spawn_complete, _ipv4_plug) = network.spawn_ipv4_tree(Ipv4Range::global(), router_node);
+        spawn_complete.map(|((), ())| ())
+    }));
+    unwrap!(res)
 }

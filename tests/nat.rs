@@ -8,6 +8,7 @@ extern crate netsim;
 extern crate unwrap;
 extern crate tokio;
 
+use futures::future;
 use netsim::{node, Ipv4Range, Network};
 use netsim::device::ipv4::Ipv4NatBuilder;
 use tokio::runtime::Runtime;
@@ -37,6 +38,7 @@ fn query_under_nat(nat_builder: Ipv4NatBuilder) -> Vec<u16> {
             let mut buf = [0; 4096];
             let (_, client_addr) = unwrap!(sock.recv_from(&mut buf));
             unwrap!(client_ports_tx.send(client_addr.port()));
+            future::ok(())
         });
         stun_servers.push(server);
     }
@@ -46,6 +48,7 @@ fn query_under_nat(nat_builder: Ipv4NatBuilder) -> Vec<u16> {
         while let Ok(addr) = stun_addrs_rx.try_recv() {
             unwrap!(sock.send_to(&[1, 2, 3], addr));
         }
+        future::ok(())
     });
     let client = node::ipv4::nat(nat_builder, client);
 

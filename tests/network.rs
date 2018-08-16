@@ -10,7 +10,7 @@ extern crate tokio;
 
 use netsim::{node, Ipv4Range, Network};
 use futures::sync::oneshot;
-use futures::Future;
+use futures::{future, Future};
 use tokio::runtime::Runtime;
 
 #[test]
@@ -20,10 +20,11 @@ fn spawn_ipv4_tree() {
 
     let (addr_tx, addr_rx) = oneshot::channel();
 
-    let node_recipe = node::ipv4::machine(|ip| {
+    let node = node::ipv4::machine(|ip| {
         unwrap!(addr_tx.send(ip));
+        future::ok(())
     });
-    let (spawn_complete, _ipv4_plug) = network.spawn_ipv4_tree(Ipv4Range::new(ipv4!("78.100.10.1"), 30), node_recipe);
+    let (spawn_complete, _ipv4_plug) = network.spawn_ipv4_tree(Ipv4Range::new(ipv4!("78.100.10.1"), 30), node);
 
     let addr = unwrap!(evloop.block_on(spawn_complete.and_then(|()| addr_rx.map_err(|e| panic!(e)))));
     assert_eq!(addr.octets()[0..3], [78, 100, 10]);

@@ -4,6 +4,7 @@ use future_utils;
 use spawn;
 use self::tap::TapTask;
 use self::tun::TunTask;
+use tokio;
 
 mod tap;
 mod tun;
@@ -44,15 +45,17 @@ impl MachineBuilder {
 
     /// Spawn the machine onto the event loop. The returned `SpawnComplete` will resolve with the
     /// value returned by the given function.
-    pub fn spawn<F, R>(
+    pub fn spawn<F, T>(
         self,
         handle: &NetworkHandle,
         func: F,
-    ) -> SpawnComplete<R>
+    ) -> SpawnComplete<T::Item>
     where
-        F: FnOnce() -> R,
+        F: FnOnce() -> T,
         F: Send + 'static,
-        R: Send + 'static,
+        T: Future<Error = Void>,
+        T::Item: Send + 'static,
+        T: Send + 'static,
     {
         let (ether_tx, ether_rx) = std::sync::mpsc::channel();
         let (ip_tx, ip_rx) = std::sync::mpsc::channel();
@@ -75,9 +78,14 @@ impl MachineBuilder {
             }
             drop(ip_tx);
 
-            let ret = func();
-            drop(drop_txs);
-            ret
+            let mut runtime = unwrap!(tokio::runtime::current_thread::Runtime::new());
+            runtime.block_on(
+               func()
+               .map(|ret| {
+                    drop(drop_txs);
+                    ret
+                })
+            ).void_unwrap()
         });
 
         for (tap_unbound, plug, drop_rx) in ether_rx {
