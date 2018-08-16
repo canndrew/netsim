@@ -7,27 +7,29 @@ pub struct MachineNode<F> {
 
 /// Create a node for a machine with an IP interface. This node will run the given function in a
 /// network namespace with a single interface.
-pub fn machine<R, F>(func: F) -> MachineNode<F>
+pub fn machine<T, F>(func: F) -> MachineNode<F>
 where
-    R: Send + 'static,
-    F: FnOnce(Option<Ipv4Addr>, Option<Ipv6Addr>) -> R + Send + 'static,
+    T: Future<Error = Void> + Send + 'static,
+    T::Item: Send + 'static,
+    F: FnOnce(Option<Ipv4Addr>, Option<Ipv6Addr>) -> T + Send + 'static,
 {
     MachineNode { func }
 }
 
-impl<R, F> IpNode for MachineNode<F>
+impl<T, F> IpNode for MachineNode<F>
 where
-    R: Send + 'static,
-    F: FnOnce(Option<Ipv4Addr>, Option<Ipv6Addr>) -> R + Send + 'static,
+    T: Future<Error = Void> + Send + 'static,
+    T::Item: Send + 'static,
+    F: FnOnce(Option<Ipv4Addr>, Option<Ipv6Addr>) -> T + Send + 'static,
 {
-    type Output = R;
+    type Output = T::Item;
 
     fn build(
         self,
         handle: &NetworkHandle,
         ipv4_range: Option<Ipv4Range>,
         ipv6_range: Option<Ipv6Range>,
-    ) -> (SpawnComplete<R>, IpPlug) {
+    ) -> (SpawnComplete<T::Item>, IpPlug) {
         let mut iface = IpIfaceBuilder::new();
         let ipv4_addr = if let Some(range) = ipv4_range {
             let ipv4_addr = range.random_client_addr();

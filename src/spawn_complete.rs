@@ -20,7 +20,10 @@ impl<R> Future for SpawnComplete<R> {
                 res.map(Async::Ready)
             },
             Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(oneshot::Canceled) => panic!("thread destroyed without sending response!?"),
+            Err(oneshot::Canceled) => {
+                let holds_process = self.process_handle.is_some();
+                panic!("thread destroyed without sending response!? {}", holds_process);
+            },
         }
     }
 }

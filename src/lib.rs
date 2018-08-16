@@ -89,8 +89,8 @@
 //! extern crate futures;
 //! extern crate void;
 //!
-//! use std::net::UdpSocket;
 //! use tokio::runtime::Runtime;
+//! use tokio::net::UdpSocket;
 //! use futures::{Future, Stream};
 //! use netsim::{spawn, node, Network, Ipv4Range};
 //! use netsim::wire::Ipv4Payload;
@@ -109,8 +109,13 @@
 //!         Ipv4Range::local_subnet_10(),
 //!         node::ipv4::machine(|ipv4_addr| {
 //!             // Send a packet out the interface
-//!             let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
-//!             socket.send_to(b"hello world", "10.1.2.3:4567").unwrap();
+//!             let bind_addr = "0.0.0.0:0".parse().unwrap();
+//!             let socket = UdpSocket::bind(&bind_addr).unwrap();
+//!             let addr = "10.1.2.3:4567".parse().unwrap();
+//!             socket
+//!             .send_dgram(b"hello world", &addr)
+//!             .map_err(|e| panic!("error sending: {}", e))
+//!             .map(|(_socket, _buffer)| ())
 //!         }),
 //!     );
 //!
@@ -143,8 +148,10 @@
 //! extern crate future_utils;
 //! extern crate netsim;
 //!
-//! use std::net::UdpSocket;
+//! use std::net::{SocketAddr, IpAddr};
 //! use tokio::runtime::Runtime;
+//! use tokio::net::UdpSocket;
+//! use futures::Future;
 //! use netsim::{spawn, node, Network, Ipv4Range};
 //!
 //! // Create an event loop and a network to bind devices to.
@@ -158,19 +165,30 @@
 //!
 //!     // Create a machine which will receive a UDP packet and return its contents
 //!     let receiver_node = node::ipv4::machine(move |ipv4_addr| {
-//!         let socket = UdpSocket::bind(("0.0.0.0", 1234)).unwrap();
+//!         let bind_addr = "0.0.0.0:1234".parse().unwrap();
+//!         let socket = UdpSocket::bind(&bind_addr).unwrap();
 //!         /// Tell the sending node our IP address
 //!         tx.send(ipv4_addr).unwrap();
 //!         let mut buffer = [0; 1024];
-//!         let (n, _sender_addr) = socket.recv_from(&mut buffer).unwrap();
-//!         buffer[..n].to_owned()
+//!
+//!         socket
+//!         .recv_dgram(vec![0; 1024])
+//!         .map_err(|e| panic!("error receiving: {}", e))
+//!         .map(|(_socket, mut buffer, len, _addr)| {
+//!             buffer.truncate(len);
+//!             buffer
+//!         })
 //!     });
 //!
 //!     // Create the machine which will send the UDP packet
 //!     let sender_node = node::ipv4::machine(move |_ipv4_addr| {
 //!         let receiver_ip = rx.recv().unwrap();
-//!         let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
-//!         socket.send_to(b"hello world", (receiver_ip, 1234)).unwrap();
+//!         let bind_addr = "0.0.0.0:0".parse().unwrap();
+//!         let socket = UdpSocket::bind(&bind_addr).unwrap();
+//!         socket
+//!         .send_dgram(b"hello world", &SocketAddr::new(IpAddr::V4(receiver_ip), 1234))
+//!         .map_err(|e| panic!("error sending: {}", e))
+//!         .map(|(_socket, _buffer)| ())
 //!     });
 //!
 //!     // Connect the sending and receiving nodes via a router
