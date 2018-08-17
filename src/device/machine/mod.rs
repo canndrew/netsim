@@ -79,13 +79,13 @@ impl MachineBuilder {
             drop(ip_tx);
 
             let mut runtime = unwrap!(tokio::runtime::current_thread::Runtime::new());
-            runtime.block_on(
+            runtime.block_on(future::lazy(|| {
                func()
                .map(|ret| {
                     drop(drop_txs);
                     ret
                 })
-            ).void_unwrap()
+            })).void_unwrap()
         });
 
         for (tap_unbound, plug, drop_rx) in ether_rx {
