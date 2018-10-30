@@ -28,6 +28,26 @@ impl Network {
             drop_tx_tx: self.drop_tx_tx.clone(),
         }
     }
+
+    /// Spawn a hierarchical network of nodes. The returned plug can be used to write packets to the
+    /// network and read packets that try to leave the network.
+    pub fn spawn_ipv4_tree<N: Ipv4Node>(
+        &self,
+        ipv4_range: Ipv4Range,
+        node: N,
+    ) -> (SpawnComplete<N::Output>, Ipv4Plug) {
+        node.build(&self.handle(), ipv4_range)
+    }
+
+    /// Spawn a hierarchical network of nodes. The returned plug can be used to write packets to the
+    /// network and read packets that try to leave the network.
+    pub fn spawn_ipv6_tree<N: Ipv6Node>(
+        &self,
+        ipv6_range: Ipv6Range,
+        node: N,
+    ) -> (SpawnComplete<N::Output>, Ipv6Plug) {
+        node.build(&self.handle(), ipv6_range)
+    }
 }
 
 #[derive(Clone)]
