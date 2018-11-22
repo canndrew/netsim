@@ -7,7 +7,7 @@ extern crate futures;
 
 use futures::Future;
 use futures::sync::oneshot;
-use netsim::{node, spawn, Ipv4Range, Network};
+use netsim::{node, Ipv4Range, Network};
 use tokio_core::reactor::Core;
 
 use std::net::{SocketAddr, SocketAddrV4, UdpSocket};
@@ -40,8 +40,7 @@ fn main() {
     });
 
     let router_recipe = node::ipv4::router((server_recipe, client_recipe));
-    let (spawn_complete, _ipv4_plug) =
-        spawn::ipv4_tree(&network.handle(), Ipv4Range::global(), router_recipe);
+    let (spawn_complete, _ipv4_plug) = network.spawn_ipv4_tree(Ipv4Range::global(), router_recipe);
 
     evloop.run(spawn_complete).unwrap();
 }
