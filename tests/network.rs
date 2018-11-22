@@ -1,3 +1,5 @@
+#![cfg(feature = "linux_host")]
+
 #[macro_use]
 extern crate net_literals;
 extern crate netsim;
