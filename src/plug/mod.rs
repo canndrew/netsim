@@ -7,9 +7,9 @@ mod packet_loss;
 pub use self::latency::*;
 pub use self::packet_loss::*;
 
-#[derive(Debug)]
 /// Bidirectional network plug that can be used to exchange data between two devices.
-/// Anything written to the plub will be readable on the other side.
+/// Anything written to the plug will be readable on the other side.
+#[derive(Debug)]
 pub struct Plug<T: fmt::Debug + 'static> {
     /// The sender
     pub tx: UnboundedSender<T>,
