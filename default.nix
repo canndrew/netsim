@@ -9,5 +9,6 @@ with import <nixpkgs> {}; {
 
     LIBCLANG_PATH = "${llvmPackages.clang-unwrapped.lib}/lib";
     CPATH = "${stdenv.cc.libc.dev}/include";
+    LD_LIBRARY_PATH = stdenv.lib.makeLibraryPath [ libcap ];
   };
 }
