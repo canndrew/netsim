@@ -10,7 +10,7 @@ categories = ["development-tools::testing", "network-programming", "simulation"]
 readme = "README.md"
 
 [dependencies]
-libc = "=0.2.41"
+libc = "=0.2.42"
 unwrap = "1.1"
 get_if_addrs = "0.5"
 future-utils = "0.8.0"
