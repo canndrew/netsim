@@ -1,3 +1,5 @@
+#![cfg(feature = "linux_host")]
+
 extern crate futures;
 #[macro_use]
 extern crate net_literals;

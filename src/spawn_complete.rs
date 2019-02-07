@@ -1,3 +1,5 @@
+//! This module implements futures to wait for task completion.
+
 use priv_prelude::*;
 
 /// A handle to the spawned network-isolated thread. Implements `Future` so that you can wait for
@@ -25,6 +27,7 @@ impl<R> Future for SpawnComplete<R> {
     }
 }
 
+/// Constructs `SpawnComplete` that waits for a completion signal and until a given process stops.
 pub fn from_parts<R>(
     ret_rx: oneshot::Receiver<thread::Result<R>>,
     process_handle: ProcessHandle,
@@ -35,6 +38,7 @@ pub fn from_parts<R>(
     }
 }
 
+/// Constructs `SpawnComplete` that waits for a completion signal.
 pub fn from_receiver<R>(
     ret_rx: oneshot::Receiver<thread::Result<R>>,
 ) -> SpawnComplete<R> {
