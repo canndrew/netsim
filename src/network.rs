@@ -73,5 +73,14 @@ impl NetworkHandle {
             .infallible()
         });
     }
-}
 
+    /// Spawn a hierarchical network of nodes. The returned plug can be used to write packets to the
+    /// network and read packets that try to leave the network.
+    pub fn spawn_ipv4_tree<N: Ipv4Node>(
+        &self,
+        ipv4_range: Ipv4Range,
+        node: N,
+    ) -> (SpawnComplete<N::Output>, Ipv4Plug) {
+        node.build(&self, ipv4_range)
+    }
+}

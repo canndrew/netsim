@@ -17,6 +17,7 @@ use tokio::runtime::Runtime;
 fn spawn_ipv4_tree() {
     let mut evloop = unwrap!(Runtime::new());
     let network = Network::new();
+    let network_handle = network.handle();
 
     let (addr_tx, addr_rx) = oneshot::channel();
 
@@ -24,8 +25,12 @@ fn spawn_ipv4_tree() {
         unwrap!(addr_tx.send(ip));
         future::ok(())
     });
-    let (spawn_complete, _ipv4_plug) = network.spawn_ipv4_tree(Ipv4Range::new(ipv4!("78.100.10.1"), 30), node);
+    let get_addr = future::lazy(move || {
+        let (spawn_complete, _ipv4_plug) =
+            network_handle.spawn_ipv4_tree(Ipv4Range::new(ipv4!("78.100.10.1"), 30), node);
+        spawn_complete.and_then(|()| addr_rx.map_err(|e| panic!(e)))
+    });
 
-    let addr = unwrap!(evloop.block_on(spawn_complete.and_then(|()| addr_rx.map_err(|e| panic!(e)))));
+    let addr = unwrap!(evloop.block_on(get_addr));
     assert_eq!(addr.octets()[0..3], [78, 100, 10]);
 }

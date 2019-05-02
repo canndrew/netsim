@@ -20,6 +20,7 @@ use std::sync::mpsc;
 fn query_under_nat(nat_builder: Ipv4NatBuilder) -> Vec<u16> {
     let mut evloop = unwrap!(Runtime::new());
     let network = Network::new();
+    let network_handle = network.handle();
 
     let (stun_addrs_tx, stun_addrs_rx) = mpsc::channel();
     let (client_ports_tx, client_ports_rx) = mpsc::channel();
@@ -55,7 +56,7 @@ fn query_under_nat(nat_builder: Ipv4NatBuilder) -> Vec<u16> {
     let router = node::ipv4::router(stun_servers);
     let router = node::ipv4::router((router, client));
     let spawn_complete = future::lazy(move || {
-        let (spawn_complete, _ip_plug) = network.spawn_ipv4_tree(Ipv4Range::global(), router);
+        let (spawn_complete, _ip_plug) = network_handle.spawn_ipv4_tree(Ipv4Range::global(), router);
         spawn_complete
     });
     unwrap!(evloop.block_on(spawn_complete));

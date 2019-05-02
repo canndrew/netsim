@@ -20,6 +20,7 @@ use std::str;
 
 fn main() {
     let network = Network::new();
+    let network_handle = network.handle();
 
     let mut runtime = unwrap!(Runtime::new());
     let res = runtime.block_on(future::lazy(move || {
@@ -57,8 +58,8 @@ fn main() {
         });
 
         let router_node = node::ipv4::router((server_node, client_node));
-        let (spawn_complete, _ipv4_plug) = network.spawn_ipv4_tree(Ipv4Range::global(), router_node);
-        spawn_complete.map(|((), ())| ())
+        let (spawn_complete, _ipv4_plug) = network_handle.spawn_ipv4_tree(Ipv4Range::global(), router_node);
+        spawn_complete.map(|_| ())
     }));
-    unwrap!(res)
+    unwrap!(res);
 }
