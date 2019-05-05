@@ -1,8 +1,8 @@
 //! Contains utilites for working with virtual (TAP) network interfaces.
 
-use priv_prelude::*;
+use crate::priv_prelude::*;
 use libc;
-use iface::build::{IfaceBuilder, build};
+use crate::iface::build::{IfaceBuilder, build};
 
 /// This object can be used to set the configuration options for a `EtherIface` before creating the
 /// `EtherIface`
@@ -199,11 +199,11 @@ impl Sink for EtherIface {
 #[cfg(feature = "linux_host")]
 #[cfg(test)]
 mod test {
-    use priv_prelude::*;
-    use spawn;
+    use crate::priv_prelude::*;
+    use crate::spawn;
     use capabilities;
     use rand;
-    use iface;
+    use crate::iface;
     use get_if_addrs::{self, IfAddr};
 
     #[test]

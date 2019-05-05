@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 use tokio;
 
 /// A sink for IP packets which writes the packets to a pcap file.
@@ -29,7 +29,7 @@ impl IpLog {
         const VERSION_MINOR: u16 = 4;
         const LINKTYPE_RAW: u32 = 101;
 
-        let try = || -> io::Result<_> {
+        let write_header = || -> io::Result<_> {
             let file = File::open(path)?;
             let raw_fd = file.into_raw_fd();
             let async_fd = AsyncFd::new(raw_fd)?;
@@ -58,7 +58,7 @@ impl IpLog {
             })
         };
 
-        future::result(try()).flatten().into_boxed()
+        future::result(write_header()).flatten().into_boxed()
     }
 }
 

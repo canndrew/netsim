@@ -1,6 +1,6 @@
 // Note: this file was ripped-off from smoltcp
 
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 fn propagate_carries(word: u32) -> u16 {
     let sum = (word >> 16) + (word & 0xffff);

@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 /// A node representing a machine with an IP interface.
 pub struct MachineNode<F> {

@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 /// A `Node` which adds packet loss to an underlying node.
 pub struct PacketLossNode<N> {

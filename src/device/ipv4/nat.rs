@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 use rand;
 
 #[derive(Debug)]
@@ -37,7 +37,7 @@ impl PortAllocator {
                         *oe.get_mut() = oe.get().checked_add(1).unwrap_or(49152);
                         port
                     },
-                    hash_map::Entry::Vacant(mut ve) => {
+                    hash_map::Entry::Vacant(ve) => {
                         let port = *next_original_port;
                         *next_original_port = next_original_port.wrapping_add(16);
                         if *next_original_port < 49152 { *next_original_port += 49153 };

@@ -1,5 +1,5 @@
-use priv_prelude::*;
-use sys;
+use crate::priv_prelude::*;
+use crate::sys;
 
 ioctl!(bad read siocgifflags with 0x8913; sys::ifreq);
 ioctl!(bad write siocsifflags with 0x8914; sys::ifreq);

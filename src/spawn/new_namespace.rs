@@ -1,7 +1,7 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 use libc;
 use libc::{c_int, c_void, pid_t};
-use spawn_complete;
+use crate::spawn_complete;
 
 const STACK_ALIGN: usize = 16;
 

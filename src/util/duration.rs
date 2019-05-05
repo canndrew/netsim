@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 pub trait DurationExt {
     fn mul_f64(self, m: f64) -> Duration;

@@ -1,7 +1,7 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 use rand;
 use rand::distributions::{Sample, Range};
-use util;
+use crate::util;
 
 /// Simulate packet loss on a link
 pub struct PacketLoss<T: fmt::Debug + 'static> {

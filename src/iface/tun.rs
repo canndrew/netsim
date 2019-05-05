@@ -1,8 +1,8 @@
 //! Contains utilites for working with virtual (TUN) network interfaces.
 
-use priv_prelude::*;
+use crate::priv_prelude::*;
 use libc;
-use iface::build::{IfaceBuilder, build};
+use crate::iface::build::{IfaceBuilder, build};
 
 /// This object can be used to set the configuration options for a `IpIface` before creating the
 /// `IpIface`

@@ -1,7 +1,7 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 use std;
 use future_utils;
-use spawn;
+use crate::spawn;
 use self::tap::TapTask;
 use self::tun::TunTask;
 use tokio;

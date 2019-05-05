@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 /// A node representing latency on an Ipv4 connection.
 pub struct LatencyNode<N> {

@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 pub struct TapTask {
     tap: EtherIface,

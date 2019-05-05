@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 /// A node representing an ethernet machine
 pub struct MachineNode<F> {
@@ -74,12 +74,12 @@ where
 #[cfg(feature = "linux_host")]
 #[cfg(test)]
 mod test {
-    use priv_prelude::*;
+    use crate::priv_prelude::*;
     use rand;
     use std;
     use void;
-    use spawn;
-    use node;
+    use crate::spawn;
+    use crate::node;
     use tokio::net::UdpSocket;
 
     #[test]

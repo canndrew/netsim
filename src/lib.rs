@@ -292,10 +292,10 @@ pub mod spawn;
 #[cfg(test)]
 mod test;
 
-pub use range::{Ipv4Range, Ipv6Range, IpRangeParseError};
-pub use route::{Ipv4Route, Ipv6Route, AddRouteError};
-pub use spawn_complete::SpawnComplete;
-pub use pcap::IpLog;
-pub use network::{Network, NetworkHandle};
-pub use util::{ipv4_addr::Ipv4AddrExt, ipv6_addr::Ipv6AddrExt};
+pub use crate::range::{Ipv4Range, Ipv6Range, IpRangeParseError};
+pub use crate::route::{Ipv4Route, Ipv6Route, AddRouteError};
+pub use crate::spawn_complete::SpawnComplete;
+pub use crate::pcap::IpLog;
+pub use crate::network::{Network, NetworkHandle};
+pub use crate::util::{ipv4_addr::Ipv4AddrExt, ipv6_addr::Ipv6AddrExt};
 

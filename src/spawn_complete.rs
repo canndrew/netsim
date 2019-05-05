@@ -1,6 +1,6 @@
 //! This module implements futures to wait for task completion.
 
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 /// A handle to the spawned network-isolated thread. Implements `Future` so that you can wait for
 /// the thread to complete.

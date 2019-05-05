@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 #[derive(Debug)]
 /// Adapts between an Ipv4 network and a raw ethernet network. This can, for instance, act as a

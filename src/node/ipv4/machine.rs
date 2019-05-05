@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 /// A node representing an Ipv4 machine.
 pub struct MachineNode<F> {
@@ -52,12 +52,12 @@ where
 #[cfg(feature = "linux_host")]
 #[cfg(test)]
 mod test {
-    use priv_prelude::*;
+    use crate::priv_prelude::*;
     use std;
     use rand;
     use void;
-    use spawn;
-    use node;
+    use crate::spawn;
+    use crate::node;
     use tokio;
     use future_utils;
     use tokio::net::{UdpSocket, TcpStream};

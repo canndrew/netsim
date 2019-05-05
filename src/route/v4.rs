@@ -1,6 +1,6 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 use super::*;
-use sys;
+use crate::sys;
 use libc;
 
 /// Represents an IPv4 route.

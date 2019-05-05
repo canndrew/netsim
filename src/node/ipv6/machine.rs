@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 /// A node representing an Ipv6 machine.
 pub struct MachineNode<F> {

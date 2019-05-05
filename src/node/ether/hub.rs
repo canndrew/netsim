@@ -1,5 +1,5 @@
-use priv_prelude::*;
-use spawn_complete;
+use crate::priv_prelude::*;
+use crate::spawn_complete;
 
 /// A set of clients that can be attached to a hub node.
 pub trait HubClients {
