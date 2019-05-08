@@ -4,21 +4,23 @@ extern crate futures;
 #[macro_use]
 extern crate net_literals;
 extern crate netsim;
-extern crate tokio_core;
 #[macro_use]
 extern crate unwrap;
+extern crate tokio;
 
+use futures::future;
 use netsim::{node, Ipv4Range, Network};
 use netsim::device::ipv4::Ipv4NatBuilder;
-use tokio_core::reactor::Core;
+use tokio::runtime::Runtime;
 use std::net::{SocketAddr, SocketAddrV4, UdpSocket};
 use std::sync::mpsc;
 
 /// Makes 3 UDP queries from the same client to different servers and returns the ports the server
 /// saw the client.
 fn query_under_nat(nat_builder: Ipv4NatBuilder) -> Vec<u16> {
-    let mut evloop = unwrap!(Core::new());
-    let network = Network::new(&evloop.handle());
+    let mut evloop = unwrap!(Runtime::new());
+    let network = Network::new();
+    let network_handle = network.handle();
 
     let (stun_addrs_tx, stun_addrs_rx) = mpsc::channel();
     let (client_ports_tx, client_ports_rx) = mpsc::channel();
@@ -37,6 +39,7 @@ fn query_under_nat(nat_builder: Ipv4NatBuilder) -> Vec<u16> {
             let mut buf = [0; 4096];
             let (_, client_addr) = unwrap!(sock.recv_from(&mut buf));
             unwrap!(client_ports_tx.send(client_addr.port()));
+            future::ok(())
         });
         stun_servers.push(server);
     }
@@ -46,13 +49,17 @@ fn query_under_nat(nat_builder: Ipv4NatBuilder) -> Vec<u16> {
         while let Ok(addr) = stun_addrs_rx.try_recv() {
             unwrap!(sock.send_to(&[1, 2, 3], addr));
         }
+        future::ok(())
     });
     let client = node::ipv4::nat(nat_builder, client);
 
     let router = node::ipv4::router(stun_servers);
     let router = node::ipv4::router((router, client));
-    let (spawn_complete, _ip_plug) = network.spawn_ipv4_tree(Ipv4Range::global(), router);
-    unwrap!(evloop.run(spawn_complete));
+    let spawn_complete = future::lazy(move || {
+        let (spawn_complete, _ip_plug) = network_handle.spawn_ipv4_tree(Ipv4Range::global(), router);
+        spawn_complete
+    });
+    unwrap!(evloop.block_on(spawn_complete));
 
     let mut ports = vec![];
     while let Ok(port) = client_ports_rx.try_recv() {

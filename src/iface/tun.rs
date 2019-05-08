@@ -1,8 +1,8 @@
 //! Contains utilites for working with virtual (TUN) network interfaces.
 
-use priv_prelude::*;
+use crate::priv_prelude::*;
 use libc;
-use iface::build::{IfaceBuilder, build};
+use crate::iface::build::{IfaceBuilder, build};
 
 /// This object can be used to set the configuration options for a `IpIface` before creating the
 /// `IpIface`
@@ -77,8 +77,8 @@ impl IpIfaceBuilder {
     /// Consume this `IpIfaceBuilder` and build the TUN interface. The returned `IpIface` object can be
     /// used to read/write ethernet frames from this interface. `handle` is a handle to a tokio
     /// event loop which will be used for reading/writing.
-    pub fn build(self, handle: &Handle) -> Result<IpIface, IfaceBuildError> {
-        Ok(self.build_unbound()?.bind(handle))
+    pub fn build(self) -> Result<IpIface, IfaceBuildError> {
+        Ok(self.build_unbound()?.bind())
     }
 }
 
@@ -91,9 +91,9 @@ pub struct UnboundIpIface {
 impl UnboundIpIface {
     /// Bind the tap device to the event loop, creating a `IpIface` which you can read/write ethernet
     /// frames with.
-    pub fn bind(self, handle: &Handle) -> IpIface {
+    pub fn bind(self) -> IpIface {
         let UnboundIpIface { fd } = self;
-        let fd = unwrap!(PollEvented::new(fd, handle));
+        let fd = PollEvented2::new(fd);
         IpIface { fd }
     }
 }
@@ -101,7 +101,7 @@ impl UnboundIpIface {
 /// A handle to a virtual (TUN) network interface. Can be used to read/write ethernet frames
 /// directly to the device.
 pub struct IpIface {
-    fd: PollEvented<AsyncFd>,
+    fd: PollEvented2<AsyncFd>,
 }
 
 impl Stream for IpIface {
@@ -110,7 +110,7 @@ impl Stream for IpIface {
     
     fn poll(&mut self) -> io::Result<Async<Option<IpPacket>>> {
         loop {
-            if let Async::NotReady = self.fd.poll_read() {
+            if let Async::NotReady = self.fd.poll_read_ready(Ready::readable())? {
                 return Ok(Async::NotReady);
             }
 
@@ -146,7 +146,7 @@ impl Stream for IpIface {
                     return Ok(Async::Ready(Some(frame)));
                 },
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    self.fd.need_read();
+                    self.fd.clear_read_ready(Ready::readable())?;
                     return Ok(Async::NotReady);
                 },
                 Err(e) => return Err(e),
@@ -161,7 +161,7 @@ impl Sink for IpIface {
     
     fn start_send(&mut self, item: IpPacket) -> io::Result<AsyncSink<IpPacket>> {
         info!("TUN received frame: {:?}", item);
-        if let Async::NotReady = self.fd.poll_write() {
+        if let Async::NotReady = self.fd.poll_write_ready()? {
             return Ok(AsyncSink::NotReady(item));
         }
 
@@ -183,7 +183,7 @@ impl Sink for IpIface {
                 assert_eq!(n, item.as_bytes().len());
             },
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                self.fd.need_write();
+                self.fd.clear_write_ready()?;
                 return Ok(AsyncSink::NotReady(item));
             }
             Err(e) => return Err(e),

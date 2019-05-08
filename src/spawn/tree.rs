@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 /// Spawn a hierarchical network of nodes. The returned plug can be used to write frames to the
 /// network and read frames that try to leave the network.

@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 /// Adapts an `EtherNode` to an `Ipv4Node`
 pub struct EtherAdaptorNode<N> {

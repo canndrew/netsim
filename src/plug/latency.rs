@@ -1,9 +1,9 @@
-use priv_prelude::*;
-use util;
+use crate::priv_prelude::*;
+use crate::util;
 
 struct InTransit<T> {
     packet: Option<T>,
-    timeout: Timeout,
+    timeout: Delay,
 }
 
 impl<T> Future for InTransit<T> {
@@ -20,7 +20,6 @@ impl<T> Future for InTransit<T> {
 
 /// Links two `Ipv4Plug`s and adds delay to packets travelling between them.
 pub struct Latency<T: fmt::Debug + 'static> {
-    handle: Handle,
     plug_a: Plug<T>,
     plug_b: Plug<T>,
     outgoing_a: FuturesUnordered<InTransit<T>>,
@@ -29,7 +28,7 @@ pub struct Latency<T: fmt::Debug + 'static> {
     mean_additional_latency: Duration,
 }
 
-impl<T: fmt::Debug + 'static> Latency<T> {
+impl<T: fmt::Debug + Send + 'static> Latency<T> {
     pub fn spawn(
         handle: &NetworkHandle,
         min_latency: Duration,
@@ -38,7 +37,6 @@ impl<T: fmt::Debug + 'static> Latency<T> {
         plug_b: Plug<T>,
     ) {
         let latency = Latency {
-            handle: handle.event_loop().clone(),
             plug_a,
             plug_b,
             outgoing_a: FuturesUnordered::new(),
@@ -55,6 +53,7 @@ impl<T: fmt::Debug + 'static> Future for Latency<T> {
     type Error = Void;
 
     fn poll(&mut self) -> Result<Async<()>, Void> {
+        let now = Instant::now();
         let a_unplugged = loop {
             match self.plug_a.rx.poll().void_unwrap() {
                 Async::NotReady => break false,
@@ -65,7 +64,7 @@ impl<T: fmt::Debug + 'static> Future for Latency<T> {
                         + self.mean_additional_latency.mul_f64(util::expovariate_rand());
                     let in_transit = InTransit {
                         packet: Some(packet),
-                        timeout: Timeout::new(delay, &self.handle),
+                        timeout: Delay::new(now + delay),
                     };
                     self.outgoing_b.push(in_transit);
                 },
@@ -82,7 +81,7 @@ impl<T: fmt::Debug + 'static> Future for Latency<T> {
                         + self.mean_additional_latency.mul_f64(util::expovariate_rand());
                     let in_transit = InTransit {
                         packet: Some(packet),
-                        timeout: Timeout::new(delay, &self.handle),
+                        timeout: Delay::new(now + delay),
                     };
                     self.outgoing_a.push(in_transit);
                 },

@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 use super::*;
 use futures::sync::mpsc::SendError;
 
@@ -451,7 +451,7 @@ impl<S> IntoIpv4Plug for S
 where
     S: Stream<Item = Ipv4Packet, Error = Void>,
     S: Sink<SinkItem = Ipv4Packet, SinkError = Void>,
-    S: 'static,
+    S: Send + 'static,
 {
     fn into_ipv4_plug(self, handle: &NetworkHandle) -> Ipv4Plug {
         let (self_tx, self_rx) = self.split();

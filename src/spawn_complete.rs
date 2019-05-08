@@ -1,6 +1,6 @@
 //! This module implements futures to wait for task completion.
 
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 /// A handle to the spawned network-isolated thread. Implements `Future` so that you can wait for
 /// the thread to complete.
@@ -22,7 +22,10 @@ impl<R> Future for SpawnComplete<R> {
                 res.map(Async::Ready)
             },
             Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(oneshot::Canceled) => panic!("thread destroyed without sending response!?"),
+            Err(oneshot::Canceled) => {
+                let holds_process = self.process_handle.is_some();
+                panic!("thread destroyed without sending response!? {}", holds_process);
+            },
         }
     }
 }

@@ -1,5 +1,5 @@
-use priv_prelude::*;
-use spawn_complete;
+use crate::priv_prelude::*;
+use crate::spawn_complete;
 
 /// A set of clients that can be attached to a router node.
 pub trait Ipv4RouterClients {
@@ -19,7 +19,7 @@ macro_rules! tuple_impl {
     ($($ty:ident,)*) => {
         impl<$($ty),*> Ipv4RouterClients for ($($ty,)*)
         where
-            $($ty: Ipv4Node + 'static,)*
+            $($ty: Ipv4Node + Send + 'static,)*
         {
             type Output = ($($ty::Output,)*);
             

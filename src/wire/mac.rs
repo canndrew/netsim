@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 use rand;
 
 /// An ethernet hardware MAC address.

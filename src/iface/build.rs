@@ -1,9 +1,9 @@
-use priv_prelude::*;
-use sys;
+use crate::priv_prelude::*;
+use crate::sys;
 use libc;
 use get_if_addrs;
-use iface;
-use ioctl;
+use crate::iface;
+use crate::ioctl;
 
 quick_error! {
     /// Error raised when `netsim` fails to build an interface.

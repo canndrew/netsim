@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 /// A node representing an ethernet machine
 pub struct MachineNode<F> {
@@ -7,27 +7,29 @@ pub struct MachineNode<F> {
 
 /// Create a node for a machine with an ethernet interface. This node will run the given function
 /// in a network namespace with a single interface.
-pub fn machine<R, F>(func: F) -> MachineNode<F>
+pub fn machine<T, F>(func: F) -> MachineNode<F>
 where
-    R: Send + 'static,
-    F: FnOnce(MacAddr, Option<Ipv4Addr>, Option<Ipv6Addr>) -> R + Send + 'static,
+    T: Future<Error = Void> + Send + 'static,
+    T::Item: Send + 'static,
+    F: FnOnce(MacAddr, Option<Ipv4Addr>, Option<Ipv6Addr>) -> T + Send + 'static,
 {
     MachineNode { func }
 }
 
-impl<R, F> EtherNode for MachineNode<F>
+impl<T, F> EtherNode for MachineNode<F>
 where
-    R: Send + 'static,
-    F: FnOnce(MacAddr, Option<Ipv4Addr>, Option<Ipv6Addr>) -> R + Send + 'static,
+    T: Future<Error = Void> + Send + 'static,
+    T::Item: Send + 'static,
+    F: FnOnce(MacAddr, Option<Ipv4Addr>, Option<Ipv6Addr>) -> T + Send + 'static,
 {
-    type Output = R;
+    type Output = T::Item;
 
     fn build(
         self,
         handle: &NetworkHandle,
         ipv4_range: Option<Ipv4Range>,
         ipv6_range: Option<Ipv6Range>,
-    ) -> (SpawnComplete<R>, EtherPlug) {
+    ) -> (SpawnComplete<T::Item>, EtherPlug) {
         let mac_addr = MacAddr::random();
         let mut iface = {
             EtherIfaceBuilder::new()
@@ -72,20 +74,21 @@ where
 #[cfg(feature = "linux_host")]
 #[cfg(test)]
 mod test {
-    use priv_prelude::*;
+    use crate::priv_prelude::*;
     use rand;
     use std;
     use void;
-    use spawn;
-    use node;
+    use crate::spawn;
+    use crate::node;
+    use tokio::net::UdpSocket;
 
     #[test]
     fn one_interface_send_udp_ipv4() {
         run_test(3, || {
-            let mut core = unwrap!(Core::new());
-            let network = Network::new(&core.handle());
+            let mut runtime = unwrap!(Runtime::new());
+            let network = Network::new();
             let handle = network.handle();
-            let res = core.run(future::lazy(|| {
+            let res = runtime.block_on(future::lazy(move || {
                 trace!("starting");
                 let payload: [u8; 8] = rand::random();
                 let target_ip = Ipv4Addr::random_global();
@@ -104,9 +107,13 @@ mod test {
                         let ipv4_addr = unwrap!(ipv4_addr_opt);
                         unwrap!(ipv4_addr_tx.send(ipv4_addr));
 
-                        let socket = unwrap!(std::net::UdpSocket::bind(addr!("0.0.0.0:0")));
-                        unwrap!(socket.send_to(&payload[..], SocketAddr::V4(target_addr)));
-                        trace!("sent udp packet");
+                        let socket = unwrap!(UdpSocket::bind(&addr!("0.0.0.0:0")));
+                        socket
+                        .send_dgram(payload, &SocketAddr::V4(target_addr))
+                        .map_err(|e| panic!("error sending: {}", e))
+                        .map(|(_socket, _payload)| {
+                            trace!("sent udp packet");
+                        })
                     }),
                 );
                 let (tx, rx) = plug.split();

@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 /// Connects two `Ipv4Plug`s and adds a hop between them. This causes the TTL value of all packets
 /// to be decremented while travelling along the connection (and dropped if the TLL reaches zero).

@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 use futures::future::Loop;
 use futures::sync::mpsc::SendError;
 
@@ -265,7 +265,7 @@ impl<S> IntoIpPlug for S
 where
     S: Stream<Item = IpPacket, Error = Void>,
     S: Sink<SinkItem = IpPacket, SinkError = Void>,
-    S: 'static,
+    S: Send + 'static,
 {
     fn into_ip_plug(self, handle: &NetworkHandle) -> IpPlug {
         let (self_tx, self_rx) = self.split();

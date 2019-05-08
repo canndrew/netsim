@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 /// A node representing an Ipv6 machine.
 pub struct MachineNode<F> {
@@ -7,26 +7,28 @@ pub struct MachineNode<F> {
 
 /// Create a node for an Ipv6 machine. This node will run the given function in a network
 /// namespace with a single interface.
-pub fn machine<R, F>(func: F) -> MachineNode<F>
+pub fn machine<T, F>(func: F) -> MachineNode<F>
 where
-    R: Send + 'static,
-    F: FnOnce(Ipv6Addr) -> R + Send + 'static,
+    T: Future<Error = Void> + Send + 'static,
+    T::Item: Send + 'static,
+    F: FnOnce(Ipv6Addr) -> T + Send + 'static,
 {
     MachineNode { func }
 }
 
-impl<R, F> Ipv6Node for MachineNode<F>
+impl<T, F> Ipv6Node for MachineNode<F>
 where
-    R: Send + 'static,
-    F: FnOnce(Ipv6Addr) -> R + Send + 'static,
+    T: Future<Error = Void> + Send + 'static,
+    T::Item: Send + 'static,
+    F: FnOnce(Ipv6Addr) -> T + Send + 'static,
 {
-    type Output = R;
+    type Output = T::Item;
 
     fn build(
         self,
         handle: &NetworkHandle,
         ipv6_range: Ipv6Range,
-    ) -> (SpawnComplete<R>, Ipv6Plug) {
+    ) -> (SpawnComplete<T::Item>, Ipv6Plug) {
         let address = ipv6_range.random_client_addr();
         let iface = {
             IpIfaceBuilder::new()

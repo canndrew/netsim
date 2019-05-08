@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 #[derive(Debug)]
 /// Adapts between an Ipv4 network and a raw ethernet network. This can, for instance, act as a
@@ -212,16 +212,16 @@ fn test() {
     run_test(1, || {
         use rand;
         use void;
+        use tokio;
 
-        let mut core = unwrap!(Core::new());
-        let handle = core.handle();
-        let res = core.run({
+        let mut runtime = unwrap!(Runtime::new());
+        let res = runtime.block_on(future::lazy(|| {
             let (ether_plug_0, ether_plug_1) = EtherPlug::new_pair();
             let (ipv4_plug_0, ipv4_plug_1) = Ipv4Plug::new_pair();
             let veth_ip = Ipv4Addr::random_global();
             let veth = EtherAdaptorV4::new(veth_ip, ether_plug_0, ipv4_plug_0);
             let veth_mac = veth.mac_addr();
-            handle.spawn(veth.infallible());
+            tokio::spawn(veth.infallible());
 
             let (ether_tx, ether_rx) = ether_plug_1.split();
             let (ipv4_tx, ipv4_rx) = ipv4_plug_1.split();
@@ -387,7 +387,7 @@ fn test() {
                     })
                 })
             })
-        });
+        }));
         res.void_unwrap()
     })
 }

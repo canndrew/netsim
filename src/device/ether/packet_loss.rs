@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 /// Adds packet loss to an ethernet connection
 pub struct EtherPacketLoss {

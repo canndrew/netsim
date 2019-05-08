@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 /// A node representing an Ipv4 NAT.
 pub struct NatNode<N> {

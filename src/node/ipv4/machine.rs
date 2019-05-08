@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 /// A node representing an Ipv4 machine.
 pub struct MachineNode<F> {
@@ -7,26 +7,28 @@ pub struct MachineNode<F> {
 
 /// Create a node for an Ipv4 machine. This node will run the given function in a network
 /// namespace with a single interface in a separate thread of it's own.
-pub fn machine<R, F>(func: F) -> MachineNode<F>
+pub fn machine<T, F>(func: F) -> MachineNode<F>
 where
-    R: Send + 'static,
-    F: FnOnce(Ipv4Addr) -> R + Send + 'static,
+    T: Future<Error = Void> + Send + 'static,
+    T::Item: Send + 'static,
+    F: FnOnce(Ipv4Addr) -> T + Send + 'static,
 {
     MachineNode { func }
 }
 
-impl<R, F> Ipv4Node for MachineNode<F>
+impl<T, F> Ipv4Node for MachineNode<F>
 where
-    R: Send + 'static,
-    F: FnOnce(Ipv4Addr) -> R + Send + 'static,
+    T: Future<Error = Void> + Send + 'static,
+    T::Item: Send + 'static,
+    F: FnOnce(Ipv4Addr) -> T + Send + 'static,
 {
-    type Output = R;
+    type Output = T::Item;
 
     fn build(
         self,
         handle: &NetworkHandle,
         ipv4_range: Ipv4Range,
-    ) -> (SpawnComplete<R>, Ipv4Plug) {
+    ) -> (SpawnComplete<T::Item>, Ipv4Plug) {
         let address = ipv4_range.random_client_addr();
         let iface = {
             IpIfaceBuilder::new()
@@ -50,23 +52,25 @@ where
 #[cfg(feature = "linux_host")]
 #[cfg(test)]
 mod test {
-    use super::*;
-
+    use crate::priv_prelude::*;
     use std;
     use rand;
     use void;
-    use spawn;
-    use node;
+    use crate::spawn;
+    use crate::node;
+    use tokio;
+    use future_utils;
+    use tokio::net::{UdpSocket, TcpStream};
     use futures::future::Loop;
 
     #[test]
     fn test_udp() {
         run_test(3, || {
-            let mut core = unwrap!(Core::new());
-            let network = Network::new(&core.handle());
+            let mut runtime = unwrap!(Runtime::new());
+            let network = Network::new();
             let handle = network.handle();
 
-            let res = core.run(future::lazy(move || {
+            let res = runtime.block_on(future::lazy(move || {
                 let remote_ip = Ipv4Addr::random_global();
                 let remote_port = rand::random::<u16>() / 2 + 1000;
                 let remote_addr = SocketAddrV4::new(remote_ip, remote_port);
@@ -79,16 +83,22 @@ mod test {
                     node::ipv4::machine(move |ipv4_addr| {
                         unwrap!(ipv4_addr_tx.send(ipv4_addr));
                         let buffer_out = rand::random::<[u8; 8]>();
-                        let socket = unwrap!(std::net::UdpSocket::bind(addr!("0.0.0.0:0")));
-                        let n = unwrap!(socket.send_to(&buffer_out, &SocketAddr::V4(remote_addr)));
-                        assert_eq!(n, 8);
+                        let socket = unwrap!(UdpSocket::bind(&addr!("0.0.0.0:0")));
 
-                        let mut buffer_in = [0u8; 8];
-                        trace!("waiting to receive reply");
-                        let (n, recv_addr) = unwrap!(socket.recv_from(&mut buffer_in));
-                        assert_eq!(n, 8);
-                        assert_eq!(recv_addr, SocketAddr::V4(remote_addr));
-                        assert_eq!(buffer_out, buffer_in);
+                        socket
+                        .send_dgram(buffer_out, &SocketAddr::V4(remote_addr))
+                        .map_err(|e| panic!("error sending dgram: {}", e))
+                        .and_then(move |(socket, buffer_out)| {
+                            trace!("waiting to receive reply");
+                            socket
+                            .recv_dgram([0u8; 8])
+                            .map_err(|e| panic!("error receiving dgram: {}", e))
+                            .map(move |(_socket, buffer_in, n, recv_addr)| {
+                                assert_eq!(n, 8);
+                                assert_eq!(recv_addr, SocketAddr::V4(remote_addr));
+                                assert_eq!(buffer_out, buffer_in);
+                            })
+                        })
                     }),
                 );
 
@@ -142,11 +152,11 @@ mod test {
     #[test]
     fn test_tcp_connect() {
         run_test(3, || {
-            let mut core = unwrap!(Core::new());
-            let network = Network::new(&core.handle());
+            let mut runtime = unwrap!(Runtime::new());
+            let network = Network::new();
             let handle = network.handle();
 
-            let res = core.run(future::lazy(move || {
+            let res = runtime.block_on(future::lazy(move || {
                 let remote_ip = Ipv4Addr::random_global();
                 let remote_port = rand::random::<u16>() / 2 + 1000;
                 let remote_addr = SocketAddrV4::new(remote_ip, remote_port);
@@ -159,15 +169,21 @@ mod test {
                     node::ipv4::machine(move |ipv4_addr| {
                         unwrap!(ipv4_addr_tx.send(ipv4_addr));
                         let buffer_out = rand::random::<[u8; 8]>();
-                        let mut stream = unwrap!(std::net::TcpStream::connect(&remote_addr));
-                        let n = unwrap!(stream.write(&buffer_out));
-                        assert_eq!(n, 8);
 
-                        let mut buffer_in = [0u8; 8];
-                        trace!("waiting to receive reply");
-                        let n = unwrap!(stream.read(&mut buffer_in));
-                        assert_eq!(n, 8);
-                        assert_eq!(buffer_out, buffer_in);
+                        TcpStream::connect(&SocketAddr::V4(remote_addr))
+                        .map_err(|e| panic!("error connecting: {}", e))
+                        .and_then(move |stream| {
+                            tokio::io::write_all(stream, buffer_out)
+                            .map_err(|e| panic!("error writing: {}", e))
+                        })
+                        .and_then(move |(stream, buffer_out)| {
+                            trace!("waiting to receive reply");
+                            tokio::io::read_exact(stream, [0u8; 8])
+                            .map_err(|e| panic!("error reading: {}", e))
+                            .map(move |(_stream, buffer_in)| {
+                                assert_eq!(buffer_out, buffer_in);
+                            })
+                        })
                     }),
                 );
 
@@ -261,7 +277,7 @@ mod test {
                                         plug_rx,
                                         next_seq_num_0,
                                         next_seq_num_1,
-                                    ))).into_boxed();
+                                    ))).into_send_boxed();
                                 }
 
                                 let ack_packet = Ipv4Packet::new_from_fields_recursive(
@@ -307,7 +323,7 @@ mod test {
                                         next_seq_num_1,
                                     ))
                                 })
-                                .into_boxed()
+                                .into_send_boxed()
                             })
                         })
                         .and_then(move |(plug_tx, plug_rx, seq_num_0, seq_num_1)| {
@@ -415,12 +431,12 @@ mod test {
     #[test]
     fn test_ping_reply() {
         run_test(3, || {
-            let mut core = unwrap!(Core::new());
-            let network = Network::new(&core.handle());
+            let mut runtime = unwrap!(Runtime::new());
+            let network = Network::new();
             let handle = network.handle();
 
-            let res = core.run(future::lazy(move || {
-                let (done_tx, done_rx) = std::sync::mpsc::channel();
+            let res = runtime.block_on(future::lazy(move || {
+                let (done_tx, done_rx) = future_utils::drop_notify();
 
                 let client_ip = Ipv4Addr::random_global();
 
@@ -431,7 +447,7 @@ mod test {
                     ipv4_range,
                     node::ipv4::machine(move |ipv4_addr| {
                         unwrap!(ipv4_addr_tx.send(ipv4_addr));
-                        unwrap!(done_rx.recv());
+                        done_rx
                     }),
                 );
 
@@ -480,7 +496,7 @@ mod test {
                             },
                             kind => panic!("unexpected ICMP reply kind: {:?}", kind),
                         }
-                        unwrap!(done_tx.send(()));
+                        drop(done_tx);
 
                         spawn_complete
                         .map_err(|e| panic::resume_unwind(e))

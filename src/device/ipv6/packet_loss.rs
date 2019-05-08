@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 /// Adds packet loss to an IPv6 connection
 pub struct Ipv6PacketLoss {

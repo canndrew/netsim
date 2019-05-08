@@ -1,4 +1,4 @@
-use priv_prelude::*;
+use crate::priv_prelude::*;
 
 /// A node representing hops between Ipv4 nodes.
 pub struct HopsNode<N> {

@@ -1,6 +1,6 @@
-use priv_prelude::*;
-use sys;
-use ioctl;
+use crate::priv_prelude::*;
+use crate::sys;
+use crate::ioctl;
 use libc;
 
 quick_error! {
@@ -590,7 +590,7 @@ pub fn put_up(iface_name: &str) -> Result<(), PutUpError> {
 mod test {
     use super::*;
     use rand;
-    use spawn;
+    use crate::spawn;
     use capabilities;
 
     #[test]
@@ -665,8 +665,8 @@ mod test {
 
                 drop(tap);
             });
-            let mut core = unwrap!(Core::new());
-            unwrap!(core.run(spawn_complete))
+            let mut runtime = unwrap!(Runtime::new());
+            unwrap!(runtime.block_on(spawn_complete))
         })
     }
 }
