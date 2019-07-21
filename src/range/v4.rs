@@ -136,6 +136,13 @@ impl Ipv4Range {
         (base_addr ^ test_addr).leading_zeros() >= u32::from(self.bits)
     }
 
+    /// Check if given address is a broadcast address for this IP range/subnet.
+    pub fn is_broadcast(&self, ip: Ipv4Addr) -> bool {
+        let host_broadcast = 0xFFFF_FFFF >> self.bits;
+        let host_part = u32::from(ip) & host_broadcast;
+        ip.is_broadcast() || (self.contains(ip) && host_part == host_broadcast)
+    }
+
     /// Split a range into `num` sub-ranges
     ///
     /// # Panics
@@ -214,16 +221,61 @@ mod tests {
     mod ipv4range {
         use super::*;
 
-        mod new {
+        mod contains {
             use super::*;
 
             #[test]
-            fn it_creates_address_range() {
+            fn it_checks_if_address_is_within_the_range() {
                 let addrs = Ipv4Range::new(ipv4!("1.2.3.0"), 24);
 
                 assert!(addrs.contains(ipv4!("1.2.3.5")));
                 assert!(addrs.contains(ipv4!("1.2.3.255")));
                 assert!(!addrs.contains(ipv4!("1.2.4.5")));
+            }
+
+            #[test]
+            fn when_range_is_global_it_returns_true_for_all_addresses() {
+                let addrs = Ipv4Range::global();
+
+                assert!(addrs.contains(ipv4!("1.2.3.5")));
+                assert!(addrs.contains(ipv4!("192.168.1.255")));
+                assert!(addrs.contains(ipv4!("255.255.255.255")));
+            }
+        }
+
+        mod is_brodcast {
+            use super::*;
+
+            #[test]
+            fn it_returns_false_if_address_is_not_even_in_the_range() {
+                let addrs = Ipv4Range::new(ipv4!("1.2.3.0"), 24);
+
+                assert!(!addrs.is_broadcast(ipv4!("1.2.4.5")));
+            }
+
+            #[test]
+            fn it_returns_false_if_address_is_in_the_range_but_not_a_broadcast() {
+                let addrs = Ipv4Range::new(ipv4!("1.2.3.0"), 24);
+                assert!(!addrs.is_broadcast(ipv4!("1.2.3.4")));
+
+                let addrs = Ipv4Range::new(ipv4!("1.2.0.0"), 16);
+                assert!(!addrs.is_broadcast(ipv4!("1.2.3.255")));
+            }
+
+            #[test]
+            fn it_returns_true_if_address_host_bits_are_all_1() {
+                let addrs = Ipv4Range::new(ipv4!("1.2.3.0"), 24);
+                assert!(addrs.is_broadcast(ipv4!("1.2.3.255")));
+
+                let addrs = Ipv4Range::new(ipv4!("1.2.0.0"), 16);
+                assert!(addrs.is_broadcast(ipv4!("1.2.255.255")));
+            }
+
+            #[test]
+            fn it_returns_true_if_address_is_255_255_255_255() {
+                let addrs = Ipv4Range::new(ipv4!("1.2.3.0"), 24);
+
+                assert!(addrs.is_broadcast(ipv4!("255.255.255.255")));
             }
         }
     }

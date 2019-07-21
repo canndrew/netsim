@@ -73,23 +73,33 @@ impl Ipv4Router {
     /// Find a plug for given packet by it's destination address and send the packet.
     /// Returns true if packet was sent, false otherwise.
     fn send_packet(&mut self, packet: Ipv4Packet) -> bool {
-        for &mut (ref mut tx, ref routes) in &mut self.txs {
+        let mut packets_sent = 0;
+
+        'all_tx_loop: for &mut (ref mut tx, ref routes) in &mut self.txs {
             for route in routes {
-                if route.destination().contains(packet.dest_ip()) {
+                let route_dest = route.destination();
+                let packet_is_broadcast = route_dest.is_broadcast(packet.dest_ip());
+                if route_dest.contains(packet.dest_ip()) || packet_is_broadcast {
                     info!(
                         "router {} routing packet on route {:?} {:?}",
                         self.ipv4_addr, route, packet,
                     );
-                    tx.unbounded_send(packet);
-                    return true;
+                    tx.unbounded_send(packet.clone());
+                    packets_sent += 1;
+
+                    // Terminate only, if this is a regular packet. Broadcast packets are sent to
+                    // multiple targets.
+                    if !packet_is_broadcast {
+                        break 'all_tx_loop;
+                    }
                 }
             }
         }
-        info!(
-            "router {} dropping unroutable packet {:?}",
-            self.ipv4_addr, packet
-        );
-        false
+
+        if packets_sent == 0 {
+            info!("router {} dropping unroutable packet {:?}", self.ipv4_addr, packet);
+        }
+        packets_sent > 0
     }
 }
 
@@ -179,13 +189,12 @@ mod tests {
             #[test]
             fn it_sends_packet_to_the_channel_associated_with_packet_destination_address() {
                 let (plug1_a, mut plug1_b) = Ipv4Plug::new_pair();
-                let conns = vec![(
-                    plug1_a,
-                    vec![Ipv4Route::new(
-                        Ipv4Range::new(ipv4!("192.168.1.0"), 24),
-                        None,
-                    )],
-                )];
+                let conns = vec![
+                    (
+                        plug1_a,
+                        vec![Ipv4Route::new(Ipv4Range::new(ipv4!("192.168.1.0"), 24), None)],
+                    ),
+                ];
                 let mut router = Ipv4Router::new(ipv4!("192.168.1.1"), conns);
                 let packet =
                     udp_packet_v4(addrv4!("192.168.1.100:5000"), addrv4!("192.168.1.200:6000"));
@@ -195,6 +204,110 @@ mod tests {
                 assert!(sent);
                 let received_packet = plug1_b.poll();
                 assert_eq!(received_packet, Ok(Async::Ready(Some(packet))));
+            }
+
+            #[test]
+            fn it_sends_broadcast_packet_to_the_machine_on_the_same_subnet() {
+                let (plug1_a, mut plug1_b) = Ipv4Plug::new_pair();
+                let conns = vec![
+                    (
+                        plug1_a,
+                        vec![Ipv4Route::new(Ipv4Range::new(ipv4!("192.168.1.0"), 24), None)],
+                    ),
+                ];
+                let mut router = Ipv4Router::new(ipv4!("192.168.1.1"), conns);
+                let packet =
+                    udp_packet_v4(addrv4!("192.168.1.100:5000"), addrv4!("192.168.1.255:6000"));
+
+                let sent = router.send_packet(packet.clone());
+
+                assert!(sent);
+                let received_packet = plug1_b.poll();
+                assert_eq!(received_packet, Ok(Async::Ready(Some(packet))));
+            }
+
+            #[test]
+            fn it_sends_broadcast_packet_to_all_machines_on_the_same_subnet() {
+                let (plug1_a, mut plug1_b) = Ipv4Plug::new_pair();
+                let (plug2_a, mut plug2_b) = Ipv4Plug::new_pair();
+                let (plug3_a, mut plug3_b) = Ipv4Plug::new_pair();
+                let conns = vec![
+                    (
+                        plug1_a,
+                        vec![Ipv4Route::new(Ipv4Range::new(ipv4!("192.168.1.0"), 24), None)],
+                    ),
+                    (
+                        plug2_a,
+                        vec![Ipv4Route::new(Ipv4Range::new(ipv4!("10.0.0.0"), 24), None)],
+                    ),
+                    (
+                        plug3_a,
+                        vec![Ipv4Route::new(Ipv4Range::new(ipv4!("192.168.1.0"), 24), None)],
+                    ),
+                ];
+                let mut router = Ipv4Router::new(ipv4!("192.168.1.1"), conns);
+                let packet =
+                    udp_packet_v4(addrv4!("192.168.1.100:5000"), addrv4!("192.168.1.255:6000"));
+
+                let sent = router.send_packet(packet.clone());
+                assert!(sent);
+
+                let mut evloop = unwrap!(Core::new());
+                let task = future::lazy(|| {
+                    let received_packet = plug1_b.poll();
+                    assert_eq!(received_packet, Ok(Async::Ready(Some(packet.clone()))));
+
+                    let received_packet = plug2_b.poll();
+                    assert_eq!(received_packet, Ok(Async::NotReady));
+
+                    let received_packet = plug3_b.poll();
+                    assert_eq!(received_packet, Ok(Async::Ready(Some(packet))));
+
+                    future::ok::<(), ()>(())
+                });
+                evloop.run(task);
+            }
+
+            #[test]
+            fn it_sends_255_255_255_255_packet_to_all_connected_machines() {
+                let (plug1_a, mut plug1_b) = Ipv4Plug::new_pair();
+                let (plug2_a, mut plug2_b) = Ipv4Plug::new_pair();
+                let (plug3_a, mut plug3_b) = Ipv4Plug::new_pair();
+                let conns = vec![
+                    (
+                        plug1_a,
+                        vec![Ipv4Route::new(Ipv4Range::new(ipv4!("192.168.1.0"), 24), None)],
+                    ),
+                    (
+                        plug2_a,
+                        vec![Ipv4Route::new(Ipv4Range::new(ipv4!("10.0.0.0"), 24), None)],
+                    ),
+                    (
+                        plug3_a,
+                        vec![Ipv4Route::new(Ipv4Range::new(ipv4!("192.168.1.0"), 24), None)],
+                    ),
+                ];
+                let mut router = Ipv4Router::new(ipv4!("192.168.1.1"), conns);
+                let packet =
+                    udp_packet_v4(addrv4!("192.168.1.100:5000"), addrv4!("255.255.255.255:6000"));
+
+                let sent = router.send_packet(packet.clone());
+                assert!(sent);
+
+                let mut evloop = unwrap!(Core::new());
+                let task = future::lazy(|| {
+                    let received_packet = plug1_b.poll();
+                    assert_eq!(received_packet, Ok(Async::Ready(Some(packet.clone()))));
+
+                    let received_packet = plug2_b.poll();
+                    assert_eq!(received_packet, Ok(Async::Ready(Some(packet.clone()))));
+
+                    let received_packet = plug3_b.poll();
+                    assert_eq!(received_packet, Ok(Async::Ready(Some(packet))));
+
+                    future::ok::<(), ()>(())
+                });
+                evloop.run(task);
             }
         }
     }
