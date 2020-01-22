@@ -46,7 +46,7 @@ impl Ipv6AddrExt for Ipv6Addr {
         loop {
             let ip = Ipv6Addr::from(x);
             if Ipv6AddrExt::is_unicast_global(&ip) {
-                return ip
+                return ip;
             }
             x >>= 8;
             x |= u128::from(rand::random::<u8>()) << 120;
@@ -54,15 +54,13 @@ impl Ipv6AddrExt for Ipv6Addr {
     }
 
     fn is_unicast_global(&self) -> bool {
-        !(
-            self.is_loopback() ||
-            Ipv6AddrExt::is_unicast_link_local(self) ||
-            Ipv6AddrExt::is_unicast_site_local(self) ||
-            Ipv6AddrExt::is_unique_local(self) ||
-            self.is_unspecified() ||
-            Ipv6AddrExt::is_documentation(self) ||
-            self.is_multicast()
-        )
+        !(self.is_loopback()
+            || Ipv6AddrExt::is_unicast_link_local(self)
+            || Ipv6AddrExt::is_unicast_site_local(self)
+            || Ipv6AddrExt::is_unique_local(self)
+            || self.is_unspecified()
+            || Ipv6AddrExt::is_documentation(self)
+            || self.is_multicast())
     }
 
     fn is_unicast_link_local(&self) -> bool {
@@ -87,7 +85,7 @@ impl Ipv6AddrExt for Ipv6Addr {
 
     fn class(&self) -> Ipv6AddrClass {
         if *self == ipv6!("::") {
-            return Ipv6AddrClass::Unspecified
+            return Ipv6AddrClass::Unspecified;
         }
         if *self == ipv6!("::1") {
             return Ipv6AddrClass::Loopback;
@@ -126,5 +124,3 @@ impl Ipv6AddrExt for Ipv6Addr {
         Ipv6Addr::from(!((!0u128) >> bits))
     }
 }
-
-

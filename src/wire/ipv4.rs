@@ -1,5 +1,5 @@
-use crate::priv_prelude::*;
 use super::*;
+use crate::priv_prelude::*;
 use futures::sync::mpsc::SendError;
 
 /// An Ipv4 packet.
@@ -13,30 +13,32 @@ impl fmt::Debug for Ipv4Packet {
         let payload = self.payload();
 
         if self.verify_checksum() {
-            f
-            .debug_struct("Ipv4Packet")
-            .field("source_ip", &self.source_ip())
-            .field("dest_ip", &self.dest_ip())
-            .field("ttl", &self.ttl())
-            .field("payload", match payload {
-                Ipv4Payload::Udp(ref udp) => {
-                    if udp.verify_checksum_v4(self.source_ip(), self.dest_ip()) {
-                        udp
-                    } else {
-                        &"INVALID UDP packet"
-                    }
-                },
-                Ipv4Payload::Tcp(ref tcp) => {
-                    if tcp.verify_checksum_v4(self.source_ip(), self.dest_ip()) {
-                        tcp
-                    } else {
-                        &"INVALID TCP packet"
-                    }
-                },
-                Ipv4Payload::Icmp(ref icmp) => icmp,
-                Ipv4Payload::Unknown { .. } => &payload,
-            })
-            .finish()
+            f.debug_struct("Ipv4Packet")
+                .field("source_ip", &self.source_ip())
+                .field("dest_ip", &self.dest_ip())
+                .field("ttl", &self.ttl())
+                .field(
+                    "payload",
+                    match payload {
+                        Ipv4Payload::Udp(ref udp) => {
+                            if udp.verify_checksum_v4(self.source_ip(), self.dest_ip()) {
+                                udp
+                            } else {
+                                &"INVALID UDP packet"
+                            }
+                        }
+                        Ipv4Payload::Tcp(ref tcp) => {
+                            if tcp.verify_checksum_v4(self.source_ip(), self.dest_ip()) {
+                                tcp
+                            } else {
+                                &"INVALID TCP packet"
+                            }
+                        }
+                        Ipv4Payload::Icmp(ref icmp) => icmp,
+                        Ipv4Payload::Unknown { .. } => &payload,
+                    },
+                )
+                .finish()
         } else {
             write!(f, "INVALID Ipv4Packet")
         }
@@ -57,7 +59,9 @@ pub struct Ipv4Fields {
 impl Ipv4Fields {
     /// Parse an IPv4 header from a byte buffer
     pub fn from_bytes(buffer: &[u8]) -> Ipv4Fields {
-        let packet = Ipv4Packet { buffer: Bytes::from(&buffer[..20]) };
+        let packet = Ipv4Packet {
+            buffer: Bytes::from(&buffer[..20]),
+        };
         packet.fields()
     }
 
@@ -119,7 +123,7 @@ pub enum Ipv4PayloadFields {
     Icmp {
         /// The kind of ICMP packet
         kind: Icmpv4PacketKind,
-    }
+    },
 }
 
 impl Ipv4PayloadFields {
@@ -127,9 +131,10 @@ impl Ipv4PayloadFields {
     pub fn payload_len(&self) -> usize {
         match *self {
             Ipv4PayloadFields::Udp { ref payload, .. } => 8 + payload.len(),
-            Ipv4PayloadFields::Tcp { ref payload, ref fields } => {
-                fields.header_len() + payload.len()
-            },
+            Ipv4PayloadFields::Tcp {
+                ref payload,
+                ref fields,
+            } => fields.header_len() + payload.len(),
             Ipv4PayloadFields::Icmp { ref kind } => kind.buffer_len(),
         }
     }
@@ -155,10 +160,7 @@ impl Ipv4Packet {
     /// Create a new `Ipv4Packet` with the given header fields and payload. If you are also
     /// creating the packet's payload data it can be more efficient to use
     /// `new_from_fields_recursive` and save an allocation/copy.
-    pub fn new_from_fields(
-        fields: Ipv4Fields,
-        payload: &Ipv4Payload,
-    ) -> Ipv4Packet {
+    pub fn new_from_fields(fields: Ipv4Fields, payload: &Ipv4Payload) -> Ipv4Packet {
         let header_len = fields.header_len();
         let len = header_len + payload.payload_len();
         let mut buffer = unsafe { BytesMut::uninit(len) };
@@ -175,14 +177,16 @@ impl Ipv4Packet {
             Ipv4Payload::Udp(ref udp) => buffer[header_len..].clone_from_slice(udp.as_bytes()),
             Ipv4Payload::Tcp(ref tcp) => buffer[header_len..].clone_from_slice(tcp.as_bytes()),
             Ipv4Payload::Icmp(ref icmp) => buffer[header_len..].clone_from_slice(icmp.as_bytes()),
-            Ipv4Payload::Unknown { ref payload, .. } => buffer[header_len..].clone_from_slice(payload),
+            Ipv4Payload::Unknown { ref payload, .. } => {
+                buffer[header_len..].clone_from_slice(payload)
+            }
         }
 
         Ipv4Packet {
             buffer: buffer.freeze(),
         }
     }
-    
+
     /// Create a new `Ipv4Packet` with the given header fields and payload fields.
     pub fn new_from_fields_recursive(
         fields: Ipv4Fields,
@@ -192,7 +196,7 @@ impl Ipv4Packet {
         let mut buffer = unsafe { BytesMut::uninit(len) };
         Ipv4Packet::write_to_buffer(&mut buffer, fields, payload_fields);
         Ipv4Packet {
-            buffer: buffer.freeze()
+            buffer: buffer.freeze(),
         }
     }
 
@@ -213,7 +217,10 @@ impl Ipv4Packet {
         set_fields(buffer, fields);
 
         match payload_fields {
-            Ipv4PayloadFields::Udp { fields: ref udp_fields, ref payload } => {
+            Ipv4PayloadFields::Udp {
+                fields: ref udp_fields,
+                ref payload,
+            } => {
                 UdpPacket::write_to_buffer_v4(
                     &mut buffer[header_len..],
                     udp_fields,
@@ -221,8 +228,11 @@ impl Ipv4Packet {
                     fields.dest_ip,
                     payload,
                 );
-            },
-            Ipv4PayloadFields::Tcp { fields: ref tcp_fields, ref payload } => {
+            }
+            Ipv4PayloadFields::Tcp {
+                fields: ref tcp_fields,
+                ref payload,
+            } => {
                 TcpPacket::write_to_buffer_v4(
                     &mut buffer[header_len..],
                     tcp_fields,
@@ -230,21 +240,16 @@ impl Ipv4Packet {
                     fields.dest_ip,
                     payload,
                 );
-            },
+            }
             Ipv4PayloadFields::Icmp { kind } => {
-                Icmpv4Packet::write_to_buffer(
-                    &mut buffer[header_len..],
-                    kind,
-                );
-            },
+                Icmpv4Packet::write_to_buffer(&mut buffer[header_len..], kind);
+            }
         }
     }
 
     /// Parse an Ipv4 packet from the given buffer.
     pub fn from_bytes(buffer: Bytes) -> Ipv4Packet {
-        Ipv4Packet {
-            buffer,
-        }
+        Ipv4Packet { buffer }
     }
 
     /// Get the header of fields of this packet.
@@ -356,13 +361,15 @@ impl Ipv4Plug {
 
     /// Add latency to a connection
     pub fn with_latency(
-        self, 
+        self,
         handle: &NetworkHandle,
         min_latency: Duration,
         mean_additional_latency: Duration,
     ) -> Ipv4Plug {
         Ipv4Plug {
-            inner: self.inner.with_latency(handle, min_latency, mean_additional_latency),
+            inner: self
+                .inner
+                .with_latency(handle, min_latency, mean_additional_latency),
         }
     }
 
@@ -374,7 +381,9 @@ impl Ipv4Plug {
         mean_loss_duration: Duration,
     ) -> Ipv4Plug {
         Ipv4Plug {
-            inner: self.inner.with_packet_loss(handle, loss_rate, mean_loss_duration),
+            inner: self
+                .inner
+                .with_packet_loss(handle, loss_rate, mean_loss_duration),
         }
     }
 
@@ -388,11 +397,7 @@ impl Ipv4Plug {
 
     /// Add extra hops to the end of this connection. Packets travelling through this plug will
     /// have their TTL decremented by the amount of hops given.
-    pub fn with_hops(
-        self,
-        handle: &NetworkHandle,
-        num_hops: u32,
-    ) -> Ipv4Plug {
+    pub fn with_hops(self, handle: &NetworkHandle, num_hops: u32) -> Ipv4Plug {
         let mut plug = self;
         for _ in 0..num_hops {
             let (plug_0, plug_1) = Ipv4Plug::new_pair();
@@ -501,4 +506,3 @@ impl Stream for Ipv4Receiver {
         self.rx.poll()
     }
 }
-

@@ -30,30 +30,28 @@ impl PortAllocator {
             PortAllocator::Sequential {
                 ref mut next_original_port,
                 ref mut next_for_local_endpoint,
-            } => {
-                match next_for_local_endpoint.entry(local_endpoint) {
-                    hash_map::Entry::Occupied(mut oe) => {
-                        let port = *oe.get();
-                        *oe.get_mut() = oe.get().checked_add(1).unwrap_or(49152);
-                        port
-                    },
-                    hash_map::Entry::Vacant(ve) => {
-                        let port = *next_original_port;
-                        *next_original_port = next_original_port.wrapping_add(16);
-                        if *next_original_port < 49152 { *next_original_port += 49153 };
-                        ve.insert(port);
-                        port
-                    },
+            } => match next_for_local_endpoint.entry(local_endpoint) {
+                hash_map::Entry::Occupied(mut oe) => {
+                    let port = *oe.get();
+                    *oe.get_mut() = oe.get().checked_add(1).unwrap_or(49152);
+                    port
+                }
+                hash_map::Entry::Vacant(ve) => {
+                    let port = *next_original_port;
+                    *next_original_port = next_original_port.wrapping_add(16);
+                    if *next_original_port < 49152 {
+                        *next_original_port += 49153
+                    };
+                    ve.insert(port);
+                    port
                 }
             },
-            PortAllocator::Random => {
-                loop {
-                    let port = rand::random();
-                    if port >= 1000 {
-                        break port;
-                    }
+            PortAllocator::Random => loop {
+                let port = rand::random();
+                if port >= 1000 {
+                    break port;
                 }
-            }
+            },
         }
     }
 }
@@ -94,8 +92,16 @@ impl PortMap {
 
     pub fn get_inbound_addr(&self, remote_addr: SocketAddrV4, port: u16) -> Option<SocketAddrV4> {
         if let Some(ref allowed_endpoints) = self.allowed_endpoints {
-            if !allowed_endpoints.get(&port).map(|allowed| *allowed == remote_addr).unwrap_or(false) {
-                trace!("NAT dropping packet from restricted address {}. allowed endpoints: {:?}", remote_addr, allowed_endpoints);
+            if !allowed_endpoints
+                .get(&port)
+                .map(|allowed| *allowed == remote_addr)
+                .unwrap_or(false)
+            {
+                trace!(
+                    "NAT dropping packet from restricted address {}. allowed endpoints: {:?}",
+                    remote_addr,
+                    allowed_endpoints
+                );
                 return None;
             }
         }
@@ -132,9 +138,11 @@ impl PortMap {
                             };
 
                             ve.insert(port);
-                            symmetric_map.map_in.insert(port, (source_addr, remote_addr));
+                            symmetric_map
+                                .map_in
+                                .insert(port, (source_addr, remote_addr));
                             port
-                        },
+                        }
                     }
                 } else {
                     let port = loop {
@@ -149,7 +157,7 @@ impl PortMap {
                     self.map_in.insert(port, source_addr);
                     port
                 }
-            },
+            }
         };
         if let Some(ref mut allowed_endpoints) = self.allowed_endpoints {
             allowed_endpoints.insert(port, remote_addr);
@@ -318,8 +326,11 @@ impl Ipv4Nat {
                     let ipv4_fields = packet.fields();
 
                     if !self.subnet.contains(source_ip) {
-                        info!("nat {:?} dropping outbound packet which does not originate from our \
-                               subnet. {:?}", self.public_ip, packet);
+                        info!(
+                            "nat {:?} dropping outbound packet which does not originate from our \
+                               subnet. {:?}",
+                            self.public_ip, packet
+                        );
                         continue;
                     }
 
@@ -331,7 +342,7 @@ impl Ipv4Nat {
                                 self.public_ip, packet
                             );
                             continue;
-                        },
+                        }
                     };
 
                     if self.hair_pinning && dest_ip == self.public_ip {
@@ -342,13 +353,15 @@ impl Ipv4Nat {
                                 let dest_addr = SocketAddrV4::new(self.public_ip, dest_port);
                                 let source_port = udp.source_port();
                                 let source_addr = SocketAddrV4::new(source_ip, source_port);
-                                let external_source_port = self.udp_map.map_port(dest_addr, source_addr);
-                                let external_source_addr = SocketAddrV4::new(
-                                    self.public_ip,
-                                    external_source_port,
-                                );
+                                let external_source_port =
+                                    self.udp_map.map_port(dest_addr, source_addr);
+                                let external_source_addr =
+                                    SocketAddrV4::new(self.public_ip, external_source_port);
 
-                                let private_dest_addr = match self.udp_map.get_inbound_addr(external_source_addr, dest_port) {
+                                let private_dest_addr = match self
+                                    .udp_map
+                                    .get_inbound_addr(external_source_addr, dest_port)
+                                {
                                     Some(addr) => addr,
                                     None => continue,
                                 };
@@ -357,32 +370,34 @@ impl Ipv4Nat {
                                     Ipv4Fields {
                                         dest_ip: *private_dest_addr.ip(),
                                         ttl: next_ttl,
-                                        .. ipv4_fields
+                                        ..ipv4_fields
                                     },
                                     Ipv4PayloadFields::Udp {
                                         fields: UdpFields {
                                             dest_port: private_dest_addr.port(),
-                                            .. udp_fields
+                                            ..udp_fields
                                         },
                                         payload: udp.payload(),
-                                    }
+                                    },
                                 );
 
                                 let _ = self.private_plug.unbounded_send(bounced_packet);
-                            },
+                            }
                             Ipv4Payload::Tcp(tcp) => {
                                 let tcp_fields = tcp.fields();
                                 let dest_port = tcp.dest_port();
                                 let dest_addr = SocketAddrV4::new(self.public_ip, dest_port);
                                 let source_port = tcp.source_port();
                                 let source_addr = SocketAddrV4::new(source_ip, source_port);
-                                let external_source_port = self.tcp_map.map_port(dest_addr, source_addr);
-                                let external_source_addr = SocketAddrV4::new(
-                                    self.public_ip,
-                                    external_source_port,
-                                );
+                                let external_source_port =
+                                    self.tcp_map.map_port(dest_addr, source_addr);
+                                let external_source_addr =
+                                    SocketAddrV4::new(self.public_ip, external_source_port);
 
-                                let private_dest_addr = match self.tcp_map.get_inbound_addr(external_source_addr, dest_port) {
+                                let private_dest_addr = match self
+                                    .tcp_map
+                                    .get_inbound_addr(external_source_addr, dest_port)
+                                {
                                     Some(addr) => addr,
                                     None => continue,
                                 };
@@ -391,19 +406,19 @@ impl Ipv4Nat {
                                     Ipv4Fields {
                                         dest_ip: *private_dest_addr.ip(),
                                         ttl: next_ttl,
-                                        .. ipv4_fields
+                                        ..ipv4_fields
                                     },
                                     Ipv4PayloadFields::Tcp {
                                         fields: TcpFields {
                                             dest_port: private_dest_addr.port(),
-                                            .. tcp_fields
+                                            ..tcp_fields
                                         },
                                         payload: tcp.payload(),
-                                    }
+                                    },
                                 );
 
                                 let _ = self.private_plug.unbounded_send(bounced_packet);
-                            },
+                            }
                             _ => (),
                         }
                         continue;
@@ -421,25 +436,27 @@ impl Ipv4Nat {
                                 Ipv4Fields {
                                     source_ip: self.public_ip,
                                     ttl: next_ttl,
-                                    .. ipv4_fields
+                                    ..ipv4_fields
                                 },
                                 Ipv4PayloadFields::Udp {
                                     fields: UdpFields {
                                         source_port: mapped_source_port,
-                                        .. udp_fields
+                                        ..udp_fields
                                     },
                                     payload: udp.payload(),
-                                }
+                                },
                             );
 
                             info!(
                                 "nat {} rewrote packet source address: {} => {}: {:?}",
-                                source_addr, SocketAddrV4::new(self.public_ip, mapped_source_port),
-                                self.public_ip, natted_packet,
+                                source_addr,
+                                SocketAddrV4::new(self.public_ip, mapped_source_port),
+                                self.public_ip,
+                                natted_packet,
                             );
 
                             let _ = self.public_plug.unbounded_send(natted_packet);
-                        },
+                        }
                         Ipv4Payload::Tcp(tcp) => {
                             let tcp_fields = tcp.fields();
                             let dest_port = tcp.dest_port();
@@ -451,15 +468,15 @@ impl Ipv4Nat {
                                 Ipv4Fields {
                                     source_ip: self.public_ip,
                                     ttl: next_ttl,
-                                    .. ipv4_fields
+                                    ..ipv4_fields
                                 },
                                 Ipv4PayloadFields::Tcp {
                                     fields: TcpFields {
                                         source_port: mapped_source_port,
-                                        .. tcp_fields
+                                        ..tcp_fields
                                     },
                                     payload: tcp.payload(),
-                                }
+                                },
                             );
 
                             info!(
@@ -468,10 +485,10 @@ impl Ipv4Nat {
                             );
 
                             let _ = self.public_plug.unbounded_send(natted_packet);
-                        },
+                        }
                         _ => (),
                     }
-                },
+                }
             }
         }
     }
@@ -482,7 +499,11 @@ impl Ipv4Nat {
                 Async::NotReady => return false,
                 Async::Ready(None) => return true,
                 Async::Ready(Some(packet)) => {
-                    trace!("nat {} received packet from public side: {:?}", self.public_ip, packet);
+                    trace!(
+                        "nat {} received packet from public side: {:?}",
+                        self.public_ip,
+                        packet
+                    );
                     let ipv4_fields = packet.fields();
                     let source_ip = packet.source_ip();
                     if packet.dest_ip() != self.public_ip {
@@ -499,8 +520,8 @@ impl Ipv4Nat {
                                 "nat {} dropping inbound packet with ttl zero {:?}",
                                 self.public_ip, packet,
                             );
-                            continue
-                        },
+                            continue;
+                        }
                     };
                     match packet.payload() {
                         Ipv4Payload::Udp(udp) => {
@@ -508,7 +529,10 @@ impl Ipv4Nat {
                             let source_port = udp.source_port();
                             let source_addr = SocketAddrV4::new(source_ip, source_port);
                             if self.blacklisted_addrs.contains(&source_addr) {
-                                info!("nat {} dropped packet from blacklisted addr {}", self.public_ip, source_addr);
+                                info!(
+                                    "nat {} dropped packet from blacklisted addr {}",
+                                    self.public_ip, source_addr
+                                );
                                 continue;
                             }
                             let dest_port = udp.dest_port();
@@ -518,15 +542,15 @@ impl Ipv4Nat {
                                         Ipv4Fields {
                                             dest_ip: *private_dest_addr.ip(),
                                             ttl: next_ttl,
-                                            .. ipv4_fields
+                                            ..ipv4_fields
                                         },
                                         Ipv4PayloadFields::Udp {
                                             fields: UdpFields {
                                                 dest_port: private_dest_addr.port(),
-                                                .. udp_fields
+                                                ..udp_fields
                                             },
                                             payload: udp.payload(),
-                                        }
+                                        },
                                     );
 
                                     info!(
@@ -535,15 +559,19 @@ impl Ipv4Nat {
                                     );
 
                                     let _ = self.private_plug.unbounded_send(natted_packet);
-                                },
+                                }
                                 None => {
                                     if self.blacklist_unrecognized_addrs {
-                                        trace!("nat {} blacklisting unknown address {}", self.public_ip, source_addr);
+                                        trace!(
+                                            "nat {} blacklisting unknown address {}",
+                                            self.public_ip,
+                                            source_addr
+                                        );
                                         self.blacklisted_addrs.insert(source_addr);
                                     }
-                                },
+                                }
                             }
-                        },
+                        }
                         Ipv4Payload::Tcp(tcp) => {
                             let tcp_fields = tcp.fields();
                             let source_port = tcp.source_port();
@@ -558,15 +586,15 @@ impl Ipv4Nat {
                                         Ipv4Fields {
                                             dest_ip: *private_dest_addr.ip(),
                                             ttl: next_ttl,
-                                            .. ipv4_fields
+                                            ..ipv4_fields
                                         },
                                         Ipv4PayloadFields::Tcp {
                                             fields: TcpFields {
                                                 dest_port: private_dest_addr.port(),
-                                                .. tcp_fields
+                                                ..tcp_fields
                                             },
                                             payload: tcp.payload(),
-                                        }
+                                        },
                                     );
 
                                     info!(
@@ -575,17 +603,17 @@ impl Ipv4Nat {
                                     );
 
                                     let _ = self.private_plug.unbounded_send(natted_packet);
-                                },
+                                }
                                 None => {
                                     if self.blacklist_unrecognized_addrs {
                                         self.blacklisted_addrs.insert(source_addr);
                                     }
-                                },
+                                }
                             }
-                        },
+                        }
                         _ => (),
                     }
-                },
+                }
             }
         }
     }
@@ -628,10 +656,8 @@ fn test() {
             let (public_tx, public_rx) = public_plug_1.split();
             let (private_tx, private_rx) = private_plug_1.split();
 
-            let remote_addr = SocketAddrV4::new(
-                Ipv4Addr::random_global(),
-                rand::random::<u16>() / 2 + 1000,
-            );
+            let remote_addr =
+                SocketAddrV4::new(Ipv4Addr::random_global(), rand::random::<u16>() / 2 + 1000);
             let local_addr = SocketAddrV4::new(
                 subnet.random_client_addr(),
                 rand::random::<u16>() / 2 + 1000,
@@ -654,69 +680,80 @@ fn test() {
             );
 
             private_tx
-            .send(packet)
-            .map_err(|_e| panic!("private side hung up!"))
-            .and_then(move |_private_tx| {
-                public_rx
-                .into_future()
-                .map_err(|(v, _public_rx)| void::unreachable(v))
-                .and_then(move |(packet_opt, _public_rx)| {
-                    let packet = unwrap!(packet_opt);
-                    assert_eq!(packet.fields(), Ipv4Fields {
-                        source_ip: public_ip,
-                        dest_ip: *remote_addr.ip(),
-                        ttl: initial_ttl - 1,
-                    });
-                    let mapped_port = match packet.payload() {
-                        Ipv4Payload::Udp(udp) => {
-                            assert_eq!(udp.payload(), payload);
-                            assert_eq!(udp.dest_port(), remote_addr.port());
-                            udp.source_port()
-                        },
-                        payload => panic!("unexpected ipv4 payload: {:?}", payload),
-                    };
-                    let payload = Bytes::from(&rand::random::<[u8; 8]>()[..]);
-                    let packet = Ipv4Packet::new_from_fields_recursive(
-                        Ipv4Fields {
-                            source_ip: *remote_addr.ip(),
-                            dest_ip: public_ip,
-                            ttl: initial_ttl,
-                        },
-                        Ipv4PayloadFields::Udp {
-                            fields: UdpFields {
-                                source_port: remote_addr.port(),
-                                dest_port: mapped_port,
-                            },
-                            payload: payload.clone(),
-                        },
-                    );
-
-                    public_tx
-                    .send(packet)
-                    .map_err(|_e| panic!("public side hung up!"))
-                    .and_then(move |_public_tx| {
-                        private_rx
+                .send(packet)
+                .map_err(|_e| panic!("private side hung up!"))
+                .and_then(move |_private_tx| {
+                    public_rx
                         .into_future()
-                        .map_err(|(v, _private_rx)| void::unreachable(v))
-                        .map(move |(packet_opt, _private_rx)| {
+                        .map_err(|(v, _public_rx)| void::unreachable(v))
+                        .and_then(move |(packet_opt, _public_rx)| {
                             let packet = unwrap!(packet_opt);
-                            assert_eq!(packet.fields(), Ipv4Fields {
-                                source_ip: *remote_addr.ip(),
-                                dest_ip: *local_addr.ip(),
-                                ttl: initial_ttl - 1,
-                            });
-                            match packet.payload() {
+                            assert_eq!(
+                                packet.fields(),
+                                Ipv4Fields {
+                                    source_ip: public_ip,
+                                    dest_ip: *remote_addr.ip(),
+                                    ttl: initial_ttl - 1,
+                                }
+                            );
+                            let mapped_port = match packet.payload() {
                                 Ipv4Payload::Udp(udp) => {
                                     assert_eq!(udp.payload(), payload);
-                                    assert_eq!(udp.source_port(), remote_addr.port());
-                                    assert_eq!(udp.dest_port(), local_addr.port());
-                                },
+                                    assert_eq!(udp.dest_port(), remote_addr.port());
+                                    udp.source_port()
+                                }
                                 payload => panic!("unexpected ipv4 payload: {:?}", payload),
-                            }
+                            };
+                            let payload = Bytes::from(&rand::random::<[u8; 8]>()[..]);
+                            let packet = Ipv4Packet::new_from_fields_recursive(
+                                Ipv4Fields {
+                                    source_ip: *remote_addr.ip(),
+                                    dest_ip: public_ip,
+                                    ttl: initial_ttl,
+                                },
+                                Ipv4PayloadFields::Udp {
+                                    fields: UdpFields {
+                                        source_port: remote_addr.port(),
+                                        dest_port: mapped_port,
+                                    },
+                                    payload: payload.clone(),
+                                },
+                            );
+
+                            public_tx
+                                .send(packet)
+                                .map_err(|_e| panic!("public side hung up!"))
+                                .and_then(move |_public_tx| {
+                                    private_rx
+                                        .into_future()
+                                        .map_err(|(v, _private_rx)| void::unreachable(v))
+                                        .map(move |(packet_opt, _private_rx)| {
+                                            let packet = unwrap!(packet_opt);
+                                            assert_eq!(
+                                                packet.fields(),
+                                                Ipv4Fields {
+                                                    source_ip: *remote_addr.ip(),
+                                                    dest_ip: *local_addr.ip(),
+                                                    ttl: initial_ttl - 1,
+                                                }
+                                            );
+                                            match packet.payload() {
+                                                Ipv4Payload::Udp(udp) => {
+                                                    assert_eq!(udp.payload(), payload);
+                                                    assert_eq!(
+                                                        udp.source_port(),
+                                                        remote_addr.port()
+                                                    );
+                                                    assert_eq!(udp.dest_port(), local_addr.port());
+                                                }
+                                                payload => {
+                                                    panic!("unexpected ipv4 payload: {:?}", payload)
+                                                }
+                                            }
+                                        })
+                                })
                         })
-                    })
                 })
-            })
         }));
         res.void_unwrap()
     })
@@ -773,4 +810,3 @@ fn test_symmetric_map() {
     assert_eq!(inbound_addr_10, None);
     assert_eq!(inbound_addr_11, Some(internal_addr));
 }
-

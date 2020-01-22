@@ -9,11 +9,11 @@ extern crate unwrap;
 extern crate tokio;
 
 use futures::future;
-use netsim::{node, Ipv4Range, Network};
 use netsim::device::ipv4::Ipv4NatBuilder;
-use tokio::runtime::Runtime;
+use netsim::{node, Ipv4Range, Network};
 use std::net::{SocketAddr, SocketAddrV4, UdpSocket};
 use std::sync::mpsc;
+use tokio::runtime::Runtime;
 
 /// Makes 3 UDP queries from the same client to different servers and returns the ports the server
 /// saw the client.
@@ -56,7 +56,8 @@ fn query_under_nat(nat_builder: Ipv4NatBuilder) -> Vec<u16> {
     let router = node::ipv4::router(stun_servers);
     let router = node::ipv4::router((router, client));
     let spawn_complete = future::lazy(move || {
-        let (spawn_complete, _ip_plug) = network_handle.spawn_ipv4_tree(Ipv4Range::global(), router);
+        let (spawn_complete, _ip_plug) =
+            network_handle.spawn_ipv4_tree(Ipv4Range::global(), router);
         spawn_complete
     });
     unwrap!(evloop.block_on(spawn_complete));

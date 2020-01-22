@@ -1,8 +1,8 @@
 //! Contains utilites for working with virtual (TAP) network interfaces.
 
+use crate::iface::build::{build, IfaceBuilder};
 use crate::priv_prelude::*;
 use libc;
-use crate::iface::build::{IfaceBuilder, build};
 
 /// This object can be used to set the configuration options for a `EtherIface` before creating the
 /// `EtherIface`
@@ -121,13 +121,10 @@ impl Stream for EtherIface {
             return Ok(Async::NotReady);
         }
 
-        let mut buffer: [u8; libc::ETH_FRAME_LEN as usize] = unsafe {
-            mem::uninitialized()
-        };
+        let mut buffer: [u8; libc::ETH_FRAME_LEN as usize] = unsafe { mem::uninitialized() };
         match self.fd.read(&mut buffer[..]) {
             Ok(0) => Ok(Async::Ready(None)),
             Ok(n) => {
-
                 /*
                 'out: for i in 0.. {
                     println!("");
@@ -147,11 +144,11 @@ impl Stream for EtherIface {
                 let frame = EtherFrame::from_bytes(bytes);
                 info!("TAP sending frame: {:?}", frame);
                 Ok(Async::Ready(Some(frame)))
-            },
+            }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 self.fd.clear_read_ready(Ready::readable())?;
                 Ok(Async::NotReady)
-            },
+            }
             Err(e) => Err(e),
         }
     }
@@ -199,12 +196,12 @@ impl Sink for EtherIface {
 #[cfg(feature = "linux_host")]
 #[cfg(test)]
 mod test {
+    use crate::iface;
     use crate::priv_prelude::*;
     use crate::spawn;
     use capabilities;
-    use rand;
-    use crate::iface;
     use get_if_addrs::{self, IfAddr};
+    use rand;
 
     #[test]
     fn build_tap_correct_settings() {
@@ -219,10 +216,10 @@ mod test {
 
                 let tap_builder = {
                     EtherIfaceBuilder::new()
-                    .mac_addr(mac_addr)
-                    .ipv4_addr(ipv4_addr, ipv4_netmask_bits)
-                    .ipv6_addr(ipv6_addr, ipv6_netmask_bits)
-                    .name(name.clone())
+                        .mac_addr(mac_addr)
+                        .ipv4_addr(ipv4_addr, ipv4_netmask_bits)
+                        .ipv6_addr(ipv6_addr, ipv6_netmask_bits)
+                        .name(name.clone())
                 };
 
                 let tap = unwrap!(tap_builder.build_unbound());
@@ -246,7 +243,7 @@ mod test {
                             );
 
                             found_v4 = true;
-                        },
+                        }
                         IfAddr::V6(ref ifv6_addr) => {
                             assert!(!found_v6);
                             assert_eq!(ifv6_addr.ip, ipv6_addr);
@@ -256,7 +253,7 @@ mod test {
                             );
 
                             found_v6 = true;
-                        },
+                        }
                     }
                 }
                 assert!(found_v4 && found_v6);
@@ -273,8 +270,8 @@ mod test {
         run_test(1, || {
             let tap_builder = {
                 EtherIfaceBuilder::new()
-                .ipv4_addr(Ipv4Addr::random_global(), 0)
-                .name("hello\0")
+                    .ipv4_addr(Ipv4Addr::random_global(), 0)
+                    .name("hello\0")
             };
             let res = tap_builder.build_unbound();
             match res {
@@ -290,16 +287,16 @@ mod test {
             let spawn_complete = spawn::new_namespace(|| {
                 let tap_builder = {
                     EtherIfaceBuilder::new()
-                    .ipv4_addr(Ipv4Addr::random_global(), 0)
-                    .name("hello")
+                        .ipv4_addr(Ipv4Addr::random_global(), 0)
+                        .name("hello")
                 };
                 trace!("build_tap_duplicate_name: building first interface");
                 let _tap = unwrap!(tap_builder.build_unbound());
 
                 let tap_builder = {
                     EtherIfaceBuilder::new()
-                    .ipv4_addr(Ipv4Addr::random_global(), 0)
-                    .name("hello")
+                        .ipv4_addr(Ipv4Addr::random_global(), 0)
+                        .name("hello")
                 };
                 trace!("build_tap_duplicate_name: building second interface");
                 match tap_builder.build_unbound() {
@@ -330,4 +327,3 @@ mod test {
         })
     }
 }
-

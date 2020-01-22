@@ -1,5 +1,5 @@
-use crate::priv_prelude::*;
 use super::*;
+use crate::priv_prelude::*;
 use rand;
 
 /// A range of IPv4 addresses with a common prefix
@@ -119,14 +119,14 @@ impl Ipv4Range {
         loop {
             let x = rand::random::<u32>() & mask;
             if x < 2 {
-                continue
+                continue;
             }
             let addr = Ipv4Addr::from(u32::from(self.addr) | x);
             if class != addr.class() {
-                continue
+                continue;
             }
             return addr;
-        };
+        }
     }
 
     /// Check whether this range contains the given IP address
@@ -163,10 +163,7 @@ impl Ipv4Range {
                 n += 1;
                 continue;
             }
-            ret.push(Ipv4Range {
-                addr: ip,
-                bits: 0,
-            });
+            ret.push(Ipv4Range { addr: ip, bits: 0 });
             if ret.len() == num as usize {
                 break;
             }

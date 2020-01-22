@@ -41,4 +41,3 @@ pub fn ipv6_tree<N: Ipv6Node>(
 ) -> (SpawnComplete<N::Output>, Ipv6Plug) {
     node.build(handle, ipv6_range)
 }
-

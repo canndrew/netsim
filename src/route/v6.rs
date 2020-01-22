@@ -53,22 +53,21 @@ pub fn add_route_v6(
             libc::ENFILE => return Err(AddRouteError::SystemFileDescriptorLimit(os_err)),
             _ => {
                 panic!("unexpected error creating socket: {}", os_err);
-            },
+            }
         }
     }
 
-    let mut route: sys::rtentry = unsafe {
-        mem::zeroed()
-    };
+    let mut route: sys::rtentry = unsafe { mem::zeroed() };
 
-    #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
+    #[cfg_attr(feature = "cargo-clippy", allow(cast_ptr_alignment))]
     unsafe {
         let route_destination = &mut route.rt_dst as *mut _ as *mut libc::sockaddr_in6;
         (*route_destination).sin6_family = libc::AF_INET6 as u16;
-        (*route_destination).sin6_addr = mem::transmute(u128::from(destination.base_addr()).to_be());
+        (*route_destination).sin6_addr =
+            mem::transmute(u128::from(destination.base_addr()).to_be());
     };
 
-    #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
+    #[cfg_attr(feature = "cargo-clippy", allow(cast_ptr_alignment))]
     unsafe {
         let route_genmask = &mut route.rt_genmask as *mut _ as *mut libc::sockaddr_in6;
         (*route_genmask).sin6_family = libc::AF_INET6 as u16;
@@ -76,26 +75,24 @@ pub fn add_route_v6(
     };
 
     route.rt_flags = sys::RTF_UP as u16;
-    #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
+    #[cfg_attr(feature = "cargo-clippy", allow(cast_ptr_alignment))]
     unsafe {
         let route_gateway = &mut route.rt_gateway as *mut _ as *mut libc::sockaddr_in6;
         (*route_gateway).sin6_family = libc::AF_INET6 as u16;
         (*route_gateway).sin6_addr = mem::transmute(u128::from(next_hop).to_be());
     };
-    
+
     let name = match CString::new(iface_name) {
         Ok(name) => name,
         Err(..) => {
             return Err(AddRouteError::NameContainsNul);
-        },
+        }
     };
 
     // TODO: This doesn't *actually* need to mutable yeah?
     route.rt_dev = name.as_ptr() as *mut _;
 
-    let res = unsafe {
-        libc::ioctl(fd, u64::from(sys::SIOCADDRT), &route)
-    };
+    let res = unsafe { libc::ioctl(fd, u64::from(sys::SIOCADDRT), &route) };
     if res != 0 {
         let os_err = io::Error::last_os_error();
         // TODO: there are definitely some errors that should be caught here.
@@ -104,4 +101,3 @@ pub fn add_route_v6(
 
     Ok(())
 }
-

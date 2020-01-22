@@ -22,4 +22,3 @@ impl DurationExt for Duration {
         nanos_a / nanos_b
     }
 }
-

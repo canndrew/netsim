@@ -1,8 +1,7 @@
 mod hub;
-mod packet_loss;
 mod latency;
+mod packet_loss;
 
 pub use self::hub::*;
-pub use self::packet_loss::*;
 pub use self::latency::*;
-
+pub use self::packet_loss::*;

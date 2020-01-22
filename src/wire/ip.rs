@@ -96,13 +96,15 @@ impl IpPlug {
 
     /// Add latency to a connection
     pub fn with_latency(
-        self, 
+        self,
         handle: &NetworkHandle,
         min_latency: Duration,
         mean_additional_latency: Duration,
     ) -> IpPlug {
         IpPlug {
-            inner: self.inner.with_latency(handle, min_latency, mean_additional_latency),
+            inner: self
+                .inner
+                .with_latency(handle, min_latency, mean_additional_latency),
         }
     }
 
@@ -114,7 +116,9 @@ impl IpPlug {
         mean_loss_duration: Duration,
     ) -> IpPlug {
         IpPlug {
-            inner: self.inner.with_packet_loss(handle, loss_rate, mean_loss_duration),
+            inner: self
+                .inner
+                .with_packet_loss(handle, loss_rate, mean_loss_duration),
         }
     }
 
@@ -127,36 +131,32 @@ impl IpPlug {
         handle.spawn({
             future::loop_fn((ipv4_tx, ip_rx), move |(ipv4_tx, ip_rx)| {
                 ip_rx
-                .into_future()
-                .map_err(|(v, _)| v)
-                .map(move |(ip_packet_opt, ip_rx)| {
-                    match ip_packet_opt {
+                    .into_future()
+                    .map_err(|(v, _)| v)
+                    .map(move |(ip_packet_opt, ip_rx)| match ip_packet_opt {
                         Some(IpPacket::V4(ipv4_packet)) => {
                             ipv4_tx.unbounded_send(ipv4_packet);
                             Loop::Continue((ipv4_tx, ip_rx))
-                        },
+                        }
                         Some(..) => Loop::Continue((ipv4_tx, ip_rx)),
                         None => Loop::Break(()),
-                    }
-                })
+                    })
             })
             .infallible()
         });
         handle.spawn({
             future::loop_fn((ip_tx, ipv4_rx), move |(ip_tx, ipv4_rx)| {
                 ipv4_rx
-                .into_future()
-                .map_err(|(v, _)| v)
-                .map(move |(ipv4_packet_opt, ipv4_rx)| {
-                    match ipv4_packet_opt {
+                    .into_future()
+                    .map_err(|(v, _)| v)
+                    .map(move |(ipv4_packet_opt, ipv4_rx)| match ipv4_packet_opt {
                         Some(ipv4_packet) => {
                             let ip_packet = IpPacket::V4(ipv4_packet);
                             ip_tx.unbounded_send(ip_packet);
                             Loop::Continue((ip_tx, ipv4_rx))
-                        },
+                        }
                         None => Loop::Break(()),
-                    }
-                })
+                    })
             })
             .infallible()
         });
@@ -172,36 +172,32 @@ impl IpPlug {
         handle.spawn({
             future::loop_fn((ipv6_tx, ip_rx), move |(ipv6_tx, ip_rx)| {
                 ip_rx
-                .into_future()
-                .map_err(|(v, _)| v)
-                .map(move |(ip_packet_opt, ip_rx)| {
-                    match ip_packet_opt {
+                    .into_future()
+                    .map_err(|(v, _)| v)
+                    .map(move |(ip_packet_opt, ip_rx)| match ip_packet_opt {
                         Some(IpPacket::V6(ipv6_packet)) => {
                             ipv6_tx.unbounded_send(ipv6_packet);
                             Loop::Continue((ipv6_tx, ip_rx))
-                        },
+                        }
                         Some(..) => Loop::Continue((ipv6_tx, ip_rx)),
                         None => Loop::Break(()),
-                    }
-                })
+                    })
             })
             .infallible()
         });
         handle.spawn({
             future::loop_fn((ip_tx, ipv6_rx), move |(ip_tx, ipv6_rx)| {
                 ipv6_rx
-                .into_future()
-                .map_err(|(v, _)| v)
-                .map(move |(ipv6_packet_opt, ipv6_rx)| {
-                    match ipv6_packet_opt {
+                    .into_future()
+                    .map_err(|(v, _)| v)
+                    .map(move |(ipv6_packet_opt, ipv6_rx)| match ipv6_packet_opt {
                         Some(ipv6_packet) => {
                             let ip_packet = IpPacket::V6(ipv6_packet);
                             ip_tx.unbounded_send(ip_packet);
                             Loop::Continue((ip_tx, ipv6_rx))
-                        },
+                        }
                         None => Loop::Break(()),
-                    }
-                })
+                    })
             })
             .infallible()
         });
@@ -315,4 +311,3 @@ impl Stream for IpReceiver {
         self.rx.poll()
     }
 }
-

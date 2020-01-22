@@ -10,4 +10,3 @@ ioctl!(write tunsetiff with b'T', 202; c_int);
 ioctl!(bad write siocsifhwaddr with 0x8924; sys::ifreq);
 ioctl!(bad read siocgifhwaddr with 0x8927; sys::ifreq);
 ioctl!(bad read siocgifindex with 0x8933; sys::ifreq);
-

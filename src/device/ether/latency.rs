@@ -19,7 +19,6 @@ impl EtherLatency {
         plug_a: EtherPlug,
         plug_b: EtherPlug,
     ) {
-
         Latency::spawn(
             handle,
             min_latency,
@@ -29,4 +28,3 @@ impl EtherLatency {
         )
     }
 }
-

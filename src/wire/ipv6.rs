@@ -11,29 +11,31 @@ impl fmt::Debug for Ipv6Packet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let payload = self.payload();
 
-        f
-        .debug_struct("Ipv6Packet")
-        .field("source_ip", &self.source_ip())
-        .field("dest_ip", &self.dest_ip())
-        .field("hop_limit", &self.hop_limit())
-        .field("payload", match payload {
-            Ipv6Payload::Udp(ref udp) => {
-                if udp.verify_checksum_v6(self.source_ip(), self.dest_ip()) {
-                    udp
-                } else {
-                    &"INVALID UDP packet"
-                }
-            },
-            Ipv6Payload::Tcp(ref tcp) => {
-                if tcp.verify_checksum_v6(self.source_ip(), self.dest_ip()) {
-                    tcp
-                } else {
-                    &"INVALID TCP packet"
-                }
-            },
-            Ipv6Payload::Unknown { .. } => &payload,
-        })
-        .finish()
+        f.debug_struct("Ipv6Packet")
+            .field("source_ip", &self.source_ip())
+            .field("dest_ip", &self.dest_ip())
+            .field("hop_limit", &self.hop_limit())
+            .field(
+                "payload",
+                match payload {
+                    Ipv6Payload::Udp(ref udp) => {
+                        if udp.verify_checksum_v6(self.source_ip(), self.dest_ip()) {
+                            udp
+                        } else {
+                            &"INVALID UDP packet"
+                        }
+                    }
+                    Ipv6Payload::Tcp(ref tcp) => {
+                        if tcp.verify_checksum_v6(self.source_ip(), self.dest_ip()) {
+                            tcp
+                        } else {
+                            &"INVALID TCP packet"
+                        }
+                    }
+                    Ipv6Payload::Unknown { .. } => &payload,
+                },
+            )
+            .finish()
     }
 }
 
@@ -61,7 +63,7 @@ pub enum Ipv6Payload {
         protocol: u8,
         /// The payload data
         payload: Bytes,
-    }
+    },
 }
 
 /// The payload of an IPv6 packet. Can be used to construct an IPv6 packet and its contents
@@ -89,9 +91,10 @@ impl Ipv6PayloadFields {
     pub fn total_packet_len(&self) -> usize {
         40 + match *self {
             Ipv6PayloadFields::Udp { ref payload, .. } => 8 + payload.len(),
-            Ipv6PayloadFields::Tcp { ref payload, ref fields } => {
-                fields.header_len() + payload.len()
-            },
+            Ipv6PayloadFields::Tcp {
+                ref payload,
+                ref fields,
+            } => fields.header_len() + payload.len(),
         }
     }
 }
@@ -112,15 +115,13 @@ impl Ipv6Packet {
     /// Create a new `Ipv6Packet` with the given header fields and payload. If you are also
     /// creating the packet's payload data it can be more efficient to use
     /// `new_from_fields_recursive` and save an allocation/copy.
-    pub fn new_from_fields(
-        fields: &Ipv6Fields,
-        payload: &Ipv6Payload,
-    ) -> Ipv6Packet {
-        let len = 40 + match *payload {
-            Ipv6Payload::Udp(ref udp) => udp.as_bytes().len(),
-            Ipv6Payload::Tcp(ref tcp) => tcp.as_bytes().len(),
-            Ipv6Payload::Unknown { ref payload, .. } => payload.len(),
-        };
+    pub fn new_from_fields(fields: &Ipv6Fields, payload: &Ipv6Payload) -> Ipv6Packet {
+        let len = 40
+            + match *payload {
+                Ipv6Payload::Udp(ref udp) => udp.as_bytes().len(),
+                Ipv6Payload::Tcp(ref tcp) => tcp.as_bytes().len(),
+                Ipv6Payload::Unknown { ref payload, .. } => payload.len(),
+            };
         let mut buffer = unsafe { BytesMut::uninit(len) };
         buffer[6] = match *payload {
             Ipv6Payload::Udp(..) => 17,
@@ -168,7 +169,10 @@ impl Ipv6Packet {
         set_fields(buffer, fields);
 
         match payload_fields {
-            Ipv6PayloadFields::Udp { fields: udp_fields, ref payload } => {
+            Ipv6PayloadFields::Udp {
+                fields: udp_fields,
+                ref payload,
+            } => {
                 UdpPacket::write_to_buffer_v6(
                     &mut buffer[40..],
                     udp_fields,
@@ -176,8 +180,11 @@ impl Ipv6Packet {
                     fields.dest_ip,
                     payload,
                 );
-            },
-            Ipv6PayloadFields::Tcp { fields: tcp_fields, ref payload } => {
+            }
+            Ipv6PayloadFields::Tcp {
+                fields: tcp_fields,
+                ref payload,
+            } => {
                 TcpPacket::write_to_buffer_v6(
                     &mut buffer[40..],
                     tcp_fields,
@@ -185,15 +192,13 @@ impl Ipv6Packet {
                     fields.dest_ip,
                     payload,
                 );
-            },
+            }
         }
     }
 
     /// Parse an IPv6 packet from a byte buffer
     pub fn from_bytes(buffer: Bytes) -> Ipv6Packet {
-        Ipv6Packet {
-            buffer,
-        }
+        Ipv6Packet { buffer }
     }
 
     /// Get the source IP of the packet.
@@ -267,13 +272,15 @@ impl Ipv6Plug {
 
     /// Add latency to a connection
     pub fn with_latency(
-        self, 
+        self,
         handle: &NetworkHandle,
         min_latency: Duration,
         mean_additional_latency: Duration,
     ) -> Ipv6Plug {
         Ipv6Plug {
-            inner: self.inner.with_latency(handle, min_latency, mean_additional_latency),
+            inner: self
+                .inner
+                .with_latency(handle, min_latency, mean_additional_latency),
         }
     }
 
@@ -285,7 +292,9 @@ impl Ipv6Plug {
         mean_loss_duration: Duration,
     ) -> Ipv6Plug {
         Ipv6Plug {
-            inner: self.inner.with_packet_loss(handle, loss_rate, mean_loss_duration),
+            inner: self
+                .inner
+                .with_packet_loss(handle, loss_rate, mean_loss_duration),
         }
     }
 
@@ -374,4 +383,3 @@ impl Stream for Ipv6Receiver {
         self.rx.poll()
     }
 }
-

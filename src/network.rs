@@ -66,12 +66,7 @@ impl NetworkHandle {
             panic!("network has been destroyed");
         }
 
-        tokio::spawn({
-            f
-            .until(drop_rx)
-            .map(|_unit_opt| ())
-            .infallible()
-        });
+        tokio::spawn({ f.until(drop_rx).map(|_unit_opt| ()).infallible() });
     }
 
     /// Spawn a hierarchical network of nodes. The returned plug can be used to write packets to the

@@ -14,7 +14,12 @@ impl EtherPacketLoss {
         plug_a: EtherPlug,
         plug_b: EtherPlug,
     ) {
-        PacketLoss::spawn(handle, loss_rate, mean_loss_duration, plug_a.into(), plug_b.into())
+        PacketLoss::spawn(
+            handle,
+            loss_rate,
+            mean_loss_duration,
+            plug_a.into(),
+            plug_b.into(),
+        )
     }
 }
-

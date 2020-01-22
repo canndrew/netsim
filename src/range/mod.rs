@@ -33,4 +33,3 @@ quick_error! {
         }
     }
 }
-

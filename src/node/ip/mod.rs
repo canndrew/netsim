@@ -1,11 +1,11 @@
 use crate::priv_prelude::*;
 
 mod latency;
-mod packet_loss;
 mod machine;
+mod packet_loss;
 pub use self::latency::{latency, LatencyNode};
-pub use self::packet_loss::{packet_loss, PacketLossNode};
 pub use self::machine::{machine, MachineNode};
+pub use self::packet_loss::{packet_loss, PacketLossNode};
 
 /// An `IpNode` describes a recipe for constructing a network when given the IP range that the
 /// network should operate on. The functions in the `node::ip` module return `IpNode`s that you
@@ -24,4 +24,3 @@ pub trait IpNode: Sized {
         ipv6_range: Option<Ipv6Range>,
     ) -> (SpawnComplete<Self::Output>, IpPlug);
 }
-

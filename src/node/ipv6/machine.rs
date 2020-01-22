@@ -32,15 +32,15 @@ where
         let address = ipv6_range.random_client_addr();
         let iface = {
             IpIfaceBuilder::new()
-            .ipv6_addr(address, ipv6_range.netmask_prefix_length())
-            .ipv6_route(Ipv6Route::new(Ipv6Range::global(), ipv6!("::")))
+                .ipv6_addr(address, ipv6_range.netmask_prefix_length())
+                .ipv6_route(Ipv6Route::new(Ipv6Range::global(), ipv6!("::")))
         };
         let (plug_a, plug_b) = IpPlug::new_pair();
 
         let spawn_complete = {
             MachineBuilder::new()
-            .add_ip_iface(iface, plug_b)
-            .spawn(handle, move || (self.func)(address))
+                .add_ip_iface(iface, plug_b)
+                .spawn(handle, move || (self.func)(address))
         };
 
         let plug_a = plug_a.into_ipv6_plug(handle);
@@ -48,4 +48,3 @@ where
         (spawn_complete, plug_a)
     }
 }
-
