@@ -1,10 +1,10 @@
 use crate::priv_prelude::*;
 
-mod machine;
 mod hub;
+mod machine;
 
-pub use self::machine::{machine, MachineNode};
 pub use self::hub::{hub, HubNode};
+pub use self::machine::{machine, MachineNode};
 
 /// An `EtherNode` describes a recipe for constructing a network when given the IP ranges that the network
 /// should operate on.
@@ -22,4 +22,3 @@ pub trait EtherNode: Sized {
         ipv6_range: Option<Ipv6Range>,
     ) -> (SpawnComplete<Self::Output>, EtherPlug);
 }
-

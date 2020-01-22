@@ -40,9 +40,7 @@ pub struct Hub {
 impl Hub {
     /// Create a new ethernet hub with the given clients connected to it.
     pub fn new(connections: Vec<EtherPlug>) -> Hub {
-        Hub {
-            connections,
-        }
+        Hub { connections }
     }
 
     /// Spawn a new ethernet hub on the event loop.
@@ -67,7 +65,7 @@ impl Future for Hub {
                         for connection in &mut self.connections {
                             let _ = connection.unbounded_send(packet.clone());
                         }
-                    },
+                    }
                 }
             };
         }
@@ -79,4 +77,3 @@ impl Future for Hub {
         Ok(Async::NotReady)
     }
 }
-

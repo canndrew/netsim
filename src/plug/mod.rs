@@ -22,14 +22,8 @@ impl<T: fmt::Debug + Send + 'static> Plug<T> {
     pub fn new_pair() -> (Plug<T>, Plug<T>) {
         let (a_tx, b_rx) = future_utils::mpsc::unbounded();
         let (b_tx, a_rx) = future_utils::mpsc::unbounded();
-        let a = Plug {
-            tx: a_tx,
-            rx: a_rx,
-        };
-        let b = Plug {
-            tx: b_tx,
-            rx: b_rx,
-        };
+        let a = Plug { tx: a_tx, rx: a_rx };
+        let b = Plug { tx: b_tx, rx: b_rx };
         (a, b)
     }
 
@@ -90,4 +84,3 @@ impl<T: fmt::Debug + 'static> Sink for Plug<T> {
         Ok(self.tx.poll_complete().unwrap_or(Async::Ready(())))
     }
 }
-

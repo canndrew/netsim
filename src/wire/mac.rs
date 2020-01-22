@@ -9,7 +9,9 @@ pub struct MacAddr {
 
 impl fmt::Debug for MacAddr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+        write!(
+            f,
+            "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
             self.bytes[0],
             self.bytes[1],
             self.bytes[2],
@@ -36,9 +38,7 @@ impl MacAddr {
     pub fn from_bytes(bytes: &[u8]) -> MacAddr {
         let mut b = [0u8; 6];
         b[..].clone_from_slice(bytes);
-        MacAddr {
-            bytes: b,
-        }
+        MacAddr { bytes: b }
     }
 
     /// Get the address as a slice of bytes.
@@ -50,9 +50,7 @@ impl MacAddr {
     pub fn random() -> MacAddr {
         let mut b: [u8; 6] = rand::random();
         b[0] &= 0xfc;
-        MacAddr {
-            bytes: b,
-        }
+        MacAddr { bytes: b }
     }
 
     /// Checks weather this is the broadcast address.
@@ -60,4 +58,3 @@ impl MacAddr {
         *self == MacAddr::BROADCAST
     }
 }
-

@@ -7,7 +7,11 @@ pub trait Ipv4RouterClients {
     type Output: Send + 'static;
 
     /// Build the set of nodes.
-    fn build(self, handle: &NetworkHandle, ipv4_range: Ipv4Range) -> (SpawnComplete<Self::Output>, Ipv4Plug);
+    fn build(
+        self,
+        handle: &NetworkHandle,
+        ipv4_range: Ipv4Range,
+    ) -> (SpawnComplete<Self::Output>, Ipv4Plug);
 }
 
 struct JoinAll<X, T> {
@@ -22,7 +26,7 @@ macro_rules! tuple_impl {
             $($ty: Ipv4Node + Send + 'static,)*
         {
             type Output = ($($ty::Output,)*);
-            
+
             fn build(self, handle: &NetworkHandle, ipv4_range: Ipv4Range) -> (SpawnComplete<Self::Output>, Ipv4Plug) {
                 #![allow(non_snake_case)]
                 #![allow(unused_assignments)]
@@ -45,7 +49,7 @@ macro_rules! tuple_impl {
                     let router = router.connect(plug, vec![Ipv4Route::new(ranges[i], None)]);
                     i += 1;
                 )*
-                
+
                 let (plug_0, plug_1) = Ipv4Plug::new_pair();
                 let router = router.connect(plug_1, vec![Ipv4Route::new(Ipv4Range::global(), None)]);
                 router.spawn(handle);
@@ -103,21 +107,21 @@ macro_rules! tuple_impl {
 
 tuple_impl!();
 tuple_impl!(T0,);
-tuple_impl!(T0,T1,);
-tuple_impl!(T0,T1,T2,);
-tuple_impl!(T0,T1,T2,T3,);
-tuple_impl!(T0,T1,T2,T3,T4,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15,);
+tuple_impl!(T0, T1,);
+tuple_impl!(T0, T1, T2,);
+tuple_impl!(T0, T1, T2, T3,);
+tuple_impl!(T0, T1, T2, T3, T4,);
+tuple_impl!(T0, T1, T2, T3, T4, T5,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6, T7,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6, T7, T8,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15,);
 
 impl<N> Ipv4RouterClients for Vec<N>
 where
@@ -146,9 +150,7 @@ where
 
         let (tx, rx) = oneshot::channel();
         handle.spawn({
-            spawn_completes
-            .collect()
-            .then(|result| {
+            spawn_completes.collect().then(|result| {
                 let _ = tx.send(result);
                 Ok(())
             })
@@ -184,4 +186,3 @@ where
         self.clients.build(handle, ipv4_range)
     }
 }
-

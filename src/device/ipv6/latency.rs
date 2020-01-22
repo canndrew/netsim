@@ -19,7 +19,6 @@ impl Ipv6Latency {
         plug_a: Ipv6Plug,
         plug_b: Ipv6Plug,
     ) {
-
         Latency::spawn(
             handle,
             min_latency,
@@ -29,4 +28,3 @@ impl Ipv6Latency {
         )
     }
 }
-

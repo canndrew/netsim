@@ -5,21 +5,26 @@
 mod arp;
 mod checksum;
 mod ether;
-mod ipv4;
-mod mac;
-mod udp;
-mod tcp;
 mod icmpv4;
-mod ipv6;
 mod ip;
+mod ipv4;
+mod ipv6;
+mod mac;
+mod tcp;
+mod udp;
 
 pub use self::arp::*;
 pub use self::ether::*;
-pub use self::mac::*;
-pub use self::udp::*;
-pub use self::tcp::*;
 pub use self::icmpv4::*;
-pub use self::ipv4::{Ipv4Packet, Ipv4Fields, Ipv4Payload, Ipv4PayloadFields, Ipv4Plug, Ipv4Sender, Ipv4Receiver, IntoIpv4Plug};
-pub use self::ipv6::{Ipv6Packet, Ipv6Fields, Ipv6Payload, Ipv6PayloadFields, Ipv6Plug, Ipv6Sender, Ipv6Receiver, IntoIpv6Plug};
-pub use self::ip::{IpPacket, IpPlug, IpSender, IpReceiver, IntoIpPlug};
-
+pub use self::ip::{IntoIpPlug, IpPacket, IpPlug, IpReceiver, IpSender};
+pub use self::ipv4::{
+    IntoIpv4Plug, Ipv4Fields, Ipv4Packet, Ipv4Payload, Ipv4PayloadFields, Ipv4Plug, Ipv4Receiver,
+    Ipv4Sender,
+};
+pub use self::ipv6::{
+    IntoIpv6Plug, Ipv6Fields, Ipv6Packet, Ipv6Payload, Ipv6PayloadFields, Ipv6Plug, Ipv6Receiver,
+    Ipv6Sender,
+};
+pub use self::mac::*;
+pub use self::tcp::*;
+pub use self::udp::*;

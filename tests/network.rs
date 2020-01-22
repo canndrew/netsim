@@ -2,15 +2,15 @@
 
 #[macro_use]
 extern crate net_literals;
-extern crate netsim;
 extern crate futures;
+extern crate netsim;
 #[macro_use]
 extern crate unwrap;
 extern crate tokio;
 
-use netsim::{node, Ipv4Range, Network};
 use futures::sync::oneshot;
 use futures::{future, Future};
+use netsim::{node, Ipv4Range, Network};
 use tokio::runtime::Runtime;
 
 #[test]

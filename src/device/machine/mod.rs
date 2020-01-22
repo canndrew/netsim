@@ -1,9 +1,9 @@
-use crate::priv_prelude::*;
-use std;
-use future_utils;
-use crate::spawn;
 use self::tap::TapTask;
 use self::tun::TunTask;
+use crate::priv_prelude::*;
+use crate::spawn;
+use future_utils;
+use std;
 use tokio;
 
 mod tap;
@@ -24,32 +24,20 @@ impl MachineBuilder {
     }
 
     /// Add an ethernet (TAP) interface to the machine
-    pub fn add_ether_iface(
-        mut self,
-        iface: EtherIfaceBuilder,
-        plug: EtherPlug,
-    ) -> MachineBuilder {
+    pub fn add_ether_iface(mut self, iface: EtherIfaceBuilder, plug: EtherPlug) -> MachineBuilder {
         self.ether_ifaces.push((iface, plug));
         self
     }
 
     /// Add an IP (TUN) interface to the machine
-    pub fn add_ip_iface(
-        mut self,
-        iface: IpIfaceBuilder,
-        plug: IpPlug,
-    ) -> MachineBuilder {
+    pub fn add_ip_iface(mut self, iface: IpIfaceBuilder, plug: IpPlug) -> MachineBuilder {
         self.ip_ifaces.push((iface, plug));
         self
     }
 
     /// Spawn the machine onto the event loop. The returned `SpawnComplete` will resolve with the
     /// value returned by the given function.
-    pub fn spawn<F, T>(
-        self,
-        handle: &NetworkHandle,
-        func: F,
-    ) -> SpawnComplete<T::Item>
+    pub fn spawn<F, T>(self, handle: &NetworkHandle, func: F) -> SpawnComplete<T::Item>
     where
         F: FnOnce() -> T,
         F: Send + 'static,
@@ -79,13 +67,14 @@ impl MachineBuilder {
             drop(ip_tx);
 
             let mut runtime = unwrap!(tokio::runtime::current_thread::Runtime::new());
-            runtime.block_on(future::lazy(|| {
-               func()
-               .map(|ret| {
-                    drop(drop_txs);
-                    ret
-                })
-            })).void_unwrap()
+            runtime
+                .block_on(future::lazy(|| {
+                    func().map(|ret| {
+                        drop(drop_txs);
+                        ret
+                    })
+                }))
+                .void_unwrap()
         });
 
         for (tap_unbound, plug, drop_rx) in ether_rx {
@@ -103,4 +92,3 @@ impl MachineBuilder {
         spawn_complete
     }
 }
-

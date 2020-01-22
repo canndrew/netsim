@@ -14,7 +14,12 @@ impl Ipv6PacketLoss {
         plug_a: Ipv6Plug,
         plug_b: Ipv6Plug,
     ) {
-        PacketLoss::spawn(handle, loss_rate, mean_loss_duration, plug_a.into(), plug_b.into())
+        PacketLoss::spawn(
+            handle,
+            loss_rate,
+            mean_loss_duration,
+            plug_a.into(),
+            plug_b.into(),
+        )
     }
 }
-

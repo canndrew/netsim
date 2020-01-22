@@ -1,7 +1,7 @@
 use crate::priv_prelude::*;
+use crate::spawn_complete;
 use libc;
 use libc::{c_int, c_void, pid_t};
-use crate::spawn_complete;
 
 const STACK_ALIGN: usize = 16;
 
@@ -11,9 +11,9 @@ trait FnBox<R> {
 
 impl<F, R> FnBox<R> for F
 where
-    F: FnOnce() -> R
+    F: FnOnce() -> R,
 {
-    #[cfg_attr(feature="cargo-clippy", allow(boxed_local))]
+    #[cfg_attr(feature = "cargo-clippy", allow(boxed_local))]
     fn call_box(self: Box<Self>) -> R {
         (*self)()
     }
@@ -34,8 +34,7 @@ where
     let mut stack = Vec::<u8>::with_capacity(stack_size + STACK_ALIGN);
     let stack_base = stack.as_mut_ptr();
 
-    let flags =
-        libc::CLONE_CHILD_CLEARTID |
+    let flags = libc::CLONE_CHILD_CLEARTID |
         libc::CLONE_FILES |
         libc::CLONE_IO |
         libc::CLONE_SIGHAND |
@@ -59,7 +58,12 @@ where
         //let data: *mut CbData = arg as *mut _;
         //let data: Box<CbData> = unsafe { Box::from_raw(data) };
         let data = *data;
-        let CbData { func, ret_tx, uid, gid } = data;
+        let CbData {
+            func,
+            ret_tx,
+            uid,
+            gid,
+        } = data;
 
         // WARNING: HACKERY
         //
@@ -69,9 +73,7 @@ where
         // local storage keys. There should be a way to do this which doesn't involve spawning
         // two threads.
 
-        let res = unsafe {
-            libc::prctl(libc::PR_SET_PDEATHSIG as i32, libc::SIGTERM, 0, 0, 0)
-        };
+        let res = unsafe { libc::prctl(libc::PR_SET_PDEATHSIG as i32, libc::SIGTERM, 0, 0, 0) };
         assert_eq!(res, 0);
 
         let mut f = unwrap!(File::create("/proc/self/uid_map"));
@@ -100,9 +102,15 @@ where
     let uid = unsafe { libc::geteuid() };
     let gid = unsafe { libc::getegid() };
     let (ret_tx, ret_rx) = oneshot::channel();
-    let stack_head = ((stack_base as usize + stack_size + STACK_ALIGN) & !(STACK_ALIGN - 1)) as *mut c_void;
+    let stack_head =
+        ((stack_base as usize + stack_size + STACK_ALIGN) & !(STACK_ALIGN - 1)) as *mut c_void;
     let func = Box::new(func);
-    let arg: Box<CbData<R>> = Box::new(CbData { func, ret_tx, uid, gid });
+    let arg: Box<CbData<R>> = Box::new(CbData {
+        func,
+        ret_tx,
+        uid,
+        gid,
+    });
     let arg = Box::into_raw(arg) as *mut c_void;
     let child_tid = Box::new(!0);
 
@@ -121,27 +129,15 @@ where
         let err = io::Error::last_os_error();
         if err.kind() == io::ErrorKind::PermissionDenied {
             let mut utsname: libc::utsname = unsafe { mem::zeroed() };
-            let res = unsafe {
-                libc::uname(&mut utsname)
-            };
+            let res = unsafe { libc::uname(&mut utsname) };
             assert_eq!(res, 0);
-            let version = unsafe {
-                CStr::from_ptr(utsname.release.as_ptr())
-            };
+            let version = unsafe { CStr::from_ptr(utsname.release.as_ptr()) };
             let version = unwrap!(version.to_str());
-            let passwd = unsafe {
-                libc::getpwuid(uid)
-            };
-            let user_name = unsafe {
-                CStr::from_ptr((*passwd).pw_name)
-            };
+            let passwd = unsafe { libc::getpwuid(uid) };
+            let user_name = unsafe { CStr::from_ptr((*passwd).pw_name) };
             let user_name = unwrap!(user_name.to_str());
-            let group = unsafe {
-                libc::getgrgid(gid)
-            };
-            let group_name = unsafe {
-                CStr::from_ptr((*group).gr_name)
-            };
+            let group = unsafe { libc::getgrgid(gid) };
+            let group_name = unsafe { CStr::from_ptr((*group).gr_name) };
             let group_name = unwrap!(group_name.to_str());
 
             panic!(
@@ -201,4 +197,3 @@ mod test {
         })
     }
 }
-

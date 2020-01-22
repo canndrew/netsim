@@ -20,12 +20,15 @@ impl<R> Future for SpawnComplete<R> {
                     process_handle.busy_wait_for_exit();
                 }
                 res.map(Async::Ready)
-            },
+            }
             Ok(Async::NotReady) => Ok(Async::NotReady),
             Err(oneshot::Canceled) => {
                 let holds_process = self.process_handle.is_some();
-                panic!("thread destroyed without sending response!? {}", holds_process);
-            },
+                panic!(
+                    "thread destroyed without sending response!? {}",
+                    holds_process
+                );
+            }
         }
     }
 }
@@ -42,12 +45,9 @@ pub fn from_parts<R>(
 }
 
 /// Constructs `SpawnComplete` that waits for a completion signal.
-pub fn from_receiver<R>(
-    ret_rx: oneshot::Receiver<thread::Result<R>>,
-) -> SpawnComplete<R> {
+pub fn from_receiver<R>(ret_rx: oneshot::Receiver<thread::Result<R>>) -> SpawnComplete<R> {
     SpawnComplete {
         ret_rx,
         process_handle: None,
     }
 }
-

@@ -30,7 +30,7 @@ macro_rules! tuple_impl {
 
             fn build(
                 self,
-                handle: &NetworkHandle, 
+                handle: &NetworkHandle,
                 ipv4_range: Option<Ipv4Range>,
                 ipv6_range: Option<Ipv6Range>,
             ) -> (SpawnComplete<Self::Output>, EtherPlug)
@@ -120,21 +120,21 @@ macro_rules! tuple_impl {
 
 tuple_impl!();
 tuple_impl!(T0,);
-tuple_impl!(T0,T1,);
-tuple_impl!(T0,T1,T2,);
-tuple_impl!(T0,T1,T2,T3,);
-tuple_impl!(T0,T1,T2,T3,T4,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,);
-tuple_impl!(T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,T15,);
+tuple_impl!(T0, T1,);
+tuple_impl!(T0, T1, T2,);
+tuple_impl!(T0, T1, T2, T3,);
+tuple_impl!(T0, T1, T2, T3, T4,);
+tuple_impl!(T0, T1, T2, T3, T4, T5,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6, T7,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6, T7, T8,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14,);
+tuple_impl!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15,);
 
 /// A `Node` representing an ethernet hub.
 pub struct HubNode<C> {
@@ -161,4 +161,3 @@ where
         self.clients.build(handle, ipv4_range, ipv6_range)
     }
 }
-

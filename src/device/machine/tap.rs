@@ -9,11 +9,7 @@ pub struct TapTask {
 }
 
 impl TapTask {
-    pub fn new(
-        tap: EtherIface,
-        plug: EtherPlug,
-        drop_rx: DropNotice,
-    ) -> TapTask {
+    pub fn new(tap: EtherIface, plug: EtherPlug, drop_rx: DropNotice) -> TapTask {
         let (tx, rx) = plug.split();
         TapTask {
             tap,
@@ -26,9 +22,7 @@ impl TapTask {
 }
 
 enum TapTaskState {
-    Receiving {
-        drop_rx: DropNotice,
-    },
+    Receiving { drop_rx: DropNotice },
     Dying(Delay),
     Invalid,
 }
@@ -46,14 +40,14 @@ impl Future for TapTask {
                 Ok(Async::Ready(Some(frame))) => {
                     let _ = self.frame_tx.unbounded_send(frame);
                     received_frames = true;
-                },
+                }
                 Ok(Async::Ready(None)) => {
                     panic!("TAP stream ended somehow");
-                },
+                }
                 Ok(Async::NotReady) => break,
                 Err(e) => {
                     panic!("reading TAP device yielded an error: {}", e);
-                },
+                }
             }
         }
 
@@ -64,10 +58,10 @@ impl Future for TapTask {
                     Ok(AsyncSink::NotReady(frame)) => {
                         self.sending_frame = Some(frame);
                         break;
-                    },
+                    }
                     Err(e) => {
                         panic!("writing TAP device yielded an error: {}", e);
-                    },
+                    }
                 }
             }
 
@@ -75,7 +69,7 @@ impl Future for TapTask {
                 Async::Ready(Some(frame)) => {
                     self.sending_frame = Some(frame);
                     continue;
-                },
+                }
                 _ => break,
             }
         }
@@ -83,28 +77,26 @@ impl Future for TapTask {
             Ok(..) => (),
             Err(e) => {
                 panic!("completing TAP device write yielded an error: {}", e);
-            },
+            }
         }
 
         let mut state = mem::replace(&mut self.state, TapTaskState::Invalid);
         trace!("polling TapTask");
         loop {
             match state {
-                TapTaskState::Receiving {
-                    mut drop_rx,
-                } => {
+                TapTaskState::Receiving { mut drop_rx } => {
                     trace!("state == receiving");
                     match drop_rx.poll().void_unwrap() {
                         Async::Ready(()) => {
                             state = TapTaskState::Dying(Delay::new(Instant::now() + grace_period));
                             continue;
-                        },
+                        }
                         Async::NotReady => {
                             state = TapTaskState::Receiving { drop_rx };
                             break;
-                        },
+                        }
                     }
-                },
+                }
                 TapTaskState::Dying(mut timeout) => {
                     trace!("state == dying");
                     if received_frames {
@@ -113,16 +105,16 @@ impl Future for TapTask {
                     match timeout.poll().void_unwrap() {
                         Async::Ready(()) => {
                             return Ok(Async::Ready(()));
-                        },
+                        }
                         Async::NotReady => {
                             state = TapTaskState::Dying(timeout);
                             break;
-                        },
+                        }
                     }
                 }
                 TapTaskState::Invalid => {
                     panic!("TapTask in invalid state!");
-                },
+                }
             }
         }
         self.state = state;
@@ -130,5 +122,3 @@ impl Future for TapTask {
         Ok(Async::NotReady)
     }
 }
-
-

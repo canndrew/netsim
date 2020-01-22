@@ -29,4 +29,3 @@ quick_error! {
         }
     }
 }
-

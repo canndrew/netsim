@@ -59,15 +59,16 @@ impl<T: fmt::Debug + 'static> Future for Latency<T> {
                 Async::NotReady => break false,
                 Async::Ready(None) => break true,
                 Async::Ready(Some(packet)) => {
-                    let delay
-                        = self.min_latency
-                        + self.mean_additional_latency.mul_f64(util::expovariate_rand());
+                    let delay = self.min_latency
+                        + self
+                            .mean_additional_latency
+                            .mul_f64(util::expovariate_rand());
                     let in_transit = InTransit {
                         packet: Some(packet),
                         timeout: Delay::new(now + delay),
                     };
                     self.outgoing_b.push(in_transit);
-                },
+                }
             }
         };
 
@@ -76,15 +77,16 @@ impl<T: fmt::Debug + 'static> Future for Latency<T> {
                 Async::NotReady => break false,
                 Async::Ready(None) => break true,
                 Async::Ready(Some(packet)) => {
-                    let delay
-                        = self.min_latency
-                        + self.mean_additional_latency.mul_f64(util::expovariate_rand());
+                    let delay = self.min_latency
+                        + self
+                            .mean_additional_latency
+                            .mul_f64(util::expovariate_rand());
                     let in_transit = InTransit {
                         packet: Some(packet),
                         timeout: Delay::new(now + delay),
                     };
                     self.outgoing_a.push(in_transit);
-                },
+                }
             }
         };
 
@@ -94,7 +96,7 @@ impl<T: fmt::Debug + 'static> Future for Latency<T> {
                 Async::Ready(None) => break,
                 Async::Ready(Some(packet)) => {
                     let _ = self.plug_a.tx.unbounded_send(packet);
-                },
+                }
             }
         }
 
@@ -104,7 +106,7 @@ impl<T: fmt::Debug + 'static> Future for Latency<T> {
                 Async::Ready(None) => break,
                 Async::Ready(Some(packet)) => {
                     let _ = self.plug_b.tx.unbounded_send(packet);
-                },
+                }
             }
         }
 
@@ -212,4 +214,3 @@ fn test() {
     })
 }
 */
-

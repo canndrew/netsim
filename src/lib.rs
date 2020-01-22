@@ -211,19 +211,19 @@
 //! better designed then let us know on the bug tracker :)
 
 #![deny(missing_docs)]
-#![cfg_attr(feature="cargo-clippy", allow(redundant_field_names))]
-#![cfg_attr(feature="cargo-clippy", allow(single_match))]
-#![cfg_attr(feature="cargo-clippy", allow(match_same_arms))]
-#![cfg_attr(feature="cargo-clippy", allow(decimal_literal_representation))]
+#![cfg_attr(feature = "cargo-clippy", allow(redundant_field_names))]
+#![cfg_attr(feature = "cargo-clippy", allow(single_match))]
+#![cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
+#![cfg_attr(feature = "cargo-clippy", allow(decimal_literal_representation))]
 
-extern crate libc;
-extern crate rand;
 extern crate byteorder;
 extern crate bytes;
+extern crate libc;
+extern crate rand;
 #[macro_use]
 extern crate unwrap;
-extern crate void;
 extern crate get_if_addrs;
+extern crate void;
 #[macro_use]
 extern crate net_literals;
 #[macro_use]
@@ -232,8 +232,8 @@ extern crate quick_error;
 extern crate ioctl_sys;
 #[macro_use]
 extern crate log;
-extern crate mio;
 extern crate futures;
+extern crate mio;
 extern crate tokio;
 #[macro_use]
 extern crate rand_derive;
@@ -249,7 +249,6 @@ extern crate statrs;
 /// Convert a variable-length slice to a fixed-length array
 macro_rules! slice_assert_len {
     ($len:tt, $slice:expr) => {{
-
         use std::ptr;
 
         union MaybeUninit<T: Copy> {
@@ -261,41 +260,36 @@ macro_rules! slice_assert_len {
         let mut array: MaybeUninit<[_; $len]> = MaybeUninit { uninit: () };
         let slice: &[_] = $slice;
         for (i, x) in slice.iter().enumerate() {
-            unsafe {
-                ptr::write(&mut array.init[i], *x)
-            }
+            unsafe { ptr::write(&mut array.init[i], *x) }
         }
 
-        unsafe {
-            array.init
-        }
-    }}
+        unsafe { array.init }
+    }};
 }
 
-mod priv_prelude;
-mod util;
-mod sys;
-mod ioctl;
 mod async_fd;
-mod route;
-mod range;
-mod spawn_complete;
-mod process_handle;
+pub mod device;
+pub mod iface;
+mod ioctl;
+mod network;
+pub mod node;
 mod pcap;
 mod plug;
-mod network;
-pub mod iface;
-pub mod node;
-pub mod device;
-pub mod wire;
+mod priv_prelude;
+mod process_handle;
+mod range;
+mod route;
 pub mod spawn;
+mod spawn_complete;
+mod sys;
 #[cfg(test)]
 mod test;
+mod util;
+pub mod wire;
 
-pub use crate::range::{Ipv4Range, Ipv6Range, IpRangeParseError};
-pub use crate::route::{Ipv4Route, Ipv6Route, AddRouteError};
-pub use crate::spawn_complete::SpawnComplete;
-pub use crate::pcap::IpLog;
 pub use crate::network::{Network, NetworkHandle};
+pub use crate::pcap::IpLog;
+pub use crate::range::{IpRangeParseError, Ipv4Range, Ipv6Range};
+pub use crate::route::{AddRouteError, Ipv4Route, Ipv6Route};
+pub use crate::spawn_complete::SpawnComplete;
 pub use crate::util::{ipv4_addr::Ipv4AddrExt, ipv6_addr::Ipv6AddrExt};
-

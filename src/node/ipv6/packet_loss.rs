@@ -8,15 +8,15 @@ pub struct PacketLossNode<N> {
 }
 
 /// Create a node which adds packet loss to the underlying `node`.
-pub fn packet_loss<N>(
-    loss_rate: f64,
-    mean_loss_duration: Duration,
-    node: N,
-) -> PacketLossNode<N>
+pub fn packet_loss<N>(loss_rate: f64, mean_loss_duration: Duration, node: N) -> PacketLossNode<N>
 where
     N: Ipv6Node,
 {
-    PacketLossNode { node, loss_rate, mean_loss_duration }
+    PacketLossNode {
+        node,
+        loss_rate,
+        mean_loss_duration,
+    }
 }
 
 impl<N> Ipv6Node for PacketLossNode<N>
@@ -35,4 +35,3 @@ where
         (spawn_complete, plug)
     }
 }
-

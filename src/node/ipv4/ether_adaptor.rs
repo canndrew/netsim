@@ -6,9 +6,7 @@ pub struct EtherAdaptorNode<N> {
 }
 
 /// Adapt a `EtherNode` into an `Ipv4Node`
-pub fn ether_adaptor<N>(
-    node: N,
-) -> EtherAdaptorNode<N>
+pub fn ether_adaptor<N>(node: N) -> EtherAdaptorNode<N>
 where
     N: EtherNode,
 {
@@ -33,4 +31,3 @@ where
         (spawn_complete, ipv4_plug_0)
     }
 }
-

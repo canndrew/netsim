@@ -1,6 +1,6 @@
+use crate::ioctl;
 use crate::priv_prelude::*;
 use crate::sys;
-use crate::ioctl;
 use libc;
 
 quick_error! {
@@ -192,7 +192,7 @@ fn get_socket() -> Result<c_int, GetSocketError> {
                 libc::ENFILE => return Err(GetSocketError::SystemFileDescriptorLimit(os_err)),
                 _ => {
                     panic!("unexpected error when creating dummy socket: {}", os_err);
-                },
+                }
             }
         }
         Ok(fd)
@@ -208,10 +208,12 @@ pub fn set_mac_addr(iface_name: &str, mac_addr: MacAddr) -> Result<(), SetMacAdd
         };
         let fd = match get_socket() {
             Ok(fd) => fd,
-            Err(GetSocketError::ProcessFileDescriptorLimit(e))
-                => return Err(SetMacAddrError::ProcessFileDescriptorLimit(e)),
-            Err(GetSocketError::SystemFileDescriptorLimit(e))
-                => return Err(SetMacAddrError::SystemFileDescriptorLimit(e)),
+            Err(GetSocketError::ProcessFileDescriptorLimit(e)) => {
+                return Err(SetMacAddrError::ProcessFileDescriptorLimit(e))
+            }
+            Err(GetSocketError::SystemFileDescriptorLimit(e)) => {
+                return Err(SetMacAddrError::SystemFileDescriptorLimit(e))
+            }
         };
 
         let mac_addr = slice::from_raw_parts(
@@ -254,10 +256,12 @@ pub fn get_mac_addr(iface_name: &str) -> Result<MacAddr, GetMacAddrError> {
         };
         let fd = match get_socket() {
             Ok(fd) => fd,
-            Err(GetSocketError::ProcessFileDescriptorLimit(e))
-                => return Err(GetMacAddrError::ProcessFileDescriptorLimit(e)),
-            Err(GetSocketError::SystemFileDescriptorLimit(e))
-                => return Err(GetMacAddrError::SystemFileDescriptorLimit(e)),
+            Err(GetSocketError::ProcessFileDescriptorLimit(e)) => {
+                return Err(GetMacAddrError::ProcessFileDescriptorLimit(e))
+            }
+            Err(GetSocketError::SystemFileDescriptorLimit(e)) => {
+                return Err(GetMacAddrError::SystemFileDescriptorLimit(e))
+            }
         };
 
         if ioctl::siocgifhwaddr(fd, &mut req) < 0 {
@@ -277,10 +281,7 @@ pub fn get_mac_addr(iface_name: &str) -> Result<MacAddr, GetMacAddrError> {
             let addr = &mut *addr;
             assert_eq!(addr.sa_family, sys::ARPHRD_ETHER as u16);
             let mac_addr = &addr.sa_data[0..6];
-            let mac_addr = slice::from_raw_parts(
-                mac_addr.as_ptr() as *const _,
-                mac_addr.len(),
-            );
+            let mac_addr = slice::from_raw_parts(mac_addr.as_ptr() as *const _, mac_addr.len());
             MacAddr::from_bytes(mac_addr)
         };
 
@@ -304,13 +305,15 @@ pub fn set_ipv4_addr(
         };
         let fd = match get_socket() {
             Ok(fd) => fd,
-            Err(GetSocketError::ProcessFileDescriptorLimit(e))
-                => return Err(SetIpv4AddrError::ProcessFileDescriptorLimit(e)),
-            Err(GetSocketError::SystemFileDescriptorLimit(e))
-                => return Err(SetIpv4AddrError::SystemFileDescriptorLimit(e)),
+            Err(GetSocketError::ProcessFileDescriptorLimit(e)) => {
+                return Err(SetIpv4AddrError::ProcessFileDescriptorLimit(e))
+            }
+            Err(GetSocketError::SystemFileDescriptorLimit(e)) => {
+                return Err(SetIpv4AddrError::SystemFileDescriptorLimit(e))
+            }
         };
 
-        #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
+        #[cfg_attr(feature = "cargo-clippy", allow(cast_ptr_alignment))]
         {
             let addr = &mut req.ifr_ifru.ifru_addr;
             let addr = addr as *mut libc::sockaddr;
@@ -333,11 +336,11 @@ pub fn set_ipv4_addr(
                 libc::EADDRNOTAVAIL => return Err(SetIpv4AddrError::AddrNotAvailable(os_err)),
                 _ => {
                     panic!("unexpected error from SIOCSIFADDR ioctl: {}", os_err);
-                },
+                }
             }
         }
 
-        #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
+        #[cfg_attr(feature = "cargo-clippy", allow(cast_ptr_alignment))]
         {
             let addr = &mut req.ifr_ifru.ifru_addr;
             let addr = addr as *mut libc::sockaddr;
@@ -356,7 +359,7 @@ pub fn set_ipv4_addr(
                 libc::EADDRNOTAVAIL => return Err(SetIpv4AddrError::AddrNotAvailable(os_err)),
                 _ => {
                     panic!("unexpected error from SIOCSIFNETMASK ioctl: {}", os_err);
-                },
+                }
             }
         }
         let _ = libc::close(fd);
@@ -378,10 +381,12 @@ pub fn set_ipv6_addr(
         };
         let fd = match get_socket() {
             Ok(fd) => fd,
-            Err(GetSocketError::ProcessFileDescriptorLimit(e))
-                => return Err(SetIpv6AddrError::ProcessFileDescriptorLimit(e)),
-            Err(GetSocketError::SystemFileDescriptorLimit(e))
-                => return Err(SetIpv6AddrError::SystemFileDescriptorLimit(e)),
+            Err(GetSocketError::ProcessFileDescriptorLimit(e)) => {
+                return Err(SetIpv6AddrError::ProcessFileDescriptorLimit(e))
+            }
+            Err(GetSocketError::SystemFileDescriptorLimit(e)) => {
+                return Err(SetIpv6AddrError::SystemFileDescriptorLimit(e))
+            }
         };
 
         if ioctl::siocgifindex(fd, &mut req) < 0 {
@@ -391,12 +396,16 @@ pub fn set_ipv6_addr(
                 libc::ENODEV => return Err(SetIpv6AddrError::UnknownInterface),
                 _ => {
                     panic!("unexpected error from SIOGIFINDEX ioctl: {}", os_err);
-                },
+                }
             };
         }
         let index = req.ifr_ifru.ifru_ivalue as u32;
 
-        let netlink = libc::socket(libc::AF_NETLINK as i32, libc::SOCK_RAW, libc::NETLINK_ROUTE as i32);
+        let netlink = libc::socket(
+            libc::AF_NETLINK as i32,
+            libc::SOCK_RAW,
+            libc::NETLINK_ROUTE as i32,
+        );
         if netlink < 0 {
             let os_err = io::Error::last_os_error();
             match sys::errno() {
@@ -404,11 +413,12 @@ pub fn set_ipv6_addr(
                 libc::ENFILE => return Err(SetIpv6AddrError::SystemFileDescriptorLimit(os_err)),
                 _ => {
                     panic!("unexpected error when creating netlink socket: {}", os_err);
-                },
+                }
             }
         }
 
-        let round_up = |x| (x + sys::NLMSG_ALIGNTO as usize - 1) & !(sys::NLMSG_ALIGNTO as usize - 1);
+        let round_up =
+            |x| (x + sys::NLMSG_ALIGNTO as usize - 1) & !(sys::NLMSG_ALIGNTO as usize - 1);
 
         let header_start = 0;
         let header_end = header_start + mem::size_of::<libc::nlmsghdr>();
@@ -423,8 +433,10 @@ pub fn set_ipv6_addr(
         let mut buffer: Vec<u8> = Vec::with_capacity(total_size);
         {
             let nlmsghdr: *mut libc::nlmsghdr = {
-                #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
-                { buffer.as_mut_ptr() as *mut _ }
+                #[cfg_attr(feature = "cargo-clippy", allow(cast_ptr_alignment))]
+                {
+                    buffer.as_mut_ptr() as *mut _
+                }
             };
             let nlmsghdr: &mut libc::nlmsghdr = &mut *nlmsghdr;
 
@@ -442,21 +454,25 @@ pub fn set_ipv6_addr(
 
         {
             let ifaddrmsg: *mut sys::ifaddrmsg = {
-                #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
-                { buffer.as_mut_ptr().offset(data_start as isize) as *mut _ }
+                #[cfg_attr(feature = "cargo-clippy", allow(cast_ptr_alignment))]
+                {
+                    buffer.as_mut_ptr().offset(data_start as isize) as *mut _
+                }
             };
             let ifaddrmsg: &mut sys::ifaddrmsg = &mut *ifaddrmsg;
             ifaddrmsg.ifa_family = libc::AF_INET6 as u8;
             ifaddrmsg.ifa_prefixlen = netmask_bits;
-            ifaddrmsg.ifa_flags = 0;    // TODO: what is IFA_F_PERMANENT here?
+            ifaddrmsg.ifa_flags = 0; // TODO: what is IFA_F_PERMANENT here?
             ifaddrmsg.ifa_scope = 0;
             ifaddrmsg.ifa_index = index;
         }
 
         {
             let rtattr: *mut sys::rtattr = {
-                #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
-                { buffer.as_mut_ptr().offset(attr_header_start as isize) as *mut _ }
+                #[cfg_attr(feature = "cargo-clippy", allow(cast_ptr_alignment))]
+                {
+                    buffer.as_mut_ptr().offset(attr_header_start as isize) as *mut _
+                }
             };
             let rtattr: &mut sys::rtattr = &mut *rtattr;
             rtattr.rta_len = (attr_data_end - attr_header_start) as u16;
@@ -464,16 +480,18 @@ pub fn set_ipv6_addr(
         }
 
         {
-            let addr: *mut [u8; 16] = {
-                buffer.as_mut_ptr().offset(attr_data_start as isize) as *mut _
-            };
+            let addr: *mut [u8; 16] =
+                { buffer.as_mut_ptr().offset(attr_data_start as isize) as *mut _ };
             let addr: &mut [u8; 16] = &mut *addr;
             addr.clone_from_slice(&ipv6_addr.octets());
         }
 
         let n = libc::write(netlink, buffer.as_ptr() as *const _, total_size);
         if n < 0 {
-            panic!("unexpected error writing to netlink socket: {}", io::Error::last_os_error());
+            panic!(
+                "unexpected error writing to netlink socket: {}",
+                io::Error::last_os_error()
+            );
         }
         assert_eq!(n as usize, total_size);
 
@@ -496,8 +514,10 @@ pub fn set_ipv6_addr(
 
             {
                 let nlmsghdr: *const libc::nlmsghdr = {
-                    #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
-                    { buffer.as_ptr() as *const _ }
+                    #[cfg_attr(feature = "cargo-clippy", allow(cast_ptr_alignment))]
+                    {
+                        buffer.as_ptr() as *const _
+                    }
                 };
                 let nlmsghdr: &libc::nlmsghdr = &*nlmsghdr;
                 if nlmsghdr.nlmsg_type == libc::NLMSG_NOOP as u16 {
@@ -509,17 +529,19 @@ pub fn set_ipv6_addr(
 
             {
                 let nlmsgerr: *const libc::nlmsgerr = {
-                    #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
-                    { buffer.as_ptr().offset(error_start as isize) as *const _ }
+                    #[cfg_attr(feature = "cargo-clippy", allow(cast_ptr_alignment))]
+                    {
+                        buffer.as_ptr().offset(error_start as isize) as *const _
+                    }
                 };
                 let nlmsgerr: &libc::nlmsgerr = &*nlmsgerr;
                 if nlmsgerr.error != 0 {
                     let os_err = io::Error::from_raw_os_error(-nlmsgerr.error);
                     match -nlmsgerr.error {
-                        libc::EPERM
-                            => return Err(SetIpv6AddrError::PermissionDenied(os_err)),
-                        libc::EADDRNOTAVAIL
-                            => return Err(SetIpv6AddrError::AddrNotAvailable(os_err)),
+                        libc::EPERM => return Err(SetIpv6AddrError::PermissionDenied(os_err)),
+                        libc::EADDRNOTAVAIL => {
+                            return Err(SetIpv6AddrError::AddrNotAvailable(os_err))
+                        }
                         _ => {
                             panic!(
                                 "unexpected error from netlink when setting IPv6 address: {}",
@@ -549,10 +571,12 @@ pub fn put_up(iface_name: &str) -> Result<(), PutUpError> {
         };
         let fd = match get_socket() {
             Ok(fd) => fd,
-            Err(GetSocketError::ProcessFileDescriptorLimit(e))
-                => return Err(PutUpError::ProcessFileDescriptorLimit(e)),
-            Err(GetSocketError::SystemFileDescriptorLimit(e))
-                => return Err(PutUpError::SystemFileDescriptorLimit(e)),
+            Err(GetSocketError::ProcessFileDescriptorLimit(e)) => {
+                return Err(PutUpError::ProcessFileDescriptorLimit(e))
+            }
+            Err(GetSocketError::SystemFileDescriptorLimit(e)) => {
+                return Err(PutUpError::SystemFileDescriptorLimit(e))
+            }
         };
 
         if ioctl::siocgifflags(fd, &mut req) < 0 {
@@ -562,7 +586,7 @@ pub fn put_up(iface_name: &str) -> Result<(), PutUpError> {
                 libc::ENODEV => return Err(PutUpError::UnknownInterface),
                 _ => {
                     panic!("unexpected error from SIOCGIFFLAGS ioctl: {}", os_err);
-                },
+                }
             };
         }
 
@@ -576,7 +600,7 @@ pub fn put_up(iface_name: &str) -> Result<(), PutUpError> {
                 libc::EPERM => return Err(PutUpError::PermissionDenied(os_err)),
                 _ => {
                     panic!("unexpected error from SIOCSIFFLAGS ioctl: {}", os_err);
-                },
+                }
             }
         }
         let _ = libc::close(fd);
@@ -589,9 +613,9 @@ pub fn put_up(iface_name: &str) -> Result<(), PutUpError> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use rand;
     use crate::spawn;
     use capabilities;
+    use rand;
 
     #[test]
     fn configure_tap() {
@@ -618,9 +642,9 @@ mod test {
 
                 let tap_builder = {
                     EtherIfaceBuilder::new()
-                    .ipv4_addr(Ipv4Addr::random_global(), 0)
-                    .ipv6_addr(Ipv6Addr::random_global(), 0)
-                    .name(name.clone())
+                        .ipv4_addr(Ipv4Addr::random_global(), 0)
+                        .ipv6_addr(Ipv6Addr::random_global(), 0)
+                        .name(name.clone())
                 };
                 let tap = unwrap!(tap_builder.build_unbound());
 
@@ -670,4 +694,3 @@ mod test {
         })
     }
 }
-

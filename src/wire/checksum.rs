@@ -62,7 +62,7 @@ pub fn pseudo_header_ipv4(
     combine(&[
         data(&source_ip.octets()),
         data(&dest_ip.octets()),
-        data(&proto_len[..])
+        data(&proto_len[..]),
     ])
 }
 
@@ -79,7 +79,6 @@ pub fn pseudo_header_ipv6(
     combine(&[
         data(&source_ip.octets()),
         data(&dest_ip.octets()),
-        data(&proto_len[..])
+        data(&proto_len[..]),
     ])
 }
-

@@ -1,9 +1,9 @@
-use crate::priv_prelude::*;
-use crate::sys;
-use libc;
-use get_if_addrs;
 use crate::iface;
 use crate::ioctl;
+use crate::priv_prelude::*;
+use crate::sys;
+use get_if_addrs;
+use libc;
 
 quick_error! {
     /// Error raised when `netsim` fails to build an interface.
@@ -86,16 +86,14 @@ pub fn build(builder: IfaceBuilder, mac_addr: Option<MacAddr>) -> Result<AsyncFd
         Ok(name) => name,
         Err(..) => {
             return Err(IfaceBuildError::NameContainsNul);
-        },
+        }
     };
     if name.as_bytes_with_nul().len() > libc::IF_NAMESIZE as usize {
         return Err(IfaceBuildError::NameTooLong);
     }
 
     let fd = loop {
-        let raw_fd = unsafe {
-            libc::open(b"/dev/net/tun\0".as_ptr() as *const _, libc::O_RDWR)
-        };
+        let raw_fd = unsafe { libc::open(b"/dev/net/tun\0".as_ptr() as *const _, libc::O_RDWR) };
         if raw_fd < 0 {
             let os_err = io::Error::last_os_error();
             match sys::errno() {
@@ -108,7 +106,7 @@ pub fn build(builder: IfaceBuilder, mac_addr: Option<MacAddr>) -> Result<AsyncFd
                 libc::ENXIO => return Err(IfaceBuildError::TunDeviceNotLoaded(os_err)),
                 _ => {
                     panic!("unexpected error from open(\"/dev/net/tun\"). {}", os_err);
-                },
+                }
             }
         }
         break unwrap!(AsyncFd::new(raw_fd));
@@ -130,9 +128,7 @@ pub fn build(builder: IfaceBuilder, mac_addr: Option<MacAddr>) -> Result<AsyncFd
         req
     };
 
-    let res = unsafe {
-        ioctl::tunsetiff(fd.as_raw_fd(), &mut req as *mut _ as *mut _)
-    };
+    let res = unsafe { ioctl::tunsetiff(fd.as_raw_fd(), &mut req as *mut _ as *mut _) };
     if res < 0 {
         let os_err = sys::errno();
         match os_err {
@@ -144,26 +140,25 @@ pub fn build(builder: IfaceBuilder, mac_addr: Option<MacAddr>) -> Result<AsyncFd
                     }
                 }
                 panic!("unexpected EBUSY error when creating TAP device");
-            },
+            }
             // TODO: what error do we get if we try to create two interfaces with the same
             // name?
             _ => {
-                panic!("unexpected error creating TAP device: {}", io::Error::from_raw_os_error(os_err));
-            },
+                panic!(
+                    "unexpected error creating TAP device: {}",
+                    io::Error::from_raw_os_error(os_err)
+                );
+            }
         }
     }
 
     let real_name = {
-        let name = unsafe {
-            &req.ifr_ifrn.ifrn_name
-        };
+        let name = unsafe { &req.ifr_ifrn.ifrn_name };
         let name = match name.iter().position(|b| *b == 0) {
             Some(p) => &name[..p],
             None => name,
         };
-        let name = unsafe {
-            slice::from_raw_parts(name.as_ptr() as *const _, name.len())
-        };
+        let name = unsafe { slice::from_raw_parts(name.as_ptr() as *const _, name.len()) };
         let name = unwrap!(str::from_utf8(name));
         name.to_owned()
     };
@@ -171,61 +166,78 @@ pub fn build(builder: IfaceBuilder, mac_addr: Option<MacAddr>) -> Result<AsyncFd
     if let Some(mac_addr) = mac_addr {
         match iface::set_mac_addr(&real_name, mac_addr) {
             Ok(()) => (),
-            Err(SetMacAddrError::UnknownInterface)
-                => panic!("the interface we just created doesn't exist?"),
-            Err(SetMacAddrError::PermissionDenied(..))
-                => panic!("don't have permission to configure the interface we just created?"),
-            Err(SetMacAddrError::AddrNotAvailable(e))
-                => return Err(IfaceBuildError::MacAddrNotAvailable(e)),
-            Err(SetMacAddrError::ProcessFileDescriptorLimit(e))
-                => return Err(IfaceBuildError::ProcessFileDescriptorLimit(e)),
-            Err(SetMacAddrError::SystemFileDescriptorLimit(e))
-                => return Err(IfaceBuildError::SystemFileDescriptorLimit(e)),
+            Err(SetMacAddrError::UnknownInterface) => {
+                panic!("the interface we just created doesn't exist?")
+            }
+            Err(SetMacAddrError::PermissionDenied(..)) => {
+                panic!("don't have permission to configure the interface we just created?")
+            }
+            Err(SetMacAddrError::AddrNotAvailable(e)) => {
+                return Err(IfaceBuildError::MacAddrNotAvailable(e))
+            }
+            Err(SetMacAddrError::ProcessFileDescriptorLimit(e)) => {
+                return Err(IfaceBuildError::ProcessFileDescriptorLimit(e))
+            }
+            Err(SetMacAddrError::SystemFileDescriptorLimit(e)) => {
+                return Err(IfaceBuildError::SystemFileDescriptorLimit(e))
+            }
         }
     }
 
     if let Some((ipv4_addr, ipv4_netmask_bits)) = builder.ipv4_addr {
         match iface::set_ipv4_addr(&real_name, ipv4_addr, ipv4_netmask_bits) {
             Ok(()) => (),
-            Err(SetIpv4AddrError::UnknownInterface)
-                => panic!("the interface we just created doesn't exist?"),
-            Err(SetIpv4AddrError::PermissionDenied(..))
-                => panic!("don't have permission to configure the interface we just created?"),
-            Err(SetIpv4AddrError::AddrNotAvailable(e))
-                => return Err(IfaceBuildError::Ipv4AddrNotAvailable(e)),
-            Err(SetIpv4AddrError::ProcessFileDescriptorLimit(e))
-                => return Err(IfaceBuildError::ProcessFileDescriptorLimit(e)),
-            Err(SetIpv4AddrError::SystemFileDescriptorLimit(e))
-                => return Err(IfaceBuildError::SystemFileDescriptorLimit(e)),
+            Err(SetIpv4AddrError::UnknownInterface) => {
+                panic!("the interface we just created doesn't exist?")
+            }
+            Err(SetIpv4AddrError::PermissionDenied(..)) => {
+                panic!("don't have permission to configure the interface we just created?")
+            }
+            Err(SetIpv4AddrError::AddrNotAvailable(e)) => {
+                return Err(IfaceBuildError::Ipv4AddrNotAvailable(e))
+            }
+            Err(SetIpv4AddrError::ProcessFileDescriptorLimit(e)) => {
+                return Err(IfaceBuildError::ProcessFileDescriptorLimit(e))
+            }
+            Err(SetIpv4AddrError::SystemFileDescriptorLimit(e)) => {
+                return Err(IfaceBuildError::SystemFileDescriptorLimit(e))
+            }
         }
     }
 
     if let Some((ipv6_addr, ipv6_netmask_bits)) = builder.ipv6_addr {
         match iface::set_ipv6_addr(&real_name, ipv6_addr, ipv6_netmask_bits) {
             Ok(()) => (),
-            Err(SetIpv6AddrError::UnknownInterface)
-                => panic!("the interface we just created doesn't exist?"),
-            Err(SetIpv6AddrError::PermissionDenied(..))
-                => panic!("don't have permission to configure the interface we just created?"),
-            Err(SetIpv6AddrError::AddrNotAvailable(e))
-                => return Err(IfaceBuildError::Ipv6AddrNotAvailable(e)),
-            Err(SetIpv6AddrError::ProcessFileDescriptorLimit(e))
-                => return Err(IfaceBuildError::ProcessFileDescriptorLimit(e)),
-            Err(SetIpv6AddrError::SystemFileDescriptorLimit(e))
-                => return Err(IfaceBuildError::SystemFileDescriptorLimit(e)),
+            Err(SetIpv6AddrError::UnknownInterface) => {
+                panic!("the interface we just created doesn't exist?")
+            }
+            Err(SetIpv6AddrError::PermissionDenied(..)) => {
+                panic!("don't have permission to configure the interface we just created?")
+            }
+            Err(SetIpv6AddrError::AddrNotAvailable(e)) => {
+                return Err(IfaceBuildError::Ipv6AddrNotAvailable(e))
+            }
+            Err(SetIpv6AddrError::ProcessFileDescriptorLimit(e)) => {
+                return Err(IfaceBuildError::ProcessFileDescriptorLimit(e))
+            }
+            Err(SetIpv6AddrError::SystemFileDescriptorLimit(e)) => {
+                return Err(IfaceBuildError::SystemFileDescriptorLimit(e))
+            }
         }
     }
 
     match iface::put_up(&real_name) {
         Ok(()) => (),
-        Err(PutUpError::UnknownInterface)
-            => panic!("the interface we just created doesn't exist?"),
-        Err(PutUpError::PermissionDenied(..))
-            => panic!("don't have permission to configure the interface we just created?"),
-        Err(PutUpError::ProcessFileDescriptorLimit(e))
-            => return Err(IfaceBuildError::ProcessFileDescriptorLimit(e)),
-        Err(PutUpError::SystemFileDescriptorLimit(e))
-            => return Err(IfaceBuildError::SystemFileDescriptorLimit(e)),
+        Err(PutUpError::UnknownInterface) => panic!("the interface we just created doesn't exist?"),
+        Err(PutUpError::PermissionDenied(..)) => {
+            panic!("don't have permission to configure the interface we just created?")
+        }
+        Err(PutUpError::ProcessFileDescriptorLimit(e)) => {
+            return Err(IfaceBuildError::ProcessFileDescriptorLimit(e))
+        }
+        Err(PutUpError::SystemFileDescriptorLimit(e)) => {
+            return Err(IfaceBuildError::SystemFileDescriptorLimit(e))
+        }
     }
 
     for route in builder.ipv4_routes {
@@ -234,10 +246,10 @@ pub fn build(builder: IfaceBuilder, mac_addr: Option<MacAddr>) -> Result<AsyncFd
             Ok(()) => (),
             Err(AddRouteError::ProcessFileDescriptorLimit(e)) => {
                 return Err(IfaceBuildError::ProcessFileDescriptorLimit(e));
-            },
+            }
             Err(AddRouteError::SystemFileDescriptorLimit(e)) => {
                 return Err(IfaceBuildError::SystemFileDescriptorLimit(e));
-            },
+            }
             Err(AddRouteError::NameContainsNul) => unreachable!(),
         }
     }
@@ -248,14 +260,13 @@ pub fn build(builder: IfaceBuilder, mac_addr: Option<MacAddr>) -> Result<AsyncFd
             Ok(()) => (),
             Err(AddRouteError::ProcessFileDescriptorLimit(e)) => {
                 return Err(IfaceBuildError::ProcessFileDescriptorLimit(e));
-            },
+            }
             Err(AddRouteError::SystemFileDescriptorLimit(e)) => {
                 return Err(IfaceBuildError::SystemFileDescriptorLimit(e));
-            },
+            }
             Err(AddRouteError::NameContainsNul) => unreachable!(),
         }
     }
 
     Ok(fd)
 }
-

@@ -1,5 +1,5 @@
-use crate::priv_prelude::*;
 use super::*;
+use crate::priv_prelude::*;
 
 /// A UDP packet
 #[derive(Clone, PartialEq)]
@@ -9,12 +9,11 @@ pub struct UdpPacket {
 
 impl fmt::Debug for UdpPacket {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f
-        .debug_struct("UdpPacket")
-        .field("source_port", &self.source_port())
-        .field("dest_port", &self.dest_port())
-        .field("payload", &self.payload())
-        .finish()
+        f.debug_struct("UdpPacket")
+            .field("source_port", &self.source_port())
+            .field("dest_port", &self.dest_port())
+            .field("payload", &self.payload())
+            .finish()
     }
 }
 
@@ -39,12 +38,7 @@ fn set_fields_v4(buffer: &mut [u8], fields: &UdpFields, source_ip: Ipv4Addr, des
     set_fields(buffer, fields);
 
     let checksum = !checksum::combine(&[
-        checksum::pseudo_header_ipv4(
-            source_ip,
-            dest_ip,
-            17,
-            buffer.len() as u32,
-        ),
+        checksum::pseudo_header_ipv4(source_ip, dest_ip, 17, buffer.len() as u32),
         checksum::data(&buffer[..]),
     ]);
     let checksum = if checksum == 0x0000 { 0xffff } else { checksum };
@@ -55,12 +49,7 @@ fn set_fields_v6(buffer: &mut [u8], fields: &UdpFields, source_ip: Ipv6Addr, des
     set_fields(buffer, fields);
 
     let checksum = !checksum::combine(&[
-        checksum::pseudo_header_ipv6(
-            source_ip,
-            dest_ip,
-            17,
-            buffer.len() as u32,
-        ),
+        checksum::pseudo_header_ipv6(source_ip, dest_ip, 17, buffer.len() as u32),
         checksum::data(&buffer[..]),
     ]);
     let checksum = if checksum == 0x0000 { 0xffff } else { checksum };
@@ -132,9 +121,7 @@ impl UdpPacket {
 
     /// Parse a UDP packet from the given buffer.
     pub fn from_bytes(buffer: Bytes) -> UdpPacket {
-        UdpPacket {
-            buffer,
-        }
+        UdpPacket { buffer }
     }
 
     /// Set the header fields of this UDP packet.
@@ -180,11 +167,7 @@ impl UdpPacket {
 
     /// Verify the checksum of the packet. The source/destination IP addresses of the packet are
     /// needed to calculate the checksum.
-    pub fn verify_checksum_v4(
-        &self,
-        source_ip: Ipv4Addr,
-        dest_ip: Ipv4Addr,
-    ) -> bool {
+    pub fn verify_checksum_v4(&self, source_ip: Ipv4Addr, dest_ip: Ipv4Addr) -> bool {
         let len = NetworkEndian::read_u16(&self.buffer[4..6]);
         !0 == checksum::combine(&[
             checksum::pseudo_header_ipv4(source_ip, dest_ip, 17, u32::from(len)),
@@ -194,11 +177,7 @@ impl UdpPacket {
 
     /// Verify the checksum of the packet. The source/destination IP addresses of the packet are
     /// needed to calculate the checksum.
-    pub fn verify_checksum_v6(
-        &self,
-        source_ip: Ipv6Addr,
-        dest_ip: Ipv6Addr,
-    ) -> bool {
+    pub fn verify_checksum_v6(&self, source_ip: Ipv6Addr, dest_ip: Ipv6Addr) -> bool {
         let len = NetworkEndian::read_u16(&self.buffer[4..6]);
         !0 == checksum::combine(&[
             checksum::pseudo_header_ipv6(source_ip, dest_ip, 17, u32::from(len)),
@@ -206,4 +185,3 @@ impl UdpPacket {
         ])
     }
 }
-

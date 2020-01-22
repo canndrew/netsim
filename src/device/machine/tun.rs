@@ -9,11 +9,7 @@ pub struct TunTask {
 }
 
 impl TunTask {
-    pub fn new(
-        tun: IpIface,
-        plug: IpPlug,
-        drop_rx: DropNotice,
-    ) -> TunTask {
+    pub fn new(tun: IpIface, plug: IpPlug, drop_rx: DropNotice) -> TunTask {
         trace!("TunTask: creating");
         let (tx, rx) = plug.split();
         TunTask {
@@ -27,9 +23,7 @@ impl TunTask {
 }
 
 enum TunTaskState {
-    Receiving {
-        drop_rx: DropNotice,
-    },
+    Receiving { drop_rx: DropNotice },
     Dying(Delay),
     Invalid,
 }
@@ -48,14 +42,14 @@ impl Future for TunTask {
                 Ok(Async::Ready(Some(frame))) => {
                     self.packet_tx.unbounded_send(frame);
                     received_frames = true;
-                },
+                }
                 Ok(Async::Ready(None)) => {
                     panic!("TAP stream ended somehow");
-                },
+                }
                 Ok(Async::NotReady) => break,
                 Err(e) => {
                     panic!("reading TAP device yielded an error: {}", e);
-                },
+                }
             }
         }
 
@@ -69,10 +63,10 @@ impl Future for TunTask {
                         trace!("TunTask: couldn't send the frame ;(");
                         self.sending_packet = Some(frame);
                         break;
-                    },
+                    }
                     Err(e) => {
                         panic!("writing TAP device yielded an error: {}", e);
-                    },
+                    }
                 }
             }
 
@@ -81,7 +75,7 @@ impl Future for TunTask {
                     trace!("TunTask: we received a frame");
                     self.sending_packet = Some(frame);
                     continue;
-                },
+                }
                 _ => break,
             }
         }
@@ -91,27 +85,25 @@ impl Future for TunTask {
             Ok(..) => (),
             Err(e) => {
                 panic!("completing TAP device write yielded an error: {}", e);
-            },
+            }
         }
 
         let mut state = mem::replace(&mut self.state, TunTaskState::Invalid);
         loop {
             match state {
-                TunTaskState::Receiving {
-                    mut drop_rx,
-                } => {
+                TunTaskState::Receiving { mut drop_rx } => {
                     trace!("TunTask: state == receiving");
                     match drop_rx.poll().void_unwrap() {
                         Async::Ready(()) => {
                             state = TunTaskState::Dying(Delay::new(Instant::now() + grace_period));
                             continue;
-                        },
+                        }
                         Async::NotReady => {
                             state = TunTaskState::Receiving { drop_rx };
                             break;
-                        },
+                        }
                     }
-                },
+                }
                 TunTaskState::Dying(mut timeout) => {
                     trace!("TunTask: state == dying");
                     if received_frames {
@@ -120,16 +112,16 @@ impl Future for TunTask {
                     match timeout.poll().void_unwrap() {
                         Async::Ready(()) => {
                             return Ok(Async::Ready(()));
-                        },
+                        }
                         Async::NotReady => {
                             state = TunTaskState::Dying(timeout);
                             break;
-                        },
+                        }
                     }
                 }
                 TunTaskState::Invalid => {
                     panic!("TunTask in invalid state!");
-                },
+                }
             }
         }
         self.state = state;
@@ -138,5 +130,3 @@ impl Future for TunTask {
         Ok(Async::NotReady)
     }
 }
-
-

@@ -48,12 +48,9 @@ impl IpLog {
             }
 
             Ok({
-                tokio::io::write_all(fd, header)
-                .map(|(fd, _header)| {
-                    IpLog {
-                        fd,
-                        state: LogState::Ready,
-                    }
+                tokio::io::write_all(fd, header).map(|(fd, _header)| IpLog {
+                    fd,
+                    state: LogState::Ready,
                 })
             })
         };
@@ -93,12 +90,12 @@ impl Sink for IpLog {
                 };
                 self.poll_complete()?;
                 Ok(AsyncSink::Ready)
-            },
+            }
             LogState::Invalid => panic!("invalid LogState"),
             _ => {
                 self.state = state;
                 Ok(AsyncSink::NotReady(packet))
-            },
+            }
         }
     }
 
@@ -110,32 +107,35 @@ impl Sink for IpLog {
                 LogState::Ready => {
                     self.state = state;
                     return Ok(Async::Ready(()));
-                },
-                LogState::WritingHeader { header, bytes, written } => {
-                    match self.fd.write(&header[written..]) {
-                        Ok(n) => {
-                            let new_written = written + n;
-                            if new_written == header.len() {
-                                state = LogState::WritingPayload {
-                                    bytes,
-                                    written: 0,
-                                };
-                            } else {
-                                state = LogState::WritingHeader {
-                                    header,
-                                    bytes,
-                                    written: new_written,
-                                };
-                            }
-                            continue;
-                        },
-                        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                            self.state = LogState::WritingHeader { header, bytes, written };
-                            self.fd.clear_write_ready()?;
-                            return Ok(Async::NotReady);
+                }
+                LogState::WritingHeader {
+                    header,
+                    bytes,
+                    written,
+                } => match self.fd.write(&header[written..]) {
+                    Ok(n) => {
+                        let new_written = written + n;
+                        if new_written == header.len() {
+                            state = LogState::WritingPayload { bytes, written: 0 };
+                        } else {
+                            state = LogState::WritingHeader {
+                                header,
+                                bytes,
+                                written: new_written,
+                            };
                         }
-                        Err(e) => return Err(e),
+                        continue;
                     }
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        self.state = LogState::WritingHeader {
+                            header,
+                            bytes,
+                            written,
+                        };
+                        self.fd.clear_write_ready()?;
+                        return Ok(Async::NotReady);
+                    }
+                    Err(e) => return Err(e),
                 },
                 LogState::WritingPayload { bytes, written } => {
                     match self.fd.write(&bytes[written..]) {
@@ -150,7 +150,7 @@ impl Sink for IpLog {
                                 };
                             }
                             continue;
-                        },
+                        }
                         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                             self.state = LogState::WritingPayload { bytes, written };
                             self.fd.clear_write_ready()?;
@@ -158,9 +158,8 @@ impl Sink for IpLog {
                         }
                         Err(e) => return Err(e),
                     }
-                },
+                }
             }
         }
     }
 }
-

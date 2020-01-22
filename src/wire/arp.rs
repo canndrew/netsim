@@ -9,24 +9,20 @@ pub struct ArpPacket {
 impl fmt::Debug for ArpPacket {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.fields() {
-            ArpFields::Request { .. } => {
-                f
+            ArpFields::Request { .. } => f
                 .debug_struct("ArpPacket::Request")
                 .field("source_mac", &self.source_mac())
                 .field("source_ip", &self.source_ip())
                 .field("dest_mac", &self.dest_mac())
                 .field("dest_ip", &self.dest_ip())
-                .finish()
-            },
-            ArpFields::Response { .. } => {
-                f
+                .finish(),
+            ArpFields::Response { .. } => f
                 .debug_struct("ArpPacket::Response")
                 .field("source_mac", &self.source_mac())
                 .field("source_ip", &self.source_ip())
                 .field("dest_mac", &self.dest_mac())
                 .field("dest_ip", &self.dest_ip())
-                .finish()
-            },
+                .finish(),
         }
     }
 }
@@ -45,7 +41,7 @@ pub enum ArpFields {
     },
     /// An ARP response
     Response {
-        /// The MAC address of the sender. 
+        /// The MAC address of the sender.
         source_mac: MacAddr,
         /// The Ipv4 address of the sender.
         source_ip: Ipv4Addr,
@@ -57,11 +53,7 @@ pub enum ArpFields {
 }
 
 fn set_fields(buffer: &mut [u8], fields: ArpFields) {
-    buffer[0..6].clone_from_slice(&[
-        0x00, 0x01,
-        0x08, 0x00,
-        0x06, 0x04,
-    ]);
+    buffer[0..6].clone_from_slice(&[0x00, 0x01, 0x08, 0x00, 0x06, 0x04]);
     match fields {
         ArpFields::Request {
             source_mac,
@@ -73,7 +65,7 @@ fn set_fields(buffer: &mut [u8], fields: ArpFields) {
             buffer[14..18].clone_from_slice(&source_ip.octets());
             buffer[18..24].clone_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
             buffer[24..28].clone_from_slice(&dest_ip.octets());
-        },
+        }
         ArpFields::Response {
             source_mac,
             source_ip,
@@ -85,7 +77,7 @@ fn set_fields(buffer: &mut [u8], fields: ArpFields) {
             buffer[14..18].clone_from_slice(&source_ip.octets());
             buffer[18..24].clone_from_slice(dest_mac.as_bytes());
             buffer[24..28].clone_from_slice(&dest_ip.octets());
-        },
+        }
     }
 }
 
@@ -100,18 +92,13 @@ impl ArpPacket {
     }
 
     /// Write an ARP packet described by `fields` to the given buffer.
-    pub fn write_to_buffer(
-        buffer: &mut [u8],
-        fields: ArpFields,
-    ) {
+    pub fn write_to_buffer(buffer: &mut [u8], fields: ArpFields) {
         set_fields(buffer, fields);
     }
 
     /// Parse an ARP packet from the given buffer.
     pub fn from_bytes(buffer: Bytes) -> ArpPacket {
-        ArpPacket {
-            buffer,
-        }
+        ArpPacket { buffer }
     }
 
     /// Parse the ARP packet into an `ArpFields`.
@@ -162,4 +149,3 @@ impl ArpPacket {
         self.buffer
     }
 }
-

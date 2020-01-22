@@ -1,8 +1,8 @@
 //! Contains utilites for working with virtual (TUN) network interfaces.
 
+use crate::iface::build::{build, IfaceBuilder};
 use crate::priv_prelude::*;
 use libc;
-use crate::iface::build::{IfaceBuilder, build};
 
 /// This object can be used to set the configuration options for a `IpIface` before creating the
 /// `IpIface`
@@ -107,20 +107,17 @@ pub struct IpIface {
 impl Stream for IpIface {
     type Item = IpPacket;
     type Error = io::Error;
-    
+
     fn poll(&mut self) -> io::Result<Async<Option<IpPacket>>> {
         loop {
             if let Async::NotReady = self.fd.poll_read_ready(Ready::readable())? {
                 return Ok(Async::NotReady);
             }
 
-            let mut buffer: [u8; libc::ETH_FRAME_LEN as usize] = unsafe {
-                mem::uninitialized()
-            };
+            let mut buffer: [u8; libc::ETH_FRAME_LEN as usize] = unsafe { mem::uninitialized() };
             match self.fd.read(&mut buffer[..]) {
                 Ok(0) => return Ok(Async::Ready(None)),
                 Ok(n) => {
-
                     /*
                     'out: for i in 0.. {
                         println!("");
@@ -144,11 +141,11 @@ impl Stream for IpIface {
                     let frame = IpPacket::from_bytes(bytes);
                     info!("TUN emitting frame: {:?}", frame);
                     return Ok(Async::Ready(Some(frame)));
-                },
+                }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     self.fd.clear_read_ready(Ready::readable())?;
                     return Ok(Async::NotReady);
-                },
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -158,7 +155,7 @@ impl Stream for IpIface {
 impl Sink for IpIface {
     type SinkItem = IpPacket;
     type SinkError = io::Error;
-    
+
     fn start_send(&mut self, item: IpPacket) -> io::Result<AsyncSink<IpPacket>> {
         info!("TUN received frame: {:?}", item);
         if let Async::NotReady = self.fd.poll_write_ready()? {
@@ -181,7 +178,7 @@ impl Sink for IpIface {
             Ok(n) => {
                 trace!("wrote {} bytes of TUN data to interface", n);
                 assert_eq!(n, item.as_bytes().len());
-            },
+            }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 self.fd.clear_write_ready()?;
                 return Ok(AsyncSink::NotReady(item));
@@ -196,4 +193,3 @@ impl Sink for IpIface {
         Ok(Async::Ready(()))
     }
 }
-

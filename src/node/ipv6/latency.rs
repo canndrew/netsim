@@ -21,7 +21,11 @@ pub fn latency<N>(
 where
     N: Ipv6Node,
 {
-    LatencyNode { node, min_latency, mean_additional_latency }
+    LatencyNode {
+        node,
+        min_latency,
+        mean_additional_latency,
+    }
 }
 
 impl<N> Ipv6Node for LatencyNode<N>
@@ -40,4 +44,3 @@ where
         (spawn_complete, plug)
     }
 }
-

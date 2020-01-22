@@ -11,10 +11,7 @@ pub fn nat<N>(nat_builder: Ipv4NatBuilder, node: N) -> NatNode<N>
 where
     N: Ipv4Node,
 {
-    NatNode {
-        nat_builder,
-        node,
-    }
+    NatNode { nat_builder, node }
 }
 
 impl<N> Ipv4Node for NatNode<N>
@@ -32,8 +29,8 @@ where
 
         let private_subnet = {
             self.nat_builder
-            .get_subnet()
-            .unwrap_or_else(Ipv4Range::random_local_subnet)
+                .get_subnet()
+                .unwrap_or_else(Ipv4Range::random_local_subnet)
         };
         let nat_builder = self.nat_builder.subnet(private_subnet);
         let (spawn_complete, client_plug) = self.node.build(handle, private_subnet);
@@ -42,4 +39,3 @@ where
         (spawn_complete, public_plug_0)
     }
 }
-
