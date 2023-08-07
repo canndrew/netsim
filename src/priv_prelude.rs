@@ -9,7 +9,6 @@ pub(crate) use {
         net::Ipv4Addr,
         os::fd::{OwnedFd, FromRawFd, AsRawFd},
         pin::Pin,
-        sync::Arc,
         task::Poll,
         time::Duration,
     },
@@ -29,7 +28,10 @@ pub(crate) use {
     crate::{
         namespace, ioctl, iface,
         machine::Machine,
-        iface::create::{IpIfaceBuilder, IpPacketStream, IpPacketSink},
+        iface::{
+            create::IpIfaceBuilder,
+            stream::IpIface,
+        },
         network::Ipv4Network,
     },
 };

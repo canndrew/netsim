@@ -12,7 +12,7 @@ mod stream_ext;
 
 pub use {
     machine::Machine,
-    iface::create::{IpPacketStream, IpPacketSink},
+    iface::stream::IpIface,
     connect::{connect, Connect},
 };
 
