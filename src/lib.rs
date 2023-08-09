@@ -9,10 +9,12 @@ mod network;
 mod connect;
 mod adapter;
 mod stream_ext;
+mod packet;
 
 pub use {
     machine::Machine,
     iface::stream::IpIface,
     connect::{connect, Connect},
+    packet::{IpPacket, Ipv4Packet, Ipv6Packet},
 };
 

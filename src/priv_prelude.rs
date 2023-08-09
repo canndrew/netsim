@@ -6,12 +6,13 @@ pub(crate) use {
         fs::File,
         io::Write,
         mem::MaybeUninit,
-        net::Ipv4Addr,
+        net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddrV4},
         os::fd::{OwnedFd, FromRawFd, AsRawFd},
         pin::Pin,
         task::Poll,
         time::Duration,
     },
+    bytes::{Bytes, BytesMut},
     libc::{c_int, c_void, pid_t},
     tokio::{
         io::unix::AsyncFd,
@@ -33,6 +34,7 @@ pub(crate) use {
             stream::IpIface,
         },
         network::Ipv4Network,
+        packet::IpPacket,
     },
 };
 

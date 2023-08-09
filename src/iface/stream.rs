@@ -2,7 +2,8 @@ use crate::priv_prelude::*;
 
 pub struct IpIface {
     fd: AsyncFd<OwnedFd>,
-    send_packet_opt: Option<Vec<u8>>,
+    incoming_bytes: BytesMut,
+    send_packet_opt: Option<IpPacket>,
 }
 
 impl IpIface {
@@ -10,13 +11,14 @@ impl IpIface {
         let fd = AsyncFd::new(fd)?;
         let iface = IpIface {
             fd,
+            incoming_bytes: BytesMut::new(),
             send_packet_opt: None,
         };
         Ok(iface)
     }
 }
 
-impl Sink<Vec<u8>> for IpIface {
+impl Sink<IpPacket> for IpIface {
     type Error = io::Error;
 
     fn poll_ready(
@@ -26,7 +28,7 @@ impl Sink<Vec<u8>> for IpIface {
         Self::poll_flush(self, cx)
     }
 
-    fn start_send(self: Pin<&mut Self>, item: Vec<u8>) -> io::Result<()> {
+    fn start_send(self: Pin<&mut Self>, item: IpPacket) -> io::Result<()> {
         let this = self.get_mut();
         let send_packet_opt = this.send_packet_opt.replace(item);
         assert!(send_packet_opt.is_none());
@@ -80,22 +82,22 @@ impl Sink<Vec<u8>> for IpIface {
 }
 
 impl Stream for IpIface {
-    type Item = io::Result<Vec<u8>>;
+    type Item = io::Result<IpPacket>;
 
     fn poll_next(
         self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
-    ) -> Poll<Option<io::Result<Vec<u8>>>> {
+    ) -> Poll<Option<io::Result<IpPacket>>> {
         let this = self.get_mut();
         loop {
             let mut guard = ready!(this.fd.poll_read_ready(cx))?;
-            // TODO: don't initialize the buffer once MaybeUninit features are stable
-            let mut buffer = [0u8; libc::ETH_FRAME_LEN as usize];
+            this.incoming_bytes.reserve(libc::ETH_FRAME_LEN as usize);
+            let buffer = this.incoming_bytes.spare_capacity_mut();
             match guard.try_io(|fd| {
                 let res = unsafe {
                     libc::read(
                         fd.as_raw_fd(),
-                        buffer.as_mut_slice().as_mut_ptr() as *mut libc::c_void,
+                        buffer.as_mut_ptr() as *mut libc::c_void,
                         buffer.len(),
                     )
                 };
@@ -109,7 +111,13 @@ impl Stream for IpIface {
                     if n == 0 {
                         return Poll::Ready(None);
                     } else {
-                        return Poll::Ready(Some(Ok(buffer[..n].to_vec())));
+                        assert_eq!(this.incoming_bytes.len(), 0);
+                        unsafe {
+                            this.incoming_bytes.set_len(n);
+                        }
+                        let data = this.incoming_bytes.split().freeze();
+                        let packet = IpPacket::new(data);
+                        return Poll::Ready(Some(Ok(packet)));
                     }
                 },
                 Ok(Err(err)) => return Poll::Ready(Some(Err(err))),
