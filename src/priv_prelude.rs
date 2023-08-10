@@ -12,7 +12,7 @@ pub(crate) use {
         task::Poll,
         time::Duration,
     },
-    bytes::{Bytes, BytesMut},
+    bytes::BytesMut,
     libc::{c_int, c_void, pid_t},
     tokio::{
         io::unix::AsyncFd,

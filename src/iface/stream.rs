@@ -53,7 +53,7 @@ impl Sink<IpPacket> for IpIface {
                 let res = unsafe {
                     libc::write(
                         fd.as_raw_fd(),
-                        packet.as_slice().as_ptr() as *const libc::c_void,
+                        packet.as_bytes().as_ptr() as *const libc::c_void,
                         packet.len(),
                     )
                 };
@@ -115,7 +115,7 @@ impl Stream for IpIface {
                         unsafe {
                             this.incoming_bytes.set_len(n);
                         }
-                        let data = this.incoming_bytes.split().freeze();
+                        let data = this.incoming_bytes.split();
                         let packet = IpPacket::new(data);
                         return Poll::Ready(Some(Ok(packet)));
                     }

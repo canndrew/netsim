@@ -49,10 +49,10 @@ where
     let stack_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) } as usize;
     let stack_size = cmp::max(stack_size, 4096);
 
-    let stack = vec![0u8; stack_size + STACK_ALIGN];
+    let mut stack = vec![0u8; stack_size + STACK_ALIGN];
+    let stack_base = stack.as_mut_ptr();
     let stack = stack.into_boxed_slice();
     let stack_ptr = Box::into_raw(stack);
-    let stack_base = stack_ptr.as_mut_ptr();
 
     let flags =
         libc::CLONE_CHILD_CLEARTID |

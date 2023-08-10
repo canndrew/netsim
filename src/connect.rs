@@ -29,11 +29,11 @@ impl Connect<(IpPacketSink, IpPacketStream)> for (IpPacketSink, IpPacketStream) 
 
 impl<T0, T1> Connect<T1> for T0
 where
-    T0: Stream<Item = io::Result<Vec<u8>>>,
-    T0: Sink<Vec<u8>, Error = io::Error>,
+    T0: Stream<Item = io::Result<IpPacket>>,
+    T0: Sink<IpPacket, Error = io::Error>,
     T0: Send + 'static,
-    T1: Stream<Item = io::Result<Vec<u8>>>,
-    T1: Sink<Vec<u8>, Error = io::Error>,
+    T1: Stream<Item = io::Result<IpPacket>>,
+    T1: Sink<IpPacket, Error = io::Error>,
     T1: Send + 'static,
 {
     fn connect_to(self, other: T1) {
