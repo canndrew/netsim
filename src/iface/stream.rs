@@ -126,3 +126,13 @@ impl Stream for IpIface {
         }
     }
 }
+
+pub trait IpSinkStream:
+    Stream<Item = io::Result<IpPacket>> + Sink<IpPacket, Error = io::Error> + Send + 'static
+{}
+
+impl<T> IpSinkStream for T
+where
+    T: Stream<Item = io::Result<IpPacket>> + Sink<IpPacket, Error = io::Error> + Send + 'static,
+{}
+

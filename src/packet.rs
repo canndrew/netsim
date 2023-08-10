@@ -102,6 +102,18 @@ macro_rules! packet_type(
                 }
             }
         }
+
+        impl fmt::Debug for $name {
+            fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                fmt::Debug::fmt(&self.as_ref(), formatter)
+            }
+        }
+
+        impl<'a> fmt::Debug for $name_mut<'a> {
+            fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                fmt::Debug::fmt(&self.as_ref(), formatter)
+            }
+        }
     );
 );
 
@@ -681,6 +693,62 @@ impl<'a> Udpv4PacketMut<'a> {
     pub fn set_destination_addr(&mut self, addr: SocketAddrV4) {
         self.as_mut().ipv4_packet().set_destination_addr(*addr.ip());
         self.set_destination_port(addr.port());
+    }
+}
+
+impl<'a> fmt::Debug for IpPacketRef<'a> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        match self.version() {
+            IpPacketVersionRef::V4(packet) => fmt::Debug::fmt(&packet, formatter),
+            IpPacketVersionRef::V6(packet) => fmt::Debug::fmt(&packet, formatter),
+        }
+    }
+}
+
+impl<'a> fmt::Debug for Ipv4PacketRef<'a> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        match self.protocol() {
+            Some(Ipv4PacketProtocolRef::Tcp(tcp)) => fmt::Debug::fmt(&tcp, formatter),
+            Some(Ipv4PacketProtocolRef::Udp(udp)) => fmt::Debug::fmt(&udp, formatter),
+            None => {
+                formatter
+                .debug_struct("Ipv4Packet")
+                .field("protocol", &self.data[9])
+                .field("source_addr", &self.source_addr())
+                .field("destination_addr", &self.destination_addr())
+                .finish()
+            },
+        }
+    }
+}
+
+impl<'a> fmt::Debug for Ipv6PacketRef<'a> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter
+        .debug_struct("Ipv6Packet")
+        .field("source_addr", &self.source_addr())
+        .field("destination_addr", &self.destination_addr())
+        .finish()
+    }
+}
+
+impl<'a> fmt::Debug for Tcpv4PacketRef<'a> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter
+        .debug_struct("Tcpv4Packet")
+        .field("source_addr", &self.source_addr())
+        .field("destination_addr", &self.destination_addr())
+        .finish()
+    }
+}
+
+impl<'a> fmt::Debug for Udpv4PacketRef<'a> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter
+        .debug_struct("Udpv4Packet")
+        .field("source_addr", &self.source_addr())
+        .field("destination_addr", &self.destination_addr())
+        .finish()
     }
 }
 

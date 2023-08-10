@@ -1,6 +1,6 @@
 pub(crate) use {
     std::{
-        cmp, io, mem, panic, ptr, slice, task, thread,
+        cmp, fmt, io, mem, panic, ptr, slice, task, thread,
         ffi::{CStr, CString},
         future::{Future, IntoFuture},
         fs::File,
@@ -31,7 +31,7 @@ pub(crate) use {
         machine::Machine,
         iface::{
             create::IpIfaceBuilder,
-            stream::IpIface,
+            stream::{IpIface, IpSinkStream},
         },
         network::Ipv4Network,
         packet::IpPacket,

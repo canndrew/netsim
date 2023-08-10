@@ -7,6 +7,7 @@ mod network;
 mod connect;
 mod adapter;
 mod stream_ext;
+pub mod device;
 pub mod packet;
 
 pub use {
