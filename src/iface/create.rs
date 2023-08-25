@@ -3,6 +3,7 @@ use crate::priv_prelude::*;
 struct BuildConfig {
     name_opt: Option<String>,
     ipv4_addr_subnet_opt: Option<(Ipv4Addr, u8)>,
+    ipv4_routes: Vec<(Ipv4Network, Option<Ipv4Addr>)>,
 }
 
 pub struct IpIfaceBuilder<'m> {
@@ -17,6 +18,7 @@ impl IpIfaceBuilder<'_> {
             build_config: BuildConfig {
                 name_opt: None,
                 ipv4_addr_subnet_opt: None,
+                ipv4_routes: Vec::new(),
             },
         }
     }
@@ -31,6 +33,29 @@ impl IpIfaceBuilder<'_> {
         let network = Ipv4Network::infer_from_addr(ipv4_addr);
         self.build_config.ipv4_addr_subnet_opt = Some((ipv4_addr, network.subnet_mask_bits()));
         self
+    }
+
+    pub fn ipv4_route(mut self, destination: Ipv4Network) -> Self {
+        self.build_config.ipv4_routes.push((destination, None));
+        self
+    }
+
+    pub fn ipv4_route_with_gateway<A: Into<Ipv4Addr>>(
+        mut self,
+        destination: Ipv4Network,
+        gateway: A,
+    ) -> Self {
+        let gateway = gateway.into();
+        self.build_config.ipv4_routes.push((destination, Some(gateway)));
+        self
+    }
+
+    pub fn ipv4_default_route(self) -> Self {
+        self.ipv4_route(Ipv4Network::new(Ipv4Addr::UNSPECIFIED, 0))
+    }
+
+    pub fn ipv4_default_route_with_gateway(self, gateway: Ipv4Addr) -> Self {
+        self.ipv4_route_with_gateway(Ipv4Network::new(Ipv4Addr::UNSPECIFIED, 0), gateway)
     }
 }
 
@@ -57,7 +82,11 @@ impl<'m> IntoFuture for IpIfaceBuilder<'m> {
 }
 
 fn create_tun_interface(build_config: BuildConfig) -> io::Result<OwnedFd> {
-    let BuildConfig { name_opt, ipv4_addr_subnet_opt } = build_config;
+    let BuildConfig {
+        name_opt,
+        ipv4_addr_subnet_opt,
+        ipv4_routes,
+    } = build_config;
     let name = name_opt.as_deref().unwrap_or("netsim");
     let name_cstr = match CString::new(name) {
         Ok(name_cstr) => name_cstr,
@@ -174,21 +203,10 @@ fn create_tun_interface(build_config: BuildConfig) -> io::Result<OwnedFd> {
 
     iface::configure::put_up(&real_name)?;
 
-    /*
-    for route in builder.ipv4_routes {
-        trace!("adding route {:?} to {}", route, real_name);
-        match route.add_to_routing_table(&real_name) {
-            Ok(()) => (),
-            Err(AddRouteError::ProcessFileDescriptorLimit(e)) => {
-                return Err(IfaceBuildError::ProcessFileDescriptorLimit(e));
-            },
-            Err(AddRouteError::SystemFileDescriptorLimit(e)) => {
-                return Err(IfaceBuildError::SystemFileDescriptorLimit(e));
-            },
-            Err(AddRouteError::NameContainsNul) => unreachable!(),
-        }
+    for (destination, gateway_opt) in ipv4_routes {
+        iface::configure::add_ipv4_route(&real_name, destination, gateway_opt)?;
     }
-
+    /*
     for route in builder.ipv6_routes {
         trace!("adding route {:?} to {}", route, real_name);
         match route.add_to_routing_table(&real_name) {

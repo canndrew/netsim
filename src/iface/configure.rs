@@ -24,10 +24,10 @@ pub(crate) fn set_ipv4_addr(
     subnet_mask_bits: u8,
 ) -> io::Result<()> {
     let mask = if subnet_mask_bits == 32 { !0u32 } else { !(!0 >> subnet_mask_bits) };
-    unsafe {
-        let mut req = new_req(iface_name);
-        let fd = new_socket()?;
+    let mut req = new_req(iface_name);
+    let fd = new_socket()?;
 
+    unsafe {
         #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
         {
             let addr = &mut req.ifr_ifru.ifru_addr;
@@ -57,6 +57,59 @@ pub(crate) fn set_ipv4_addr(
         if ioctl::siocsifnetmask(fd.as_raw_fd(), &req) < 0 {
             return Err(io::Error::last_os_error());
         }
+    }
+
+    Ok(())
+}
+
+pub(crate) fn add_ipv4_route(
+    iface_name: &str,
+    destination: Ipv4Network,
+    gateway_opt: Option<Ipv4Addr>,
+) -> io::Result<()> {
+    let fd = new_socket()?;
+
+    let mut route: libc::rtentry = unsafe {
+        mem::zeroed()
+    };
+
+    #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
+    unsafe {
+        let route_destination = &mut route.rt_dst as *mut _ as *mut libc::sockaddr_in;
+        (*route_destination).sin_family = libc::AF_INET as u16;
+        (*route_destination).sin_addr = libc::in_addr { s_addr: u32::from(destination.base_addr()).to_be() };
+    };
+
+    let netmask = Ipv4Addr::from(!((!0u32).checked_shr(u32::from(destination.subnet_mask_bits())).unwrap_or(0)));
+    #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
+    unsafe {
+        let route_genmask = &mut route.rt_genmask as *mut _ as *mut libc::sockaddr_in;
+        (*route_genmask).sin_family = libc::AF_INET as u16;
+        (*route_genmask).sin_addr = libc::in_addr { s_addr: u32::from(netmask).to_be() };
+    };
+
+    route.rt_flags = libc::RTF_UP as u16;
+    if let Some(gateway_addr) = gateway_opt {
+        #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
+        unsafe {
+            let route_gateway = &mut route.rt_gateway as *mut _ as *mut libc::sockaddr_in;
+            (*route_gateway).sin_family = libc::AF_INET as u16;
+            (*route_gateway).sin_addr = libc::in_addr { s_addr: u32::from(gateway_addr).to_be() };
+        };
+    
+        route.rt_flags |= libc::RTF_GATEWAY as u16;
+    }
+
+    let c_iface_name = CString::new(iface_name).unwrap();
+
+    // TODO: This doesn't *actually* need to mutable yeah?
+    route.rt_dev = c_iface_name.as_ptr() as *mut _;
+
+    let res = unsafe {
+        libc::ioctl(fd.as_raw_fd(), u64::from(libc::SIOCADDRT), &route)
+    };
+    if res < 0 {
+        return Err(io::Error::last_os_error());
     }
 
     Ok(())

@@ -1,49 +1,47 @@
 use crate::priv_prelude::*;
 
-pub trait PacketStreamExt: Stream<Item = Vec<u8>> {
-    fn with_delay<R>(
+pub trait PacketStreamExt: Stream<Item = io::Result<Box<IpPacket>>> {
+    fn with_delay(
         self,
         min_delay: Duration,
         mean_additional_delay: Duration,
-    ) -> crate::adapter::Delay<Self, Vec<u8>, R>
+    ) -> crate::adapter::Delay<Self>
     where
-        Self: Sized,
-        R: Rng + Default;
+        Self: Sized;
 
-    fn with_loss<R>(
+    fn with_loss(
         self,
-        loss: f64,
-    ) -> crate::adapter::Loss<Self, R>
+        loss_rate: f64,
+        jitter_period: Duration,
+    ) -> crate::adapter::Loss<Self>
     where
-        Self: Sized,
-        R: Rng + Default;
+        Self: Sized;
 }
 
 impl<S> PacketStreamExt for S
 where
-    S: Stream<Item = Vec<u8>>,
+    S: Stream<Item = io::Result<Box<IpPacket>>>,
 {
-    fn with_delay<R>(
+    fn with_delay(
         self,
         min_delay: Duration,
         mean_additional_delay: Duration,
-    ) -> crate::adapter::Delay<Self, Vec<u8>, R>
+    ) -> crate::adapter::Delay<Self>
     where
         S: Sized,
-        R: Rng + Default,
     {
-        crate::adapter::Delay::new(self, R::default(), min_delay, mean_additional_delay)
+        crate::adapter::Delay::new(self, min_delay, mean_additional_delay)
     }
 
-    fn with_loss<R>(
+    fn with_loss(
         self,
-        loss: f64,
-    ) -> crate::adapter::Loss<Self, R>
+        loss_rate: f64,
+        jitter_period: Duration,
+    ) -> crate::adapter::Loss<Self>
     where
         Self: Sized,
-        R: Rng + Default,
     {
-        crate::adapter::Loss::new(self, R::default(), loss)
+        crate::adapter::Loss::new(self, loss_rate, jitter_period)
     }
 }
 

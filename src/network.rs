@@ -1,6 +1,6 @@
 use crate::priv_prelude::*;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct Ipv4Network {
     base_addr: Ipv4Addr,
     subnet_mask_bits: u8,
@@ -19,6 +19,10 @@ impl Ipv4Network {
         let addr_bits = u32::from(addr) & mask;
         let base_addr_bits = u32::from(self.base_addr);
         addr_bits == base_addr_bits
+    }
+
+    pub fn base_addr(self) -> Ipv4Addr {
+        self.base_addr
     }
 
     pub fn subnet_mask_bits(self) -> u8 {
@@ -57,5 +61,17 @@ impl Ipv4Network {
         .filter(|network| network.contains(addr))
         .max_by_key(|network| network.subnet_mask_bits)
         .unwrap_or_else(|| Ipv4Network::new(Ipv4Addr::from([0, 0, 0, 0]), 0))
+    }
+}
+
+impl fmt::Debug for Ipv4Network {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
+}
+
+impl fmt::Display for Ipv4Network {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}/{}", self.base_addr, self.subnet_mask_bits)
     }
 }

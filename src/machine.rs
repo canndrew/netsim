@@ -3,7 +3,7 @@ use crate::priv_prelude::*;
 pub struct Machine {
     #[allow(dead_code)]
     join_handle: namespace::JoinHandle<()>,
-    task_tx_opt: Option<mpsc::Sender<Pin<Box<dyn Future<Output = ()> + Send + 'static>>>>,
+    task_tx_opt: Option<mpsc::UnboundedSender<Pin<Box<dyn Future<Output = ()> + Send + 'static>>>>,
 }
 
 pub struct JoinHandle<R> {
@@ -12,7 +12,7 @@ pub struct JoinHandle<R> {
 
 impl Machine {
     pub fn new() -> io::Result<Machine> {
-        let (task_tx, mut task_rx) = mpsc::channel::<Pin<Box<dyn Future<Output = ()> + Send + 'static>>>(1);
+        let (task_tx, mut task_rx) = mpsc::unbounded::<Pin<Box<dyn Future<Output = ()> + Send + 'static>>>();
         let (startup_tx, startup_rx) = oneshot::channel();
         let join_handle_res = namespace::spawn(move || {
             let runtime_res = tokio::runtime::Runtime::new();
@@ -27,7 +27,7 @@ impl Machine {
                 },
             };
             runtime.block_on(async move {
-                while let Some(task) = task_rx.recv().await {
+                while let Some(task) = task_rx.next().await {
                     let _ = tokio::spawn(task);
                 }
             });
@@ -51,7 +51,7 @@ impl Machine {
             let ret = panic::AssertUnwindSafe(future).catch_unwind().await;
             let _ = ret_tx.send(ret);
         });
-        self.task_tx_opt.as_ref().unwrap().send(task).await.unwrap();
+        self.task_tx_opt.as_ref().unwrap().unbounded_send(task).unwrap();
         JoinHandle { ret_rx }
     }
 

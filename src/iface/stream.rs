@@ -3,7 +3,7 @@ use crate::priv_prelude::*;
 pub struct IpIface {
     fd: AsyncFd<OwnedFd>,
     incoming_bytes: BytesMut,
-    send_packet_opt: Option<IpPacket>,
+    send_packet_opt: Option<Box<IpPacket>>,
 }
 
 impl IpIface {
@@ -18,7 +18,7 @@ impl IpIface {
     }
 }
 
-impl Sink<IpPacket> for IpIface {
+impl Sink<Box<IpPacket>> for IpIface {
     type Error = io::Error;
 
     fn poll_ready(
@@ -28,7 +28,7 @@ impl Sink<IpPacket> for IpIface {
         Self::poll_flush(self, cx)
     }
 
-    fn start_send(self: Pin<&mut Self>, item: IpPacket) -> io::Result<()> {
+    fn start_send(self: Pin<&mut Self>, item: Box<IpPacket>) -> io::Result<()> {
         let this = self.get_mut();
         let send_packet_opt = this.send_packet_opt.replace(item);
         assert!(send_packet_opt.is_none());
@@ -82,12 +82,12 @@ impl Sink<IpPacket> for IpIface {
 }
 
 impl Stream for IpIface {
-    type Item = io::Result<IpPacket>;
+    type Item = io::Result<Box<IpPacket>>;
 
     fn poll_next(
         self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
-    ) -> Poll<Option<io::Result<IpPacket>>> {
+    ) -> Poll<Option<io::Result<Box<IpPacket>>>> {
         let this = self.get_mut();
         loop {
             let mut guard = ready!(this.fd.poll_read_ready(cx))?;
@@ -116,7 +116,7 @@ impl Stream for IpIface {
                             this.incoming_bytes.set_len(n);
                         }
                         let data = this.incoming_bytes.split();
-                        let packet = IpPacket::new(data);
+                        let packet = IpPacket::new_box(Box::from(&data[..]));
                         return Poll::Ready(Some(Ok(packet)));
                     }
                 },
@@ -128,11 +128,11 @@ impl Stream for IpIface {
 }
 
 pub trait IpSinkStream:
-    Stream<Item = io::Result<IpPacket>> + Sink<IpPacket, Error = io::Error> + Send + 'static
+    Stream<Item = io::Result<Box<IpPacket>>> + Sink<Box<IpPacket>, Error = io::Error> + Send + 'static
 {}
 
 impl<T> IpSinkStream for T
 where
-    T: Stream<Item = io::Result<IpPacket>> + Sink<IpPacket, Error = io::Error> + Send + 'static,
+    T: Stream<Item = io::Result<Box<IpPacket>>> + Sink<Box<IpPacket>, Error = io::Error> + Send + 'static,
 {}
 

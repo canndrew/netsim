@@ -1,4 +1,47 @@
 use crate::priv_prelude::*;
+use std::{
+    rc::Rc,
+    borrow::Borrow,
+    mem::transmute,
+};
+
+struct Ipv4Hasher {
+    sum: u16,
+}
+
+impl Ipv4Hasher {
+    pub fn new() -> Ipv4Hasher {
+        Ipv4Hasher {
+            sum: 0,
+        }
+    }
+
+    pub fn write_u16(&mut self, word: u16) {
+        let mut sum = self.sum as u32;
+        sum += word as u32;
+        self.sum = loop {
+            match u16::try_from(sum) {
+                Ok(sum) => break sum,
+                Err(_) => {
+                    let hi = sum >> 16;
+                    let lo = sum & 0xffff;
+                    sum = hi + lo;
+                },
+            }
+        };
+    }
+
+    pub fn write_u32(&mut self, word: u32) {
+        let hi = (word >> 16) as u16;
+        let lo = (word & 0xffff) as u16;
+        self.write_u16(hi);
+        self.write_u16(lo);
+    }
+
+    pub fn finish(self) -> u16 {
+        !self.sum
+    }
+}
 
 macro_rules! slice(
     ($val:expr, ..$end:literal) => (
@@ -28,19 +71,17 @@ macro_rules! slice_mut(
 );
 
 macro_rules! packet_type(
-    ($name:ident, $name_ref:ident, $name_mut:ident) => (
-        #[derive(Clone)]
+    ($name:ident, [$($parent_box:ident/$parent_arc:ident/$parent_ref:ident/$parent_mut:ident: $parent:ident),* $(,)?] $(,)?) => (
+        #[repr(transparent)]
         pub struct $name {
-            data: BytesMut,
+            data: [u8],
         }
 
-        #[derive(Clone, Copy)]
-        pub struct $name_ref<'a> {
-            data: &'a [u8],
-        }
-
-        pub struct $name_mut<'a> {
-            data: &'a mut BytesMut,
+        impl Clone for Box<$name> {
+            fn clone(&self) -> Box<$name> {
+                let boxed: Box<[u8]> = Box::from(&self.data[..]);
+                unsafe { transmute(boxed) }
+            }
         }
 
         impl $name {
@@ -52,223 +93,207 @@ macro_rules! packet_type(
                 &self.data[..]
             }
 
-            pub fn as_ref<'a>(&'a self) -> $name_ref<'a> {
-                $name_ref {
-                    data: &self.data[..],
-                }
-            }
-
-            pub fn as_mut<'a>(&'a mut self) -> $name_mut<'a> {
-                $name_mut {
-                    data: &mut self.data,
-                }
-            }
-        }
-
-        impl<'a> $name_ref<'a> {
-            pub fn len(&self) -> usize {
-                self.data.len()
-            }
-
-            pub fn as_bytes(&self) -> &[u8] {
-                &self.data[..]
-            }
-        }
-
-        impl<'a> $name_mut<'a> {
-            pub fn len(&self) -> usize {
-                self.data.len()
-            }
-
-            pub fn as_bytes(&self) -> &[u8] {
-                &self.data[..]
-            }
-
-            pub fn as_ref<'b>(&'b self) -> $name_ref<'b> {
-                $name_ref {
-                    data: self.data,
-                }
-            }
-
-            pub fn as_mut<'b>(&'b mut self) -> $name_mut<'b> {
-                $name_mut {
-                    data: self.data,
-                }
-            }
-
-            pub fn to_ref(self) -> $name_ref<'a> {
-                $name_ref {
-                    data: self.data,
-                }
-            }
-        }
-
-        impl fmt::Debug for $name {
-            fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                fmt::Debug::fmt(&self.as_ref(), formatter)
-            }
-        }
-
-        impl<'a> fmt::Debug for $name_mut<'a> {
-            fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                fmt::Debug::fmt(&self.as_ref(), formatter)
-            }
-        }
-    );
-);
-
-macro_rules! packet_enum(
-    ($name:ident, $name_ref:ident, $name_mut:ident, [
-        $(($variant:ident, $inner:ident, $inner_ref:ident, $inner_mut:ident),)*
-    ]) => (
-        #[derive(Clone)]
-        pub enum $name {
             $(
-                $variant($inner),
-            )*
-        }
+                pub fn $parent_box(self: Box<$name>) -> Box<$parent> {
+                    unsafe { transmute(self) }
+                }
 
-        #[derive(Clone, Copy)]
-        pub enum $name_ref<'a> {
-            $(
-                $variant($inner_ref<'a>),
-            )*
-        }
+                pub fn $parent_arc(self: Arc<$name>) -> Arc<$parent> {
+                    unsafe { transmute(self) }
+                }
 
-        pub enum $name_mut<'a> {
-            $(
-                $variant($inner_mut<'a>),
+                pub fn $parent_ref<'a>(&'a self) -> &'a $parent {
+                    unsafe { transmute(self) }
+                }
+
+                pub fn $parent_mut<'a>(&'a mut self) -> &'a mut $parent {
+                    unsafe { transmute(self) }
+                }
             )*
         }
     );
 );
 
-packet_type!(IpPacket, IpPacketRef, IpPacketMut);
-packet_type!(Ipv4Packet, Ipv4PacketRef, Ipv4PacketMut);
-packet_type!(Ipv6Packet, Ipv6PacketRef, Ipv6PacketMut);
-packet_type!(Tcpv4Packet, Tcpv4PacketRef, Tcpv4PacketMut);
-packet_type!(Udpv4Packet, Udpv4PacketRef, Udpv4PacketMut);
+mod protocol_numbers {
+    pub const ICMP_V4: u8 = 1;
+    pub const ICMP_V6: u8 = 58;
+    pub const TCP: u8 = 6;
+    pub const UDP: u8 = 17;
+}
 
-packet_enum!(IpPacketVersion, IpPacketVersionRef, IpPacketVersionMut, [
-    (V4, Ipv4Packet, Ipv4PacketRef, Ipv4PacketMut),
-    (V6, Ipv6Packet, Ipv6PacketRef, Ipv6PacketMut),
+#[derive(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct TcpPacketFlags {
+    pub cwr: bool,
+    pub ece: bool,
+    pub urg: bool,
+    pub ack: bool,
+    pub psh: bool,
+    pub rst: bool,
+    pub syn: bool,
+    pub fin: bool,
+}
+
+impl fmt::Debug for TcpPacketFlags {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        let mut written = false;
+        let mut write = |s| {
+            if written {
+                write!(formatter, " | {}", s)
+            } else {
+                written = true;
+                write!(formatter, "{}", s)
+            }
+        };
+        if self.cwr { write("CWR")? };
+        if self.ece { write("ECE")? };
+        if self.urg { write("URG")? };
+        if self.ack { write("ACK")? };
+        if self.psh { write("PSH")? };
+        if self.rst { write("RST")? };
+        if self.syn { write("SYN")? };
+        if self.fin { write("FIN")? };
+        Ok(())
+    }
+}
+
+pub trait Pointer<T: ?Sized + 'static>: Borrow<T> {
+    type InsteadPointTo<U: ?Sized + 'static>: Sized;
+}
+
+impl<T: ?Sized + 'static> Pointer<T> for Box<T> {
+    type InsteadPointTo<U: ?Sized + 'static> = Box<U>;
+}
+
+impl<T: ?Sized + 'static> Pointer<T> for Arc<T> {
+    type InsteadPointTo<U: ?Sized + 'static> = Arc<U>;
+}
+
+impl<T: ?Sized + 'static> Pointer<T> for Rc<T> {
+    type InsteadPointTo<U: ?Sized + 'static> = Rc<U>;
+}
+
+impl<'a, T: ?Sized + 'static> Pointer<T> for &'a T {
+    type InsteadPointTo<U: ?Sized + 'static> = &'a U;
+}
+
+impl<'a, T: ?Sized + 'static> Pointer<T> for &'a mut T {
+    type InsteadPointTo<U: ?Sized + 'static> = &'a mut U;
+}
+
+packet_type!(IpPacket, []);
+packet_type!(Ipv4Packet, [
+    ip_packet_box/ip_packet_arc/ip_packet_ref/ip_packet_mut: IpPacket,
 ]);
-packet_enum!(Ipv4PacketProtocol, Ipv4PacketProtocolRef, Ipv4PacketProtocolMut, [
-    (Tcp, Tcpv4Packet, Tcpv4PacketRef, Tcpv4PacketMut),
-    (Udp, Udpv4Packet, Udpv4PacketRef, Udpv4PacketMut),
+packet_type!(Ipv6Packet, [
+    ip_packet_box/ip_packet_arc/ip_packet_ref/ip_packet_mut: IpPacket,
 ]);
+packet_type!(Tcpv4Packet, [
+    ip_packet_box/ip_packet_arc/ip_packet_ref/ip_packet_mut: IpPacket,
+    ipv4_packet_box/ipv4_packet_arc/ipv4_packet_ref/ipv4_packet_mut: Ipv4Packet,
+]);
+packet_type!(Udpv4Packet, [
+    ip_packet_box/ip_packet_arc/ip_packet_ref/ip_packet_mut: IpPacket,
+    ipv4_packet_box/ipv4_packet_arc/ipv4_packet_ref/ipv4_packet_mut: Ipv4Packet,
+]);
+packet_type!(Icmpv4Packet, [
+    ip_packet_box/ip_packet_arc/ip_packet_ref/ip_packet_mut: IpPacket,
+    ipv4_packet_box/ipv4_packet_arc/ipv4_packet_ref/ipv4_packet_mut: Ipv4Packet,
+]);
+packet_type!(Icmpv6Packet, [
+    ip_packet_box/ip_packet_arc/ip_packet_ref/ip_packet_mut: IpPacket,
+    ipv6_packet_box/ipv6_packet_arc/ipv6_packet_ref/ipv6_packet_mut: Ipv6Packet,
+]);
+
+pub enum IpPacketVersion<P>
+where
+    P: Pointer<IpPacket>,
+{
+    V4(P::InsteadPointTo<Ipv4Packet>),
+    V6(P::InsteadPointTo<Ipv6Packet>),
+}
 
 impl IpPacket {
-    pub(crate) fn new(data: BytesMut) -> IpPacket {
-        IpPacket { data }
+    pub(crate) fn new_box(data: Box<[u8]>) -> Box<IpPacket> {
+        unsafe { transmute(data) }
     }
 
-    pub fn version(self) -> IpPacketVersion {
-        let IpPacket { data } = self;
-        let version = data[0] >> 4;
-        match version {
-            4 => IpPacketVersion::V4(Ipv4Packet { data }),
-            6 => IpPacketVersion::V6(Ipv6Packet { data }),
-            _ => panic!("invalid packet version field"),
+    pub fn version_box(self: Box<IpPacket>) -> IpPacketVersion<Box<IpPacket>> {
+        match self.data[0] >> 4 {
+            4 => IpPacketVersion::V4(unsafe { transmute(self) }),
+            6 => IpPacketVersion::V6(unsafe { transmute(self) }),
+            _ => panic!("unknown packet version"),
+        }
+    }
+
+    pub fn version_ref<'a>(&'a self) -> IpPacketVersion<&'a IpPacket> {
+        match self.data[0] >> 4 {
+            4 => IpPacketVersion::V4(unsafe { transmute(self) }),
+            6 => IpPacketVersion::V6(unsafe { transmute(self) }),
+            _ => panic!("unknown packet version"),
+        }
+    }
+
+    pub fn version_mut<'a>(&'a mut self) -> IpPacketVersion<&'a mut IpPacket> {
+        match self.data[0] >> 4 {
+            4 => IpPacketVersion::V4(unsafe { transmute(self) }),
+            6 => IpPacketVersion::V6(unsafe { transmute(self) }),
+            _ => panic!("unknown packet version"),
         }
     }
 
     pub fn source_addr(&self) -> IpAddr {
-        self.as_ref().source_addr()
-    }
-
-    pub fn destination_addr(&self) -> IpAddr {
-        self.as_ref().destination_addr()
-    }
-}
-
-impl<'a> IpPacketRef<'a> {
-    pub fn version(self) -> IpPacketVersionRef<'a> {
-        let IpPacketRef { data } = self;
-        let version = data[0] >> 4;
-        match version {
-            4 => IpPacketVersionRef::V4(Ipv4PacketRef { data }),
-            6 => IpPacketVersionRef::V6(Ipv6PacketRef { data }),
-            _ => panic!("invalid packet version field"),
-        }
-    }
-
-    pub fn source_addr(&self) -> IpAddr {
-        match self.version() {
-            IpPacketVersionRef::V4(packet) => IpAddr::V4(packet.source_addr()),
-            IpPacketVersionRef::V6(packet) => IpAddr::V6(packet.source_addr()),
+        match self.version_ref() {
+            IpPacketVersion::V4(packet) => IpAddr::V4(packet.source_addr()),
+            IpPacketVersion::V6(packet) => IpAddr::V6(packet.source_addr()),
         }
     }
 
     pub fn destination_addr(&self) -> IpAddr {
-        match self.version() {
-            IpPacketVersionRef::V4(packet) => IpAddr::V4(packet.destination_addr()),
-            IpPacketVersionRef::V6(packet) => IpAddr::V6(packet.destination_addr()),
+        match self.version_ref() {
+            IpPacketVersion::V4(packet) => IpAddr::V4(packet.destination_addr()),
+            IpPacketVersion::V6(packet) => IpAddr::V6(packet.destination_addr()),
         }
     }
 }
 
-impl<'a> IpPacketMut<'a> {
-    pub fn version(self) -> IpPacketVersionMut<'a> {
-        let IpPacketMut { data } = self;
-        let version = data[0] >> 4;
-        match version {
-            4 => IpPacketVersionMut::V4(Ipv4PacketMut { data }),
-            6 => IpPacketVersionMut::V6(Ipv6PacketMut { data }),
-            _ => panic!("invalid packet version field"),
-        }
-    }
-
-    pub fn source_addr(&self) -> IpAddr {
-        self.as_ref().source_addr()
-    }
-
-    pub fn destination_addr(&self) -> IpAddr {
-        self.as_ref().destination_addr()
-    }
+pub enum Ipv4PacketProtocol<P>
+where
+    P: Pointer<Ipv4Packet>,
+{
+    Tcp(P::InsteadPointTo<Tcpv4Packet>),
+    Udp(P::InsteadPointTo<Udpv4Packet>),
+    Icmp(P::InsteadPointTo<Icmpv4Packet>),
+    Unknown {
+        protocol_number: u8,
+    },
 }
 
 impl Ipv4Packet {
-    pub fn ip_packet(self) -> IpPacket {
-        let Ipv4Packet { data } = self;
-        IpPacket { data }
-    }
-
-    pub fn source_addr(&self) -> Ipv4Addr {
-        self.as_ref().source_addr()
-    }
-
-    pub fn destination_addr(&self) -> Ipv4Addr {
-        self.as_ref().destination_addr()
-    }
-
-    pub fn set_source_addr(&mut self, addr: Ipv4Addr) {
-        self.as_mut().set_source_addr(addr)
-    }
-
-    pub fn set_destination_addr(&mut self, addr: Ipv4Addr) {
-        self.as_mut().set_destination_addr(addr)
-    }
-
-    pub fn ipv4_header_len(&self) -> usize {
-        self.as_ref().ipv4_header_len()
-    }
-
-    pub fn protocol(self) -> Option<Ipv4PacketProtocol> {
-        let Ipv4Packet { data } = self;
-        let protocol = data[9];
-        match protocol {
-            6 => Some(Ipv4PacketProtocol::Tcp(Tcpv4Packet { data })),
-            17 => Some(Ipv4PacketProtocol::Udp(Udpv4Packet { data })),
-            _ => None,
+    pub fn protocol_box(self: Box<Ipv4Packet>) -> Ipv4PacketProtocol<Box<Ipv4Packet>> {
+        match self.data[9] {
+            protocol_numbers::TCP => Ipv4PacketProtocol::Tcp(unsafe { transmute(self) }),
+            protocol_numbers::UDP => Ipv4PacketProtocol::Udp(unsafe { transmute(self) }),
+            protocol_numbers::ICMP_V4 => Ipv4PacketProtocol::Icmp(unsafe { transmute(self) }),
+            protocol_number => Ipv4PacketProtocol::Unknown { protocol_number },
         }
     }
-}
 
-impl<'a> Ipv4PacketRef<'a> {
-    pub fn ip_packet(self) -> IpPacketRef<'a> {
-        let Ipv4PacketRef { data } = self;
-        IpPacketRef { data }
+    pub fn protocol_ref<'a>(&'a self) -> Ipv4PacketProtocol<&'a Ipv4Packet> {
+        match self.data[9] {
+            protocol_numbers::TCP => Ipv4PacketProtocol::Tcp(unsafe { transmute(self) }),
+            protocol_numbers::UDP => Ipv4PacketProtocol::Udp(unsafe { transmute(self) }),
+            protocol_numbers::ICMP_V4 => Ipv4PacketProtocol::Icmp(unsafe { transmute(self) }),
+            protocol_number => Ipv4PacketProtocol::Unknown { protocol_number },
+        }
+    }
+
+    pub fn protocol_mut<'a>(&'a mut self) -> Ipv4PacketProtocol<&'a mut Ipv4Packet> {
+        match self.data[9] {
+            protocol_numbers::TCP => Ipv4PacketProtocol::Tcp(unsafe { transmute(self) }),
+            protocol_numbers::UDP => Ipv4PacketProtocol::Udp(unsafe { transmute(self) }),
+            protocol_numbers::ICMP_V4 => Ipv4PacketProtocol::Icmp(unsafe { transmute(self) }),
+            protocol_number => Ipv4PacketProtocol::Unknown { protocol_number },
+        }
     }
 
     pub fn source_addr(&self) -> Ipv4Addr {
@@ -281,85 +306,64 @@ impl<'a> Ipv4PacketRef<'a> {
         Ipv4Addr::from(addr)
     }
 
-    pub fn ipv4_header_len(&self) -> usize {
-        (self.data[0] & 0x0f) as usize * 4
-    }
-
-    pub fn protocol(self) -> Option<Ipv4PacketProtocolRef<'a>> {
-        let Ipv4PacketRef { data } = self;
-        let protocol = data[9];
-        match protocol {
-            6 => Some(Ipv4PacketProtocolRef::Tcp(Tcpv4PacketRef { data })),
-            17 => Some(Ipv4PacketProtocolRef::Udp(Udpv4PacketRef { data })),
-            _ => None,
-        }
-    }
-}
-
-impl<'a> Ipv4PacketMut<'a> {
-    pub fn ip_packet(self) -> IpPacketMut<'a> {
-        let Ipv4PacketMut { data } = self;
-        IpPacketMut { data }
-    }
-
-    pub fn source_addr(&self) -> Ipv4Addr {
-        self.as_ref().source_addr()
-    }
-
-    pub fn destination_addr(&self) -> Ipv4Addr {
-        self.as_ref().destination_addr()
-    }
-
     pub fn set_source_addr(&mut self, addr: Ipv4Addr) {
         *slice_mut!(self.data, 12..16) = addr.octets();
+        self.fix_checksum();
     }
 
     pub fn set_destination_addr(&mut self, addr: Ipv4Addr) {
         *slice_mut!(self.data, 16..20) = addr.octets();
+        self.fix_checksum();
     }
 
     pub fn ipv4_header_len(&self) -> usize {
-        self.as_ref().ipv4_header_len()
+        (self.data[0] & 0x0f) as usize * 4
     }
 
-    pub fn protocol(self) -> Option<Ipv4PacketProtocolMut<'a>> {
-        let Ipv4PacketMut { data } = self;
-        let protocol = data[9];
-        match protocol {
-            6 => Some(Ipv4PacketProtocolMut::Tcp(Tcpv4PacketMut { data })),
-            17 => Some(Ipv4PacketProtocolMut::Udp(Udpv4PacketMut { data })),
-            _ => None,
+    fn fix_checksum(&mut self) {
+        let mut hasher = Ipv4Hasher::new();
+        let header_len = self.ipv4_header_len();
+        let mut i = 0;
+        while i < header_len {
+            if i != 10 {
+                hasher.write_u16(u16::from_be_bytes(slice!(&self.data[i..], 0..2)));
+            }
+            i += 2;
         }
+        *slice_mut!(self.data, 10..12) = hasher.finish().to_be_bytes();
     }
+}
+
+pub enum Ipv6PacketProtocol<P>
+where
+    P: Pointer<Ipv6Packet>,
+{
+    Icmp(P::InsteadPointTo<Icmpv6Packet>),
+    Unknown {
+        protocol_number: u8,
+    },
 }
 
 impl Ipv6Packet {
-    pub fn ip_packet(self) -> IpPacket {
-        let Ipv6Packet { data } = self;
-        IpPacket { data }
+    pub fn protocol_box(self: Box<Ipv6Packet>) -> Ipv6PacketProtocol<Box<Ipv6Packet>> {
+        match self.data[6] {
+            protocol_numbers::ICMP_V6 => Ipv6PacketProtocol::Icmp(unsafe { transmute(self) }),
+            protocol_number => Ipv6PacketProtocol::Unknown { protocol_number },
+        }
     }
 
-    pub fn source_addr(&self) -> Ipv6Addr {
-        self.as_ref().source_addr()
+    pub fn protocol_ref<'a>(&'a self) -> Ipv6PacketProtocol<&'a Ipv6Packet> {
+        match self.data[6] {
+            protocol_numbers::ICMP_V6 => Ipv6PacketProtocol::Icmp(unsafe { transmute(self) }),
+            protocol_number => Ipv6PacketProtocol::Unknown { protocol_number },
+        }
     }
 
-    pub fn destination_addr(&self) -> Ipv6Addr {
-        self.as_ref().destination_addr()
-    }
-
-    pub fn set_source_addr(&mut self, addr: Ipv6Addr) {
-        self.as_mut().set_source_addr(addr);
-    }
-
-    pub fn set_destination_addr(&mut self, addr: Ipv6Addr) {
-        self.as_mut().set_destination_addr(addr);
-    }
-}
-
-impl<'a> Ipv6PacketRef<'a> {
-    pub fn ip_packet(self) -> IpPacketRef<'a> {
-        let Ipv6PacketRef { data } = self;
-        IpPacketRef { data }
+    pub fn protocol_mut<'a>(&'a mut self) -> Ipv6PacketProtocol<&'a mut Ipv6Packet> {
+        match self.data[6] {
+            protocol_numbers::ICMP_V6 => Ipv6PacketProtocol::Icmp(unsafe { transmute(self) }),
+            protocol_number => Ipv6PacketProtocol::Unknown { protocol_number },
+        }
     }
 
     pub fn source_addr(&self) -> Ipv6Addr {
@@ -373,108 +377,23 @@ impl<'a> Ipv6PacketRef<'a> {
     }
 }
 
-impl<'a> Ipv6PacketMut<'a> {
-    pub fn ip_packet(self) -> IpPacketMut<'a> {
-        let Ipv6PacketMut { data } = self;
-        IpPacketMut { data }
-    }
-
-    pub fn source_addr(&self) -> Ipv6Addr {
-        self.as_ref().source_addr()
-    }
-
-    pub fn destination_addr(&self) -> Ipv6Addr {
-        self.as_ref().destination_addr()
-    }
-
-    pub fn set_source_addr(&mut self, addr: Ipv6Addr) {
-        *slice_mut!(self.data, 8..24) = addr.octets();
-    }
-
-    pub fn set_destination_addr(&mut self, addr: Ipv6Addr) {
-        *slice_mut!(self.data, 24..40) = addr.octets();
-    }
-}
-
 impl Tcpv4Packet {
-    pub fn ip_packet(self) -> IpPacket {
-        let Tcpv4Packet { data } = self;
-        IpPacket { data }
-    }
-
-    pub fn ipv4_packet(self) -> Ipv4Packet {
-        let Tcpv4Packet { data } = self;
-        Ipv4Packet { data }
-    }
-
     pub fn source_ip_addr(&self) -> Ipv4Addr {
-        self.as_ref().source_ip_addr()
+        self.ipv4_packet_ref().source_addr()
     }
 
     pub fn destination_ip_addr(&self) -> Ipv4Addr {
-        self.as_ref().destination_ip_addr()
+        self.ipv4_packet_ref().destination_addr()
     }
 
     pub fn source_port(&self) -> u16 {
-        self.as_ref().source_port()
-    }
-
-    pub fn destination_port(&self) -> u16 {
-        self.as_ref().destination_port()
-    }
-
-    pub fn set_source_port(&mut self, port: u16) {
-        self.as_mut().set_source_port(port);
-    }
-
-    pub fn set_destination_port(&mut self, port: u16) {
-        self.as_mut().set_destination_port(port);
-    }
-
-    pub fn source_addr(&self) -> SocketAddrV4 {
-        self.as_ref().source_addr()
-    }
-
-    pub fn destination_addr(&self) -> SocketAddrV4 {
-        self.as_ref().destination_addr()
-    }
-
-    pub fn set_source_addr(&mut self, addr: SocketAddrV4) {
-        self.as_mut().set_source_addr(addr);
-    }
-
-    pub fn set_destination_addr(&mut self, addr: SocketAddrV4) {
-        self.as_mut().set_destination_addr(addr);
-    }
-}
-
-impl<'a> Tcpv4PacketRef<'a> {
-    pub fn ip_packet(self) -> IpPacketRef<'a> {
-        let Tcpv4PacketRef { data } = self;
-        IpPacketRef { data }
-    }
-
-    pub fn ipv4_packet(self) -> Ipv4PacketRef<'a> {
-        let Tcpv4PacketRef { data } = self;
-        Ipv4PacketRef { data }
-    }
-
-    pub fn source_ip_addr(&self) -> Ipv4Addr {
-        self.ipv4_packet().source_addr()
-    }
-
-    pub fn destination_ip_addr(&self) -> Ipv4Addr {
-        self.ipv4_packet().destination_addr()
-    }
-
-    pub fn source_port(&self) -> u16 {
-        let header_len = self.ipv4_packet().ipv4_header_len();
+        let header_len = self.ipv4_packet_ref().ipv4_header_len();
         let port = slice!(&self.data[header_len..], 0..2);
         u16::from_be_bytes(port)
     }
 
     pub fn destination_port(&self) -> u16 {
-        let header_len = self.ipv4_packet().ipv4_header_len();
+        let header_len = self.ipv4_packet_ref().ipv4_header_len();
         let port = slice!(&self.data[header_len..], 2..4);
         u16::from_be_bytes(port)
     }
@@ -490,141 +409,93 @@ impl<'a> Tcpv4PacketRef<'a> {
         let port = self.destination_port();
         SocketAddrV4::new(ip_addr, port)
     }
-}
 
-impl<'a> Tcpv4PacketMut<'a> {
-    pub fn ip_packet(self) -> IpPacketMut<'a> {
-        let Tcpv4PacketMut { data } = self;
-        IpPacketMut { data }
-    }
-
-    pub fn ipv4_packet(self) -> Ipv4PacketMut<'a> {
-        let Tcpv4PacketMut { data } = self;
-        Ipv4PacketMut { data }
-    }
-
-    pub fn source_ip_addr(&self) -> Ipv4Addr {
-        self.as_ref().source_ip_addr()
-    }
-
-    pub fn destination_ip_addr(&self) -> Ipv4Addr {
-        self.as_ref().destination_ip_addr()
-    }
-
-    pub fn source_port(&self) -> u16 {
-        self.as_ref().source_port()
-    }
-
-    pub fn destination_port(&self) -> u16 {
-        self.as_ref().destination_port()
+    pub fn flags(&self) -> TcpPacketFlags {
+        let header_len = self.ipv4_packet_ref().ipv4_header_len();
+        let flags = self.data[header_len + 13];
+        TcpPacketFlags {
+            cwr: (flags >> 7) & 1 == 1,
+            ece: (flags >> 6) & 1 == 1,
+            urg: (flags >> 5) & 1 == 1,
+            ack: (flags >> 4) & 1 == 1,
+            psh: (flags >> 3) & 1 == 1,
+            rst: (flags >> 2) & 1 == 1,
+            syn: (flags >> 1) & 1 == 1,
+            fin: (flags >> 0) & 1 == 1,
+        }
     }
 
     pub fn set_source_port(&mut self, port: u16) {
-        *slice_mut!(self.data, 0..2) = port.to_be_bytes();
+        self.set_source_port_inner(port);
+        self.fix_checksum();
+    }
+
+    fn set_source_port_inner(&mut self, port: u16) {
+        let header_len = self.ipv4_packet_ref().ipv4_header_len();
+        *slice_mut!(&mut self.data[header_len..], 0..2) = port.to_be_bytes();
     }
 
     pub fn set_destination_port(&mut self, port: u16) {
-        *slice_mut!(self.data, 2..4) = port.to_be_bytes();
+        self.set_destination_port_inner(port);
+        self.fix_checksum();
     }
 
-    pub fn source_addr(&self) -> SocketAddrV4 {
-        self.as_ref().source_addr()
-    }
-
-    pub fn destination_addr(&self) -> SocketAddrV4 {
-        self.as_ref().destination_addr()
+    fn set_destination_port_inner(&mut self, port: u16) {
+        let header_len = self.ipv4_packet_ref().ipv4_header_len();
+        *slice_mut!(&mut self.data[header_len..], 2..4) = port.to_be_bytes();
     }
 
     pub fn set_source_addr(&mut self, addr: SocketAddrV4) {
-        self.as_mut().ipv4_packet().set_source_addr(*addr.ip());
-        self.set_source_port(addr.port());
+        self.ipv4_packet_mut().set_source_addr(*addr.ip());
+        self.set_source_port_inner(addr.port());
+        self.fix_checksum();
     }
 
     pub fn set_destination_addr(&mut self, addr: SocketAddrV4) {
-        self.as_mut().ipv4_packet().set_destination_addr(*addr.ip());
-        self.set_destination_port(addr.port());
+        self.ipv4_packet_mut().set_destination_addr(*addr.ip());
+        self.set_destination_port_inner(addr.port());
+        self.fix_checksum();
+    }
+
+    fn fix_checksum(&mut self) {
+        let ipv4_header_len = self.ipv4_packet_ref().ipv4_header_len();
+        let mut hasher = Ipv4Hasher::new();
+        hasher.write_u32(u32::from(self.ipv4_packet_ref().source_addr()));
+        hasher.write_u32(u32::from(self.ipv4_packet_ref().destination_addr()));
+        hasher.write_u16(protocol_numbers::TCP as u16);
+        hasher.write_u16((self.data.len() - ipv4_header_len) as u16);
+        let mut i = ipv4_header_len;
+        while i + 1 < self.data.len() {
+            if i != ipv4_header_len + 16 {
+                hasher.write_u16(u16::from_be_bytes(slice!(&self.data[i..], 0..2)));
+            }
+            i += 2;
+        }
+        if i < self.data.len() {
+            debug_assert_eq!(i + 1, self.data.len());
+            hasher.write_u16((self.data[i] as u16) << 8);
+        }
+        *slice_mut!(&mut self.data[ipv4_header_len..], 16..18) = hasher.finish().to_be_bytes();
     }
 }
 
 impl Udpv4Packet {
-    pub fn ip_packet(self) -> IpPacket {
-        let Udpv4Packet { data } = self;
-        IpPacket { data }
-    }
-
-    pub fn ipv4_packet(self) -> Ipv4Packet {
-        let Udpv4Packet { data } = self;
-        Ipv4Packet { data }
-    }
-
     pub fn source_ip_addr(&self) -> Ipv4Addr {
-        self.as_ref().source_ip_addr()
+        self.ipv4_packet_ref().source_addr()
     }
 
     pub fn destination_ip_addr(&self) -> Ipv4Addr {
-        self.as_ref().destination_ip_addr()
+        self.ipv4_packet_ref().destination_addr()
     }
 
     pub fn source_port(&self) -> u16 {
-        self.as_ref().source_port()
-    }
-
-    pub fn destination_port(&self) -> u16 {
-        self.as_ref().destination_port()
-    }
-
-    pub fn set_source_port(&mut self, port: u16) {
-        self.as_mut().set_source_port(port);
-    }
-
-    pub fn set_destination_port(&mut self, port: u16) {
-        self.as_mut().set_destination_port(port);
-    }
-
-    pub fn source_addr(&self) -> SocketAddrV4 {
-        self.as_ref().source_addr()
-    }
-
-    pub fn destination_addr(&self) -> SocketAddrV4 {
-        self.as_ref().destination_addr()
-    }
-
-    pub fn set_source_addr(&mut self, addr: SocketAddrV4) {
-        self.as_mut().set_source_addr(addr);
-    }
-
-    pub fn set_destination_addr(&mut self, addr: SocketAddrV4) {
-        self.as_mut().set_destination_addr(addr);
-    }
-}
-
-impl<'a> Udpv4PacketRef<'a> {
-    pub fn ip_packet(self) -> IpPacketRef<'a> {
-        let Udpv4PacketRef { data } = self;
-        IpPacketRef { data }
-    }
-
-    pub fn ipv4_packet(self) -> Ipv4PacketRef<'a> {
-        let Udpv4PacketRef { data } = self;
-        Ipv4PacketRef { data }
-    }
-
-    pub fn source_ip_addr(&self) -> Ipv4Addr {
-        self.ipv4_packet().source_addr()
-    }
-
-    pub fn destination_ip_addr(&self) -> Ipv4Addr {
-        self.ipv4_packet().destination_addr()
-    }
-
-    pub fn source_port(&self) -> u16 {
-        let header_len = self.ipv4_packet().ipv4_header_len();
+        let header_len = self.ipv4_packet_ref().ipv4_header_len();
         let port = slice!(&self.data[header_len..], 0..2);
         u16::from_be_bytes(port)
     }
 
     pub fn destination_port(&self) -> u16 {
-        let header_len = self.ipv4_packet().ipv4_header_len();
+        let header_len = self.ipv4_packet_ref().ipv4_header_len();
         let port = slice!(&self.data[header_len..], 2..4);
         u16::from_be_bytes(port)
     }
@@ -640,112 +511,159 @@ impl<'a> Udpv4PacketRef<'a> {
         let port = self.destination_port();
         SocketAddrV4::new(ip_addr, port)
     }
-}
-
-impl<'a> Udpv4PacketMut<'a> {
-    pub fn ip_packet(self) -> IpPacketMut<'a> {
-        let Udpv4PacketMut { data } = self;
-        IpPacketMut { data }
-    }
-
-    pub fn ipv4_packet(self) -> Ipv4PacketMut<'a> {
-        let Udpv4PacketMut { data } = self;
-        Ipv4PacketMut { data }
-    }
-
-    pub fn source_ip_addr(&self) -> Ipv4Addr {
-        self.as_ref().source_ip_addr()
-    }
-
-    pub fn destination_ip_addr(&self) -> Ipv4Addr {
-        self.as_ref().destination_ip_addr()
-    }
-
-    pub fn source_port(&self) -> u16 {
-        self.as_ref().source_port()
-    }
-
-    pub fn destination_port(&self) -> u16 {
-        self.as_ref().destination_port()
-    }
 
     pub fn set_source_port(&mut self, port: u16) {
-        *slice_mut!(self.data, 0..2) = port.to_be_bytes();
+        self.set_source_port_inner(port);
+        self.fix_checksum();
+    }
+
+    fn set_source_port_inner(&mut self, port: u16) {
+        let header_len = self.ipv4_packet_ref().ipv4_header_len();
+        *slice_mut!(&mut self.data[header_len..], 0..2) = port.to_be_bytes();
     }
 
     pub fn set_destination_port(&mut self, port: u16) {
-        *slice_mut!(self.data, 2..4) = port.to_be_bytes();
+        self.set_destination_port_inner(port);
+        self.fix_checksum();
     }
 
-    pub fn source_addr(&self) -> SocketAddrV4 {
-        self.as_ref().source_addr()
-    }
-
-    pub fn destination_addr(&self) -> SocketAddrV4 {
-        self.as_ref().destination_addr()
+    fn set_destination_port_inner(&mut self, port: u16) {
+        let header_len = self.ipv4_packet_ref().ipv4_header_len();
+        *slice_mut!(&mut self.data[header_len..], 2..4) = port.to_be_bytes();
     }
 
     pub fn set_source_addr(&mut self, addr: SocketAddrV4) {
-        self.as_mut().ipv4_packet().set_source_addr(*addr.ip());
-        self.set_source_port(addr.port());
+        self.ipv4_packet_mut().set_source_addr(*addr.ip());
+        self.set_source_port_inner(addr.port());
+        self.fix_checksum();
     }
 
     pub fn set_destination_addr(&mut self, addr: SocketAddrV4) {
-        self.as_mut().ipv4_packet().set_destination_addr(*addr.ip());
-        self.set_destination_port(addr.port());
+        self.ipv4_packet_mut().set_destination_addr(*addr.ip());
+        self.set_destination_port_inner(addr.port());
+        self.fix_checksum();
+    }
+
+    fn fix_checksum(&mut self) {
+        let ipv4_header_len = self.ipv4_packet_ref().ipv4_header_len();
+        let mut hasher = Ipv4Hasher::new();
+        hasher.write_u32(u32::from(self.ipv4_packet_ref().source_addr()));
+        hasher.write_u32(u32::from(self.ipv4_packet_ref().destination_addr()));
+        hasher.write_u16(protocol_numbers::UDP as u16);
+        hasher.write_u16((self.data.len() - ipv4_header_len) as u16);
+        let mut i = ipv4_header_len;
+        while i + 1 < self.data.len() {
+            if i != ipv4_header_len + 6 {
+                hasher.write_u16(u16::from_be_bytes(slice!(&self.data[i..], 0..2)));
+            }
+            i += 2;
+        }
+        if i < self.data.len() {
+            debug_assert_eq!(i + 1, self.data.len());
+            hasher.write_u16((self.data[i] as u16) << 8);
+        }
+        *slice_mut!(&mut self.data[ipv4_header_len..], 16..18) = hasher.finish().to_be_bytes();
     }
 }
 
-impl<'a> fmt::Debug for IpPacketRef<'a> {
+impl Icmpv4Packet {
+    pub fn source_addr(&self) -> Ipv4Addr {
+        self.ipv4_packet_ref().source_addr()
+    }
+
+    pub fn destination_addr(&self) -> Ipv4Addr {
+        self.ipv4_packet_ref().destination_addr()
+    }
+}
+
+impl Icmpv6Packet {
+    pub fn source_addr(&self) -> Ipv6Addr {
+        self.ipv6_packet_ref().source_addr()
+    }
+
+    pub fn destination_addr(&self) -> Ipv6Addr {
+        self.ipv6_packet_ref().destination_addr()
+    }
+}
+
+impl fmt::Debug for IpPacket {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        match self.version() {
-            IpPacketVersionRef::V4(packet) => fmt::Debug::fmt(&packet, formatter),
-            IpPacketVersionRef::V6(packet) => fmt::Debug::fmt(&packet, formatter),
+        match self.version_ref() {
+            IpPacketVersion::V4(packet) => fmt::Debug::fmt(&packet, formatter),
+            IpPacketVersion::V6(packet) => fmt::Debug::fmt(&packet, formatter),
         }
     }
 }
 
-impl<'a> fmt::Debug for Ipv4PacketRef<'a> {
+impl fmt::Debug for Ipv4Packet {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        match self.protocol() {
-            Some(Ipv4PacketProtocolRef::Tcp(tcp)) => fmt::Debug::fmt(&tcp, formatter),
-            Some(Ipv4PacketProtocolRef::Udp(udp)) => fmt::Debug::fmt(&udp, formatter),
-            None => {
+        match self.protocol_ref() {
+            Ipv4PacketProtocol::Tcp(tcp) => fmt::Debug::fmt(&tcp, formatter),
+            Ipv4PacketProtocol::Udp(udp) => fmt::Debug::fmt(&udp, formatter),
+            Ipv4PacketProtocol::Icmp(icmp) => fmt::Debug::fmt(&icmp, formatter),
+            Ipv4PacketProtocol::Unknown { protocol_number } => {
                 formatter
                 .debug_struct("Ipv4Packet")
-                .field("protocol", &self.data[9])
                 .field("source_addr", &self.source_addr())
                 .field("destination_addr", &self.destination_addr())
+                .field("protocol", &protocol_number)
                 .finish()
             },
         }
     }
 }
 
-impl<'a> fmt::Debug for Ipv6PacketRef<'a> {
+impl fmt::Debug for Ipv6Packet {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter
-        .debug_struct("Ipv6Packet")
-        .field("source_addr", &self.source_addr())
-        .field("destination_addr", &self.destination_addr())
-        .finish()
+        match self.protocol_ref() {
+            Ipv6PacketProtocol::Icmp(icmp) => fmt::Debug::fmt(&icmp, formatter),
+            Ipv6PacketProtocol::Unknown { protocol_number } => {
+                formatter
+                .debug_struct("Ipv6Packet")
+                .field("source_addr", &self.source_addr())
+                .field("destination_addr", &self.destination_addr())
+                .field("protocol", &protocol_number)
+                .finish()
+            },
+        }
     }
 }
 
-impl<'a> fmt::Debug for Tcpv4PacketRef<'a> {
+impl fmt::Debug for Tcpv4Packet {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter
         .debug_struct("Tcpv4Packet")
         .field("source_addr", &self.source_addr())
         .field("destination_addr", &self.destination_addr())
+        .field("flags", &self.flags())
         .finish()
     }
 }
 
-impl<'a> fmt::Debug for Udpv4PacketRef<'a> {
+impl fmt::Debug for Udpv4Packet {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter
         .debug_struct("Udpv4Packet")
+        .field("source_addr", &self.source_addr())
+        .field("destination_addr", &self.destination_addr())
+        .finish()
+    }
+}
+
+impl fmt::Debug for Icmpv4Packet {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter
+        .debug_struct("Icmpv4Packet")
+        .field("source_addr", &self.source_addr())
+        .field("destination_addr", &self.destination_addr())
+        .finish()
+    }
+}
+
+impl fmt::Debug for Icmpv6Packet {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter
+        .debug_struct("Icmpv6Packet")
         .field("source_addr", &self.source_addr())
         .field("destination_addr", &self.destination_addr())
         .finish()
