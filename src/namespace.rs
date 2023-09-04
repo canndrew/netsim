@@ -96,6 +96,7 @@ where
 
             let setup = move || {
                 let res = unsafe {
+                    #[cfg_attr(feature="cargo-clippy", allow(clippy::unnecessary_cast))]
                     libc::prctl(libc::PR_SET_PDEATHSIG as i32, libc::SIGTERM, 0, 0, 0)
                 };
                 if res == -1 {
@@ -105,15 +106,18 @@ where
 
                 let mut f = File::create("/proc/self/uid_map")?;
                 let s = format!("0 {} 1\n", uid);
-                f.write(s.as_bytes())?;
+                let n = f.write(s.as_bytes())?;
+                assert_eq!(n, s.len());
 
                 let mut f = File::create("/proc/self/setgroups")?;
                 let s = "deny\n";
-                f.write(s.as_bytes())?;
+                let n = f.write(s.as_bytes())?;
+                assert_eq!(n, s.len());
 
                 let mut f = File::create("/proc/self/gid_map")?;
                 let s = format!("0 {} 1\n", gid);
-                f.write(s.as_bytes())?;
+                let n = f.write(s.as_bytes())?;
+                assert_eq!(n, s.len());
 
                 Ok(())
             };

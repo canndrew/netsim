@@ -28,7 +28,7 @@ pub(crate) fn set_ipv4_addr(
     let fd = new_socket()?;
 
     unsafe {
-        #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
+        #[cfg_attr(feature="cargo-clippy", allow(clippy::cast_ptr_alignment))]
         {
             let addr = &mut req.ifr_ifru.ifru_addr;
             let addr = addr as *mut libc::sockaddr;
@@ -43,7 +43,7 @@ pub(crate) fn set_ipv4_addr(
             return Err(io::Error::last_os_error());
         }
 
-        #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
+        #[cfg_attr(feature="cargo-clippy", allow(clippy::cast_ptr_alignment))]
         {
             let addr = &mut req.ifr_ifru.ifru_addr;
             let addr = addr as *mut libc::sockaddr;
@@ -62,6 +62,7 @@ pub(crate) fn set_ipv4_addr(
     Ok(())
 }
 
+#[cfg_attr(feature="cargo-clippy", allow(clippy::cast_ptr_alignment, clippy::unnecessary_cast))]
 pub(crate) fn add_ipv4_route(
     iface_name: &str,
     destination: Ipv4Network,
@@ -73,7 +74,6 @@ pub(crate) fn add_ipv4_route(
         mem::zeroed()
     };
 
-    #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
     unsafe {
         let route_destination = &mut route.rt_dst as *mut _ as *mut libc::sockaddr_in;
         (*route_destination).sin_family = libc::AF_INET as u16;
@@ -81,7 +81,6 @@ pub(crate) fn add_ipv4_route(
     };
 
     let netmask = Ipv4Addr::from(!((!0u32).checked_shr(u32::from(destination.subnet_mask_bits())).unwrap_or(0)));
-    #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
     unsafe {
         let route_genmask = &mut route.rt_genmask as *mut _ as *mut libc::sockaddr_in;
         (*route_genmask).sin_family = libc::AF_INET as u16;
@@ -90,7 +89,6 @@ pub(crate) fn add_ipv4_route(
 
     route.rt_flags = libc::RTF_UP as u16;
     if let Some(gateway_addr) = gateway_opt {
-        #[cfg_attr(feature="cargo-clippy", allow(cast_ptr_alignment))]
         unsafe {
             let route_gateway = &mut route.rt_gateway as *mut _ as *mut libc::sockaddr_in;
             (*route_gateway).sin_family = libc::AF_INET as u16;
@@ -106,7 +104,7 @@ pub(crate) fn add_ipv4_route(
     route.rt_dev = c_iface_name.as_ptr() as *mut _;
 
     let res = unsafe {
-        libc::ioctl(fd.as_raw_fd(), u64::from(libc::SIOCADDRT), &route)
+        libc::ioctl(fd.as_raw_fd(), libc::SIOCADDRT as u64, &route)
     };
     if res < 0 {
         return Err(io::Error::last_os_error());
@@ -115,6 +113,7 @@ pub(crate) fn add_ipv4_route(
     Ok(())
 }
 
+#[cfg_attr(feature="cargo-clippy", allow(clippy::cast_ptr_alignment, clippy::unnecessary_cast))]
 fn new_req(iface_name: &str) -> libc::ifreq {
     if iface_name.len() >= libc::IF_NAMESIZE as usize {
         panic!("interface name too long");
@@ -130,6 +129,7 @@ fn new_req(iface_name: &str) -> libc::ifreq {
     }
 }
 
+#[cfg_attr(feature="cargo-clippy", allow(clippy::cast_ptr_alignment, clippy::unnecessary_cast))]
 fn new_socket() -> io::Result<OwnedFd> {
     let raw_fd = unsafe {
         libc::socket(libc::AF_INET as i32, libc::SOCK_DGRAM as i32, 0)

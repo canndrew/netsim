@@ -94,6 +94,8 @@ fn create_tun_interface(build_config: BuildConfig) -> io::Result<OwnedFd> {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, err));
         },
     };
+
+    #[cfg_attr(feature="cargo-clippy", allow(clippy::unnecessary_cast))]
     if name_cstr.as_bytes_with_nul().len() > libc::IF_NAMESIZE as usize {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "name too long"));
     }

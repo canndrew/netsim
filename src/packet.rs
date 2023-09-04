@@ -43,6 +43,12 @@ impl Ipv4Hasher {
     }
 }
 
+macro_rules! bit(
+    ($val:expr, $index:expr) => (
+        ($val >> $index) & 1 == 1
+    );
+);
+
 macro_rules! slice(
     ($val:expr, ..$end:literal) => (
         slice!($val, 0..$end)
@@ -85,6 +91,7 @@ macro_rules! packet_type(
         }
 
         impl $name {
+            #[cfg_attr(feature="cargo-clippy", allow(clippy::len_without_is_empty))]
             pub fn len(&self) -> usize {
                 self.data.len()
             }
@@ -102,11 +109,11 @@ macro_rules! packet_type(
                     unsafe { transmute(self) }
                 }
 
-                pub fn $parent_ref<'a>(&'a self) -> &'a $parent {
+                pub fn $parent_ref(&self) -> &$parent {
                     unsafe { transmute(self) }
                 }
 
-                pub fn $parent_mut<'a>(&'a mut self) -> &'a mut $parent {
+                pub fn $parent_mut(&mut self) -> &mut $parent {
                     unsafe { transmute(self) }
                 }
             )*
@@ -225,7 +232,7 @@ impl IpPacket {
         }
     }
 
-    pub fn version_ref<'a>(&'a self) -> IpPacketVersion<&'a IpPacket> {
+    pub fn version_ref(&self) -> IpPacketVersion<&IpPacket> {
         match self.data[0] >> 4 {
             4 => IpPacketVersion::V4(unsafe { transmute(self) }),
             6 => IpPacketVersion::V6(unsafe { transmute(self) }),
@@ -233,7 +240,7 @@ impl IpPacket {
         }
     }
 
-    pub fn version_mut<'a>(&'a mut self) -> IpPacketVersion<&'a mut IpPacket> {
+    pub fn version_mut(&mut self) -> IpPacketVersion<&mut IpPacket> {
         match self.data[0] >> 4 {
             4 => IpPacketVersion::V4(unsafe { transmute(self) }),
             6 => IpPacketVersion::V6(unsafe { transmute(self) }),
@@ -278,7 +285,7 @@ impl Ipv4Packet {
         }
     }
 
-    pub fn protocol_ref<'a>(&'a self) -> Ipv4PacketProtocol<&'a Ipv4Packet> {
+    pub fn protocol_ref(&self) -> Ipv4PacketProtocol<&Ipv4Packet> {
         match self.data[9] {
             protocol_numbers::TCP => Ipv4PacketProtocol::Tcp(unsafe { transmute(self) }),
             protocol_numbers::UDP => Ipv4PacketProtocol::Udp(unsafe { transmute(self) }),
@@ -287,7 +294,7 @@ impl Ipv4Packet {
         }
     }
 
-    pub fn protocol_mut<'a>(&'a mut self) -> Ipv4PacketProtocol<&'a mut Ipv4Packet> {
+    pub fn protocol_mut(&mut self) -> Ipv4PacketProtocol<&mut Ipv4Packet> {
         match self.data[9] {
             protocol_numbers::TCP => Ipv4PacketProtocol::Tcp(unsafe { transmute(self) }),
             protocol_numbers::UDP => Ipv4PacketProtocol::Udp(unsafe { transmute(self) }),
@@ -352,14 +359,14 @@ impl Ipv6Packet {
         }
     }
 
-    pub fn protocol_ref<'a>(&'a self) -> Ipv6PacketProtocol<&'a Ipv6Packet> {
+    pub fn protocol_ref(&self) -> Ipv6PacketProtocol<&Ipv6Packet> {
         match self.data[6] {
             protocol_numbers::ICMP_V6 => Ipv6PacketProtocol::Icmp(unsafe { transmute(self) }),
             protocol_number => Ipv6PacketProtocol::Unknown { protocol_number },
         }
     }
 
-    pub fn protocol_mut<'a>(&'a mut self) -> Ipv6PacketProtocol<&'a mut Ipv6Packet> {
+    pub fn protocol_mut(&mut self) -> Ipv6PacketProtocol<&mut Ipv6Packet> {
         match self.data[6] {
             protocol_numbers::ICMP_V6 => Ipv6PacketProtocol::Icmp(unsafe { transmute(self) }),
             protocol_number => Ipv6PacketProtocol::Unknown { protocol_number },
@@ -414,14 +421,14 @@ impl Tcpv4Packet {
         let header_len = self.ipv4_packet_ref().ipv4_header_len();
         let flags = self.data[header_len + 13];
         TcpPacketFlags {
-            cwr: (flags >> 7) & 1 == 1,
-            ece: (flags >> 6) & 1 == 1,
-            urg: (flags >> 5) & 1 == 1,
-            ack: (flags >> 4) & 1 == 1,
-            psh: (flags >> 3) & 1 == 1,
-            rst: (flags >> 2) & 1 == 1,
-            syn: (flags >> 1) & 1 == 1,
-            fin: (flags >> 0) & 1 == 1,
+            cwr: bit!(flags, 7),
+            ece: bit!(flags, 6),
+            urg: bit!(flags, 5),
+            ack: bit!(flags, 4),
+            psh: bit!(flags, 3),
+            rst: bit!(flags, 2),
+            syn: bit!(flags, 1),
+            fin: bit!(flags, 0),
         }
     }
 

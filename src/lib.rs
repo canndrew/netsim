@@ -1,3 +1,5 @@
+#![cfg_attr(feature="cargo-clippy", allow(clippy::let_unit_value))]
+
 mod priv_prelude;
 mod namespace;
 mod machine;
@@ -15,10 +17,8 @@ pub use {
     iface::stream::IpIface,
     connect::{connect, Connect},
     network::Ipv4Network,
-    stream_ext::PacketStreamExt,
+    stream_ext::SinkStreamExt,
 };
-
-//mod packet2;
 
 #[cfg(test)]
 mod tests;

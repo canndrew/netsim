@@ -1,6 +1,12 @@
 [package]
 name = "netsim-ng"
 version = "0.1.0"
+authors = ["Andrew Cann <shum@canndrew.org>"]
+description = "Run tests in network-isolated threads. Intercept and meddle with their packets."
+repository = "https://github.com/canndrew/netsim-ng"
+license = "MIT OR BSD-3-Clause"
+keywords = ["network", "ip", "testing"]
+categories = ["asynchronous", "development-tools::testing", "network-programming", "simulation", "virtualization"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

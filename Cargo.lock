@@ -286,6 +286,7 @@ dependencies = [
  "futures",
  "ioctl-sys",
  "libc",
+ "log",
  "net-literals",
  "oneshot",
  "pin-project",
@@ -589,6 +590,7 @@ checksum = "532826ff75199d5833b9d2c5fe410f29235e25704ee5f0ef599fb51c21f4a4da"
 dependencies = [
  "autocfg",
  "backtrace",
+ "bytes",
  "libc",
  "mio",
  "num_cpus",

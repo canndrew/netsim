@@ -28,7 +28,7 @@ impl Machine {
             };
             runtime.block_on(async move {
                 while let Some(task) = task_rx.next().await {
-                    let _ = tokio::spawn(task);
+                    let _detach = tokio::spawn(task);
                 }
             });
             runtime.shutdown_background();

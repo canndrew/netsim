@@ -12,8 +12,8 @@ where
     fn connect_to(self, other: T1) {
         let (sink_0, stream_0) = self.split();
         let (sink_1, stream_1) = other.split();
-        let _ = tokio::spawn(stream_0.forward(sink_1).map(|_res| ()));
-        let _ = tokio::spawn(stream_1.forward(sink_0).map(|_res| ()));
+        let _detach = tokio::spawn(stream_0.forward(sink_1).map(|_res| ()));
+        let _detach = tokio::spawn(stream_1.forward(sink_0).map(|_res| ()));
     }
 }
 

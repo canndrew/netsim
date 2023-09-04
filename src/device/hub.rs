@@ -10,6 +10,7 @@ struct IpHubTask {
 }
 
 impl IpHub {
+    #[cfg_attr(feature="cargo-clippy", allow(clippy::new_without_default))]
     pub fn new() -> IpHub {
         let (iface_sender, iface_receiver) = mpsc::unbounded();
         let task = IpHubTask {
@@ -33,11 +34,7 @@ impl IpHubTask {
     fn poll_flush_outgoing(&mut self, cx: &mut task::Context) -> Poll<()> {
         let mut index = 0;
         let mut any_pending = false;
-        loop {
-            let iface = match self.ifaces.get_mut(index) {
-                Some(iface) => iface,
-                None => break,
-            };
+        while let Some(iface) = self.ifaces.get_mut(index) {
             match iface.as_mut().poll_flush(cx) {
                 Poll::Ready(Ok(())) => (),
                 Poll::Ready(Err(_)) => {
@@ -65,11 +62,7 @@ impl IpHubTask {
 
         let mut index = 0;
         let mut any_pending = false;
-        loop {
-            let iface = match self.ifaces.get_mut(index) {
-                Some(iface) => iface,
-                None => break,
-            };
+        while let Some(iface) = self.ifaces.get_mut(index) {
             match iface.as_mut().poll_ready(cx) {
                 Poll::Ready(Ok(())) => (),
                 Poll::Ready(Err(_)) => {
@@ -116,11 +109,7 @@ impl IpHubTask {
 
     fn poll_next_incoming(&mut self, cx: &mut task::Context) -> Poll<(usize, Box<IpPacket>)> {
         let mut index = 0;
-        loop {
-            let iface = match self.ifaces.get_mut(index) {
-                Some(iface) => iface,
-                None => break,
-            };
+        while let Some(iface) = self.ifaces.get_mut(index) {
             match iface.as_mut().poll_next(cx) {
                 Poll::Ready(Some(Ok(packet))) => {
                     return Poll::Ready((index, packet));
