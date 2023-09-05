@@ -1,18 +1,29 @@
 use crate::priv_prelude::*;
 
+/// A simple NAT (network address translation) implementation. Allows for testing network code
+/// across NATs.
 pub struct Nat {
     iface_sender: mpsc::UnboundedSender<Pin<Box<dyn IpSinkStream>>>,
 }
 
+/// Builder for creating a [`Nat`](crate::device::Nat).
 pub struct NatBuilder {
     external_ipv4: Ipv4Addr,
     internal_ipv4_network: Ipv4Network,
     hair_pinning: bool,
     address_restricted: bool,
     port_restricted: bool,
+    reply_with_rst_to_unexpected_tcp_packets: bool,
 }
 
 impl NatBuilder {
+    /// Starts building a [`Nat`](crate::device::Nat). Use to configure the NAT then call
+    /// [`build`](crate::device::NatBuilder::build) to create the NAT.
+    ///
+    /// * `external_ipv4` is the IPv4 address that the NAT uses on its external side.
+    /// * `internal_ipv4_network` is the IPv4 network (eg. 192.168.0.0/16) on the internal side of
+    /// the NAT. The NAT won't forward any packets on its internal side that don't originate from
+    /// this network.
     pub fn new(external_ipv4: Ipv4Addr, internal_ipv4_network: Ipv4Network) -> NatBuilder {
         NatBuilder {
             external_ipv4,
@@ -20,24 +31,34 @@ impl NatBuilder {
             hair_pinning: false,
             address_restricted: false,
             port_restricted: false,
+            reply_with_rst_to_unexpected_tcp_packets: false,
         }
     }
 
+    /// Enables [NAT hair-pinning](https://en.wikipedia.org/wiki/Network_address_translation#NAT_hairpinning).
     pub fn hair_pinning(mut self) -> Self {
         self.hair_pinning = true;
         self
     }
 
+    pub fn reply_with_rst_to_unexpected_tcp_packets(mut self) -> Self {
+        self.reply_with_rst_to_unexpected_tcp_packets = true;
+        self
+    }
+
+    /// Makes this NAT [address restricted](https://en.wikipedia.org/wiki/Network_address_translation#Methods_of_translation).
     pub fn address_restricted(mut self) -> Self {
         self.address_restricted = true;
         self
     }
 
+    /// Makes this NAT [port restricted](https://en.wikipedia.org/wiki/Network_address_translation#Methods_of_translation).
     pub fn port_restricted(mut self) -> Self {
         self.port_restricted = true;
         self
     }
 
+    /// Build the NAT. The returned `IpChannel` is the external interface of the NAT.
     pub fn build(self) -> (Nat, IpChannel) {
         let NatBuilder {
             external_ipv4,
@@ -45,6 +66,7 @@ impl NatBuilder {
             hair_pinning,
             address_restricted,
             port_restricted,
+            reply_with_rst_to_unexpected_tcp_packets,
         } = self;
         let (iface_sender, iface_receiver) = mpsc::unbounded();
         let (channel_0, channel_1) = IpChannel::new(1);
@@ -64,6 +86,7 @@ impl NatBuilder {
             port_map: PortMap::new(),
             hair_pinning,
             restrictions,
+            reply_with_rst_to_unexpected_tcp_packets,
         };
         tokio::spawn(task);
         let nat = Nat { iface_sender };
@@ -82,9 +105,14 @@ struct NatTask {
     port_map: PortMap,
     hair_pinning: bool,
     restrictions: Restrictions,
+    reply_with_rst_to_unexpected_tcp_packets: bool,
 }
 
 impl Nat {
+    /// Insert an interface into the internal side of this NAT. Packets sent by this interface to
+    /// addresses outside the NAT's internal network will be address translated and sent out
+    /// the NAT's external interface. This creates a port-mapping which allows external hosts to
+    /// send packets back through the NAT to this interface.
     pub fn insert_iface<S>(&mut self, iface: S)
     where
         S: IpSinkStream,
@@ -238,23 +266,43 @@ impl NatTask {
                 match packet.protocol_box() {
                     Ipv4PacketProtocol::Tcp(mut packet) => {
                         let port = packet.destination_port();
-                        let mapped_addr = match self.port_map.incoming_addr(port) {
+                        let mapped_addr_opt = if self.restrictions.incoming_allowed(port, packet.source_addr()) {
+                            self.port_map.incoming_addr(port)
+                        } else {
+                            None
+                        };
+                        let mapped_addr = match mapped_addr_opt {
                             Some(mapped_addr) => mapped_addr,
                             None => {
+                                if self.reply_with_rst_to_unexpected_tcp_packets {
+                                    let mut rst_packet = Tcpv4Packet::new();
+                                    rst_packet.set_flags(TcpPacketFlags {
+                                        rst: true,
+                                        ack: true,
+                                        .. TcpPacketFlags::default()
+                                    });
+                                    rst_packet.set_source_addr(packet.destination_addr());
+                                    rst_packet.set_destination_addr(packet.source_addr());
+                                    rst_packet.set_ack_number(packet.seq_number().wrapping_add(1));
+                                    match &mut self.external_iface_opt {
+                                        None => (),
+                                        Some(external_iface) => {
+                                            match Pin::new(external_iface).start_send(rst_packet.ip_packet_box()) {
+                                                Ok(()) => (),
+                                                Err(_) => {
+                                                    self.external_iface_opt = None;
+                                                },
+                                            }
+                                        },
+                                    }
+                                }
                                 debug!(
-                                    "{}: dropping external packet addressed to unmapped port {}",
+                                    "{}: dropping external packet addressed to unmapped or disallowed port {}",
                                     self.external_ipv4, packet.destination_addr(),
                                 );
                                 return;
                             },
                         };
-                        if !self.restrictions.incoming_allowed(port, packet.source_addr()) {
-                            debug!(
-                                "{}: dropping external packet from unallowed remote addr {}",
-                                self.external_ipv4, packet.source_addr(),
-                            );
-                            return;
-                        }
                         let iface_index = match self.internal_addr_indexes.get(&IpAddr::V4(*mapped_addr.ip())) {
                             Some(iface_index) => iface_index,
                             None => return,

@@ -279,8 +279,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "netsim-ng"
-version = "0.1.0"
+name = "netsim"
+version = "2.0.0-alpha0"
 dependencies = [
  "bytes",
  "futures",

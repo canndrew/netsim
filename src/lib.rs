@@ -11,12 +11,16 @@ mod stream_ext;
 pub mod adapter;
 pub mod device;
 pub mod packet;
+mod sys;
 
 pub use {
-    machine::Machine,
-    iface::stream::IpIface,
-    connect::{connect, Connect},
-    network::Ipv4Network,
+    machine::{Machine, JoinHandle},
+    iface::{
+        create::IpIfaceBuilder,
+        stream::{IpIface, IpSinkStream},
+    },
+    connect::connect,
+    network::{Ipv4Network, Ipv6Network, NetworkParseError, Ipv4NetworkIter, Ipv6NetworkIter},
     stream_ext::SinkStreamExt,
 };
 

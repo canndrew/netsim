@@ -1,7 +1,7 @@
 pub(crate) use {
     std::{
-        cmp, fmt, io, mem, panic, ptr, slice, task, thread,
-        collections::{hash_map, HashMap, BTreeMap, HashSet},
+        cmp, fmt, io, mem, panic, ptr, slice, task, thread, str,
+        collections::{VecDeque, hash_map, HashMap, BTreeMap, HashSet},
         ffi::{CStr, CString},
         future::{Future, IntoFuture},
         fs::File,
@@ -19,25 +19,25 @@ pub(crate) use {
     tokio::io::unix::AsyncFd,
     futures::{
         ready, FutureExt, Sink, Stream, StreamExt,
+        stream::FusedStream,
         channel::mpsc,
-        //stream::FuturesUnordered,
     },
     ioctl_sys::ioctl,
-    net_literals::ipv4,
+    net_literals::{ipv4, ipv6},
     pin_project::pin_project,
     rand::Rng,
     log::{log_enabled, debug, Level},
     crate::{
-        namespace, ioctl, iface, adapter,
+        namespace, ioctl, iface, adapter, sys,
         device::IpChannel,
         machine::Machine,
         iface::{
             create::IpIfaceBuilder,
             stream::{IpIface, IpSinkStream},
         },
-        network::Ipv4Network,
+        network::{Ipv4Network, Ipv6Network},
         packet::{
-            IpPacket, IpPacketVersion, Ipv4PacketProtocol,
+            IpPacket, IpPacketVersion, Ipv4PacketProtocol, Tcpv4Packet, TcpPacketFlags,
         },
     },
 };
@@ -49,6 +49,10 @@ pub(crate) use {
         io::{AsyncReadExt, AsyncWriteExt},
         net::{TcpStream, TcpListener},
     },
-    crate::device::{IpHub, NatBuilder},
+    futures::{join, SinkExt},
+    crate::{
+        device::{BiChannel, IpHub, NatBuilder},
+        SinkStreamExt,
+    },
 };
 

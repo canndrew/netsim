@@ -1,5 +1,8 @@
 use crate::priv_prelude::*;
 
+/// `Sink`/`Stream` adapter which randomly drops items.
+///
+/// Can be created via [`SinkStreamExt::with_loss`](crate::SinkStreamExt::with_loss).
 #[pin_project]
 pub struct Loss<S> {
     #[pin]
@@ -17,6 +20,8 @@ struct Jitter {
 
 impl Jitter {
     pub fn new(loss_rate: f64, jitter_period: Duration) -> Jitter {
+        assert!(0.0 <= loss_rate);
+        assert!(loss_rate <= 1.0);
         let now = Instant::now();
         let mut jitter = Jitter {
             loss_rate,
@@ -65,6 +70,8 @@ impl Jitter {
 }
 
 impl<S> Loss<S> {
+    /// Creates a new [`Loss`]. See the documentation for
+    /// [`SinkStreamExt::with_loss`](crate::SinkStreamExt::with_loss).
     pub fn new(stream: S, loss_rate: f64, jitter_period: Duration) -> Loss<S> {
         Loss {
             stream,
@@ -111,6 +118,10 @@ where
 
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
         let this = self.project();
+        this.jitter.advance();
+        if this.jitter.currently_dropping() {
+            return Ok(());
+        }
         this.stream.start_send(item)
     }
 
@@ -122,6 +133,15 @@ where
     fn poll_close(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Self::Error>> {
         let this = self.project();
         this.stream.poll_close(cx)
+    }
+}
+
+impl<S> FusedStream for Loss<S>
+where
+    S: FusedStream,
+{
+    fn is_terminated(&self) -> bool {
+        self.stream.is_terminated()
     }
 }
 

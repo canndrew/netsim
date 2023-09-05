@@ -50,7 +50,7 @@ async fn connect_to_outside_world() {
         stream.read_exact(&mut received_msg).await.unwrap();
         assert_eq!(received_msg, *MSG_0);
         stream.write_all(MSG_1).await.unwrap();
-    }).await;
+    });
 
     let task_1 = machine_1.spawn(async move {
         let listener = TcpListener::bind(addr_1).await.unwrap();
@@ -61,9 +61,47 @@ async fn connect_to_outside_world() {
         let mut received_msg = [0u8; MSG_1.len()];
         stream.read_exact(&mut received_msg).await.unwrap();
         assert_eq!(received_msg, *MSG_1);
-    }).await;
+    });
 
     let (res_0, res_1) = futures::join!(task_0.join(), task_1.join());
     let () = res_0.unwrap().unwrap();
     let () = res_1.unwrap().unwrap();
 }
+
+#[tokio::test]
+async fn nat_tcp_reset() {
+    let machine_addr = addrv4!("115.70.254.190:45000");
+    let nat_addr = addrv4!("115.70.254.200:45666");
+
+    let machine = Machine::new().unwrap();
+    let machine_iface = {
+        machine
+        .add_ip_iface()
+        .ipv4_addr(*machine_addr.ip())
+        .ipv4_default_route()
+        .await
+        .unwrap()
+    };
+    let (_nat, nat_iface) = {
+        NatBuilder::new(
+            *nat_addr.ip(),
+            Ipv4Network::new(ipv4!("192.168.0.0"), 16),
+        )
+        .reply_with_rst_to_unexpected_tcp_packets()
+        .build()
+    };
+
+    crate::connect(machine_iface, nat_iface);
+
+    let res = machine.spawn(async move {
+        tokio::time::timeout(Duration::from_millis(100), TcpStream::connect(nat_addr)).await
+    }).await.unwrap().unwrap().unwrap();
+    match res {
+        Ok(_) => unreachable!(),
+        Err(err) => match err.kind() {
+            io::ErrorKind::ConnectionRefused => (),
+            kind => panic!("unexpected error kind: {}", kind),
+        },
+    }
+}
+

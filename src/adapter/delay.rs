@@ -1,8 +1,9 @@
 use crate::priv_prelude::*;
 
 /// `Sink`/`Stream` adapter which adds a time delay to items sent/received through the
-/// `Sink`/`Stream`. Can be created via
-/// [`SinkStreamExt::with_delay`](crate::SinkStreamExt::with_delay).
+/// `Sink`/`Stream`.
+///
+/// Can be created via [`SinkStreamExt::with_delay`](crate::SinkStreamExt::with_delay).
 #[pin_project]
 pub struct Delay<S, T>
 where
@@ -23,7 +24,7 @@ where
 struct DelayQueue<T> {
     #[pin]
     sleep_opt: Option<tokio::time::Sleep>,
-    pending: BTreeMap<Instant, Vec<T>>,
+    pending: BTreeMap<Instant, VecDeque<T>>,
 }
 
 impl<T> DelayQueue<T> {
@@ -37,13 +38,19 @@ impl<T> DelayQueue<T> {
     pub fn push(self: Pin<&mut Self>, delay: Duration, value: T) {
         let mut this = self.project();
         let instant = Instant::now() + delay;
-        match this.sleep_opt.as_mut().as_pin_mut() {
-            Some(_sleep) => (),
+        match this.pending.first_entry() {
             None => {
                 this.sleep_opt.set(Some(tokio::time::sleep_until(instant.into())));
             },
+            Some(entry) => {
+                let prev_instant = *entry.key();
+                if instant < prev_instant {
+                    let sleep = this.sleep_opt.as_mut().as_pin_mut().unwrap();
+                    sleep.reset(instant.into());
+                }
+            },
         }
-        this.pending.entry(instant).or_default().push(value);
+        this.pending.entry(instant).or_default().push_back(value);
     }
 
     pub fn pop(self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Option<T>> {
@@ -54,7 +61,7 @@ impl<T> DelayQueue<T> {
                 match sleep.as_mut().poll(cx) {
                     Poll::Ready(()) => {
                         let mut entry = this.pending.first_entry().unwrap();
-                        let value = entry.get_mut().pop().unwrap();
+                        let value = entry.get_mut().pop_front().unwrap();
                         let next_instant_opt = if entry.get().is_empty() {
                             let _ = entry.remove();
                             this.pending.first_key_value().map(|(&instant, _values)| instant)

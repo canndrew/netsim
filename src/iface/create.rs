@@ -4,8 +4,14 @@ struct BuildConfig {
     name_opt: Option<String>,
     ipv4_addr_subnet_opt: Option<(Ipv4Addr, u8)>,
     ipv4_routes: Vec<(Ipv4Network, Option<Ipv4Addr>)>,
+    ipv6_addr_subnet_opt: Option<(Ipv6Addr, u8)>,
+    ipv6_routes: Vec<(Ipv6Network, Ipv6Addr)>,
 }
 
+/// Builder for adding an IP interface to a [`Machine`](crate::Machine).
+///
+/// Once you're done configuring the interface you must `await` the builder to actually add the
+/// interface.
 pub struct IpIfaceBuilder<'m> {
     machine: &'m Machine,
     build_config: BuildConfig,
@@ -19,15 +25,19 @@ impl IpIfaceBuilder<'_> {
                 name_opt: None,
                 ipv4_addr_subnet_opt: None,
                 ipv4_routes: Vec::new(),
+                ipv6_addr_subnet_opt: None,
+                ipv6_routes: Vec::new(),
             },
         }
     }
 
+    /// Sets the interface name. Defaults to "netsim" if not set.
     pub fn name(mut self, name: impl Into<String>) -> Self {
         self.build_config.name_opt = Some(name.into());
         self
     }
 
+    /// Sets the interface's IPv4 address.
     pub fn ipv4_addr(mut self, ipv4_addr: impl Into<Ipv4Addr>) -> Self {
         let ipv4_addr = ipv4_addr.into();
         let network = Ipv4Network::infer_from_addr(ipv4_addr);
@@ -35,11 +45,22 @@ impl IpIfaceBuilder<'_> {
         self
     }
 
+    /// Sets the interface's IPv6 address.
+    pub fn ipv6_addr(mut self, ipv6_addr: impl Into<Ipv6Addr>) -> Self {
+        let ipv6_addr = ipv6_addr.into();
+        let network = Ipv6Network::infer_from_addr(ipv6_addr);
+        self.build_config.ipv6_addr_subnet_opt = Some((ipv6_addr, network.subnet_mask_bits()));
+        self
+    }
+
+    /// Adds an IPv4 route for this interface to the machine's routing table.
     pub fn ipv4_route(mut self, destination: Ipv4Network) -> Self {
         self.build_config.ipv4_routes.push((destination, None));
         self
     }
 
+    /// Adds an IPv4 route to the machine's routing table which forwards through this interface via
+    /// the specified gateway.
     pub fn ipv4_route_with_gateway<A: Into<Ipv4Addr>>(
         mut self,
         destination: Ipv4Network,
@@ -50,19 +71,41 @@ impl IpIfaceBuilder<'_> {
         self
     }
 
+    /// Adds an IPv4 route for this interface to the machine's routing table and sets it as the
+    /// default route.
     pub fn ipv4_default_route(self) -> Self {
         self.ipv4_route(Ipv4Network::new(Ipv4Addr::UNSPECIFIED, 0))
     }
 
+    /// Adds an IPv4 route to the machine's routing table which forwards through this interface via
+    /// the specified gateway. Sets it as the default route.
     pub fn ipv4_default_route_with_gateway(self, gateway: Ipv4Addr) -> Self {
         self.ipv4_route_with_gateway(Ipv4Network::new(Ipv4Addr::UNSPECIFIED, 0), gateway)
+    }
+
+    /// Adds an IPv6 route for this interface to the machine's routing table.
+    pub fn ipv6_route(mut self, destination: Ipv6Network, next_hop: Ipv6Addr) -> Self {
+        self.build_config.ipv6_routes.push((destination, next_hop));
+        self
+    }
+
+    /// Adds an IPv6 route for this interface to the machine's routing table and sets it as the
+    /// default route.
+    pub fn ipv6_default_route(mut self, next_hop: Ipv6Addr) -> Self {
+        self.build_config.ipv6_routes.push((Ipv6Network::new(Ipv6Addr::UNSPECIFIED, 0), next_hop));
+        self
+    }
+
+    /// Builds the interface. The returned [`IpIface`](crate::IpIface) can be used to send packets
+    /// to or receive packets from this interface.
+    pub async fn build(self) -> io::Result<IpIface> {
+        self.into_future().await
     }
 }
 
 impl<'m> IntoFuture for IpIfaceBuilder<'m> {
     type Output = io::Result<IpIface>;
     type IntoFuture = Pin<Box<dyn Future<Output = io::Result<IpIface>> + Send + 'm>>;
-    //type IntoFuture = impl Future<Output = io::Result<IpIface>> + Send + 'm;
 
     fn into_future(self) -> Pin<Box<dyn Future<Output = io::Result<IpIface>> + Send + 'm>> {
         let IpIfaceBuilder { machine, build_config } = self;
@@ -70,8 +113,7 @@ impl<'m> IntoFuture for IpIfaceBuilder<'m> {
             let task = async move {
                 create_tun_interface(build_config)
             };
-            let join_handle = machine.spawn(task).await;
-            let res = join_handle.join().await;
+            let res = machine.spawn(task).await;
             let fd = match res {
                 Ok(res_opt) => res_opt.unwrap()?,
                 Err(err) => panic::resume_unwind(err),
@@ -86,6 +128,8 @@ fn create_tun_interface(build_config: BuildConfig) -> io::Result<OwnedFd> {
         name_opt,
         ipv4_addr_subnet_opt,
         ipv4_routes,
+        ipv6_addr_subnet_opt,
+        ipv6_routes,
     } = build_config;
     let name = name_opt.as_deref().unwrap_or("netsim");
     let name_cstr = match CString::new(name) {
@@ -163,66 +207,21 @@ fn create_tun_interface(build_config: BuildConfig) -> io::Result<OwnedFd> {
     };
 
 
-    /*
-    if let Some(mac_addr) = mac_addr {
-        match iface::set_mac_addr(&real_name, mac_addr) {
-            Ok(()) => (),
-            Err(SetMacAddrError::UnknownInterface)
-                => panic!("the interface we just created doesn't exist?"),
-            Err(SetMacAddrError::PermissionDenied(..))
-                => panic!("don't have permission to configure the interface we just created?"),
-            Err(SetMacAddrError::AddrNotAvailable(e))
-                => return Err(IfaceBuildError::MacAddrNotAvailable(e)),
-            Err(SetMacAddrError::ProcessFileDescriptorLimit(e))
-                => return Err(IfaceBuildError::ProcessFileDescriptorLimit(e)),
-            Err(SetMacAddrError::SystemFileDescriptorLimit(e))
-                => return Err(IfaceBuildError::SystemFileDescriptorLimit(e)),
-        }
-    }
-    */
-
     if let Some((ipv4_addr, subnet_mask_bits)) = ipv4_addr_subnet_opt {
         iface::configure::set_ipv4_addr(&real_name, ipv4_addr, subnet_mask_bits)?;
     }
-
-    /*
-    if let Some((ipv6_addr, ipv6_netmask_bits)) = builder.ipv6_addr {
-        match iface::set_ipv6_addr(&real_name, ipv6_addr, ipv6_netmask_bits) {
-            Ok(()) => (),
-            Err(SetIpv6AddrError::UnknownInterface)
-                => panic!("the interface we just created doesn't exist?"),
-            Err(SetIpv6AddrError::PermissionDenied(..))
-                => panic!("don't have permission to configure the interface we just created?"),
-            Err(SetIpv6AddrError::AddrNotAvailable(e))
-                => return Err(IfaceBuildError::Ipv6AddrNotAvailable(e)),
-            Err(SetIpv6AddrError::ProcessFileDescriptorLimit(e))
-                => return Err(IfaceBuildError::ProcessFileDescriptorLimit(e)),
-            Err(SetIpv6AddrError::SystemFileDescriptorLimit(e))
-                => return Err(IfaceBuildError::SystemFileDescriptorLimit(e)),
-        }
+    if let Some((ipv6_addr, subnet_mask_bits)) = ipv6_addr_subnet_opt {
+        iface::configure::set_ipv6_addr(&real_name, ipv6_addr, subnet_mask_bits)?;
     }
-    */
 
     iface::configure::put_up(&real_name)?;
 
     for (destination, gateway_opt) in ipv4_routes {
         iface::configure::add_ipv4_route(&real_name, destination, gateway_opt)?;
     }
-    /*
-    for route in builder.ipv6_routes {
-        trace!("adding route {:?} to {}", route, real_name);
-        match route.add_to_routing_table(&real_name) {
-            Ok(()) => (),
-            Err(AddRouteError::ProcessFileDescriptorLimit(e)) => {
-                return Err(IfaceBuildError::ProcessFileDescriptorLimit(e));
-            },
-            Err(AddRouteError::SystemFileDescriptorLimit(e)) => {
-                return Err(IfaceBuildError::SystemFileDescriptorLimit(e));
-            },
-            Err(AddRouteError::NameContainsNul) => unreachable!(),
-        }
+    for (destination, next_hop) in ipv6_routes {
+        iface::configure::add_ipv6_route(&real_name, destination, next_hop)?;
     }
-    */
 
     Ok(fd)
 }

@@ -1,5 +1,7 @@
 use crate::priv_prelude::*;
 
+/// A simple IP network hub. You can insert any number of interfaces into the hub and any packet
+/// received on one will be forwarded to all other interfaces.
 pub struct IpHub {
     iface_sender: mpsc::UnboundedSender<Pin<Box<dyn IpSinkStream>>>,
 }
@@ -10,6 +12,7 @@ struct IpHubTask {
 }
 
 impl IpHub {
+    /// Create a new `IpHub`. Must be called within a `tokio` context.
     #[cfg_attr(feature="cargo-clippy", allow(clippy::new_without_default))]
     pub fn new() -> IpHub {
         let (iface_sender, iface_receiver) = mpsc::unbounded();
@@ -21,6 +24,9 @@ impl IpHub {
         IpHub { iface_sender }
     }
 
+    /// Insert a `Sink`/`Stream` of IP packets into the hub. Any packet created by this `Stream`
+    /// will be forwarded to all other inserted `Sink`s and this `Sink` will receive any packet
+    /// produced by any other inserted `Stream`.
     pub fn insert_iface<S>(&mut self, iface: S)
     where
         S: IpSinkStream,
@@ -166,5 +172,4 @@ impl Future for IpHubTask {
         this.poll_inner(cx)
     }
 }
-
 

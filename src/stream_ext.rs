@@ -1,5 +1,6 @@
 use crate::priv_prelude::*;
 
+/// Extension trait for types which are both `Sink`s and `Stream`s.
 pub trait SinkStreamExt<T>: Stream + Sink<T> {
     /// Delays items sent/received through this `Sink`/`Stream`.
     /// 
@@ -13,32 +14,18 @@ pub trait SinkStreamExt<T>: Stream + Sink<T> {
         mean_additional_delay: Duration,
     ) -> crate::adapter::Delay<Self, T>
     where
-        Self: Sized;
-
-    fn with_loss(
-        self,
-        loss_rate: f64,
-        jitter_period: Duration,
-    ) -> crate::adapter::Loss<Self>
-    where
-        Self: Sized;
-}
-
-impl<S, T> SinkStreamExt<T> for S
-where
-    S: Stream + Sink<T>,
-{
-    fn with_delay(
-        self,
-        min_delay: Duration,
-        mean_additional_delay: Duration,
-    ) -> crate::adapter::Delay<Self, T>
-    where
-        S: Sized,
+        Self: Sized,
     {
         crate::adapter::Delay::new(self, min_delay, mean_additional_delay)
     }
 
+    /// Randomly drops items sent through this `Sink`/`Stream`.
+    ///
+    /// * `loss_rate` is what proportion of the items to drop. Setting to `1` will drop everything,
+    /// setting to `0` will drop nothing.
+    /// * `jitter_period` controls the average rate of switching between dropping and not dropping
+    /// items. Setting this to zero disables jitter so that each item has an independent
+    /// probability of getting dropped.
     fn with_loss(
         self,
         loss_rate: f64,
@@ -49,5 +36,11 @@ where
     {
         crate::adapter::Loss::new(self, loss_rate, jitter_period)
     }
+}
+
+impl<S, T> SinkStreamExt<T> for S
+where
+    S: Stream + Sink<T>,
+{
 }
 

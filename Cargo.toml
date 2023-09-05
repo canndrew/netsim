@@ -1,6 +1,6 @@
 [package]
-name = "netsim-ng"
-version = "0.1.0"
+name = "netsim"
+version = "2.0.0-alpha0"
 authors = ["Andrew Cann <shum@canndrew.org>"]
 description = "Run tests in network-isolated threads. Intercept and meddle with their packets."
 repository = "https://github.com/canndrew/netsim-ng"

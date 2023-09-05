@@ -1,5 +1,12 @@
 use crate::priv_prelude::*;
 
+/// The external side of a network interface of a [`Machine`](crate::Machine).
+///
+/// When an interface is added to a machine, any futures executed on that machine will see it as an
+/// ordinary network interface on which packets may be sent or received. An `IpIface`
+/// is an external handle to an interface which can be dropped to remove the interface, 
+/// implements `Stream` to read packets sent by futures executing on the machine, and `Sink` to
+/// send packets to sockets bound by those futures.
 pub struct IpIface {
     fd: AsyncFd<OwnedFd>,
     incoming_bytes: BytesMut,
@@ -127,6 +134,7 @@ impl Stream for IpIface {
     }
 }
 
+/// A helper trait for types which are both `Sink`s and `Stream`s of `Box<IpPacket>`.
 pub trait IpSinkStream:
     Stream<Item = io::Result<Box<IpPacket>>> + Sink<Box<IpPacket>, Error = io::Error> + Send + 'static
 {}

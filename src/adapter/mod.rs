@@ -1,3 +1,5 @@
+//! `Sink`/`Stream` adapters.
+
 use crate::priv_prelude::*;
 
 mod delay;
