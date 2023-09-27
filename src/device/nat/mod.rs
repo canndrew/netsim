@@ -1,4 +1,12 @@
-use crate::priv_prelude::*;
+use {
+    crate::priv_prelude::*,
+    self::{
+        port_map::PortMap,
+        restrictions::Restrictions,
+    },
+};
+mod port_map;
+mod restrictions;
 
 /// A simple NAT (network address translation) implementation. Allows for testing network code
 /// across NATs.
@@ -70,7 +78,12 @@ impl NatBuilder {
         } = self;
         let (iface_sender, iface_receiver) = mpsc::unbounded();
         let (channel_0, channel_1) = IpChannel::new(1);
-        let restrictions = match (port_restricted, address_restricted) {
+        let tcpv4_restrictions = match (port_restricted, address_restricted) {
+            (false, false) => Restrictions::Unrestricted,
+            (false, true) => Restrictions::RestrictIpAddr { sent_to: HashMap::new() },
+            (true, _) => Restrictions::RestrictSocketAddr { sent_to: HashMap::new() },
+        };
+        let udpv4_restrictions = match (port_restricted, address_restricted) {
             (false, false) => Restrictions::Unrestricted,
             (false, true) => Restrictions::RestrictIpAddr { sent_to: HashMap::new() },
             (true, _) => Restrictions::RestrictSocketAddr { sent_to: HashMap::new() },
@@ -83,9 +96,11 @@ impl NatBuilder {
             external_ipv4,
             internal_ipv4_network,
             internal_addr_indexes: HashMap::new(),
-            port_map: PortMap::new(),
+            tcpv4_port_map: PortMap::new(),
+            udpv4_port_map: PortMap::new(),
             hair_pinning,
-            restrictions,
+            tcpv4_restrictions,
+            udpv4_restrictions,
             reply_with_rst_to_unexpected_tcp_packets,
         };
         tokio::spawn(task);
@@ -102,9 +117,11 @@ struct NatTask {
     external_ipv4: Ipv4Addr,
     internal_ipv4_network: Ipv4Network,
     internal_addr_indexes: HashMap<IpAddr, usize>,
-    port_map: PortMap,
+    tcpv4_port_map: PortMap,
+    udpv4_port_map: PortMap,
     hair_pinning: bool,
-    restrictions: Restrictions,
+    tcpv4_restrictions: Restrictions,
+    udpv4_restrictions: Restrictions,
     reply_with_rst_to_unexpected_tcp_packets: bool,
 }
 
@@ -266,8 +283,8 @@ impl NatTask {
                 match packet.protocol_box() {
                     Ipv4PacketProtocol::Tcp(mut packet) => {
                         let port = packet.destination_port();
-                        let mapped_addr_opt = if self.restrictions.incoming_allowed(port, packet.source_addr()) {
-                            self.port_map.incoming_addr(port)
+                        let mapped_addr_opt = if self.tcpv4_restrictions.incoming_allowed(port, packet.source_addr()) {
+                            self.tcpv4_port_map.incoming_addr(port)
                         } else {
                             None
                         };
@@ -327,7 +344,47 @@ impl NatTask {
                             },
                         }
                     },
-                    Ipv4PacketProtocol::Udp(_) => (),
+                    Ipv4PacketProtocol::Udp(mut packet) => {
+                        let port = packet.destination_port();
+                        let mapped_addr_opt = if self.udpv4_restrictions.incoming_allowed(port, packet.source_addr()) {
+                            self.udpv4_port_map.incoming_addr(port)
+                        } else {
+                            None
+                        };
+                        let mapped_addr = match mapped_addr_opt {
+                            Some(mapped_addr) => mapped_addr,
+                            None => {
+                                debug!(
+                                    "{}: dropping external packet addressed to unmapped or disallowed port {}",
+                                    self.external_ipv4, packet.destination_addr(),
+                                );
+                                return;
+                            },
+                        };
+                        let iface_index = match self.internal_addr_indexes.get(&IpAddr::V4(*mapped_addr.ip())) {
+                            Some(iface_index) => iface_index,
+                            None => return,
+                        };
+                        let internal_iface = match self.internal_ifaces.get_mut(iface_index) {
+                            Some(internal_iface) => internal_iface,
+                            None => return,
+                        };
+                        packet.set_destination_addr(mapped_addr);
+                        if log_enabled!(Level::Debug) {
+                            debug!(
+                                "{}: forwarding translated packet on internal iface #{} {:?}",
+                                self.external_ipv4,
+                                iface_index,
+                                packet,
+                            );
+                        }
+                        match Pin::new(internal_iface).start_send(packet.ip_packet_box()) {
+                            Ok(()) => (),
+                            Err(_) => {
+                                self.internal_ifaces.remove(iface_index);
+                            },
+                        }
+                    },
                     Ipv4PacketProtocol::Icmp(_) => (),
                     Ipv4PacketProtocol::Unknown { .. } => (),
                 }
@@ -384,8 +441,8 @@ impl NatTask {
                     match packet.protocol_box() {
                         Ipv4PacketProtocol::Tcp(mut packet) => {
                             let internal_addr = packet.source_addr();
-                            let port = self.port_map.outgoing_port(internal_addr);
-                            self.restrictions.sending(port, packet.destination_addr());
+                            let port = self.tcpv4_port_map.outgoing_port(internal_addr);
+                            self.tcpv4_restrictions.sending(port, packet.destination_addr());
                             packet.set_source_addr(SocketAddrV4::new(self.external_ipv4, port));
                             if log_enabled!(Level::Debug) {
                                 debug!(
@@ -417,7 +474,41 @@ impl NatTask {
                                 }
                             }
                         },
-                        Ipv4PacketProtocol::Udp(_) => (),
+                        Ipv4PacketProtocol::Udp(mut packet) => {
+                            let internal_addr = packet.source_addr();
+                            let port = self.udpv4_port_map.outgoing_port(internal_addr);
+                            self.udpv4_restrictions.sending(port, packet.destination_addr());
+                            packet.set_source_addr(SocketAddrV4::new(self.external_ipv4, port));
+                            if log_enabled!(Level::Debug) {
+                                debug!(
+                                    "{}: translated outgoing packet {:?}",
+                                    self.external_ipv4,
+                                    packet,
+                                );
+                            }
+                            if *packet.destination_addr().ip() == self.external_ipv4 {
+                                if self.hair_pinning {
+                                    self.dispatch_incoming_external(packet.ip_packet_box());
+                                } else {
+                                    debug!(
+                                        "{}: dropped internal packet from {} addressed to own external address {} since hair-pinning is disabled",
+                                        self.external_ipv4, packet.source_addr(), packet.destination_addr(),
+                                    );
+                                }
+                            } else {
+                                match &mut self.external_iface_opt {
+                                    None => (),
+                                    Some(external_iface) => {
+                                        match Pin::new(external_iface).start_send(packet.ip_packet_box()) {
+                                            Ok(()) => (),
+                                            Err(_) => {
+                                                self.external_iface_opt = None;
+                                            },
+                                        }
+                                    },
+                                }
+                            }
+                        },
                         Ipv4PacketProtocol::Icmp(_) => (),
                         Ipv4PacketProtocol::Unknown { .. } => (),
                     }
@@ -471,101 +562,6 @@ impl Future for NatTask {
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<()> {
         let this = self.get_mut();
         this.poll_inner(cx)
-    }
-}
-
-pub struct PortMap {
-    tcpv4_outgoing_map: HashMap<SocketAddrV4, u16>,
-    tcpv4_incoming_map: HashMap<u16, SocketAddrV4>,
-    next_tcpv4_port: u16,
-}
-
-impl PortMap {
-    const INITIAL_PORT: u16 = 1025;
-
-    pub fn new() -> PortMap {
-        PortMap {
-            tcpv4_outgoing_map: HashMap::new(),
-            tcpv4_incoming_map: HashMap::new(),
-            next_tcpv4_port: PortMap::INITIAL_PORT,
-        }
-    }
-
-    pub fn outgoing_port(&mut self, internal_addr: SocketAddrV4) -> u16 {
-        match self.tcpv4_outgoing_map.entry(internal_addr) {
-            hash_map::Entry::Occupied(entry) => *entry.get(),
-            hash_map::Entry::Vacant(entry) => {
-                let mut attempts = PortMap::INITIAL_PORT;
-                let port = loop {
-                    let port = self.next_tcpv4_port;
-                    self.next_tcpv4_port = {
-                        self.next_tcpv4_port.checked_add(1).unwrap_or(PortMap::INITIAL_PORT)
-                    };
-                    match self.tcpv4_incoming_map.entry(port) {
-                        hash_map::Entry::Occupied(mut entry) => {
-                            attempts = match attempts.checked_add(1) {
-                                Some(attempts) => attempts,
-                                None => {
-                                    entry.insert(internal_addr);
-                                    break port;
-                                },
-                            };
-                        },
-                        hash_map::Entry::Vacant(entry) => {
-                            entry.insert(internal_addr);
-                            break port;
-                        },
-                    }
-                };
-                *entry.insert(port)
-            },
-        }
-    }
-
-    pub fn incoming_addr(&self, port: u16) -> Option<SocketAddrV4> {
-        self.tcpv4_incoming_map.get(&port).copied()
-    }
-}
-
-enum Restrictions {
-    Unrestricted,
-    RestrictIpAddr {
-        sent_to: HashMap<u16, HashSet<Ipv4Addr>>,
-    },
-    RestrictSocketAddr {
-        sent_to: HashMap<u16, HashSet<SocketAddrV4>>,
-    },
-}
-
-impl Restrictions {
-    pub fn sending(&mut self, external_port: u16, destination_addr: SocketAddrV4) {
-        match self {
-            Restrictions::Unrestricted => (),
-            Restrictions::RestrictIpAddr { sent_to } => {
-                sent_to.entry(external_port).or_default().insert(*destination_addr.ip());
-            },
-            Restrictions::RestrictSocketAddr { sent_to } => {
-                sent_to.entry(external_port).or_default().insert(destination_addr);
-            },
-        }
-    }
-
-    pub fn incoming_allowed(&self, external_port: u16, source_addr: SocketAddrV4) -> bool {
-        match self {
-            Restrictions::Unrestricted => true,
-            Restrictions::RestrictIpAddr { sent_to } => {
-                match sent_to.get(&external_port) {
-                    None => false,
-                    Some(ipv4_addrs) => ipv4_addrs.contains(source_addr.ip()),
-                }
-            },
-            Restrictions::RestrictSocketAddr { sent_to } => {
-                match sent_to.get(&external_port) {
-                    None => false,
-                    Some(socket_addrs) => socket_addrs.contains(&source_addr),
-                }
-            },
-        }
     }
 }
 
