@@ -15,7 +15,7 @@ pub(crate) use {
         time::{Duration, Instant},
     },
     bytes::BytesMut,
-    libc::{c_int, c_void, pid_t},
+    libc::{c_int, c_long, c_void, pid_t},
     tokio::io::unix::AsyncFd,
     futures::{
         ready, FutureExt, Sink, Stream, StreamExt,

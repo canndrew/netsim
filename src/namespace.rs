@@ -11,14 +11,43 @@ pub struct JoinHandle<R> {
 unsafe impl<R: Send> Send for JoinHandle<R> {}
 unsafe impl<R> Sync for JoinHandle<R> {}
 
+unsafe fn futex(
+    uaddr: *mut u32,
+    futex_op: c_int,
+    val: u32,
+    timeout: *const libc::timespec,
+    uaddr2: *mut u32,
+    val3: u32,
+) -> c_long {
+    libc::syscall(libc::SYS_futex, uaddr, futex_op, val, timeout, uaddr2, val3)
+}
+
+unsafe fn futex_wait(ptr: *mut u32, value: u32) -> c_long {
+    futex(ptr, libc::FUTEX_WAIT, value, ptr::null(), ptr::null_mut(), 0)
+}
+
 impl<R> JoinHandle<R> {
     fn join_inner(&mut self, ret_rx: oneshot::Receiver<thread::Result<R>>) -> thread::Result<R> {
         let ret = ret_rx.recv().expect("sender is never dropped without sending");
         loop {
-            if 0 == unsafe { ptr::read_volatile(self.child_tid) } {
-                break;
+            let res = unsafe {
+                futex_wait(self.child_tid as *mut u32, !0)
+            };
+            if res == -1 {
+                let raw_err = unsafe {
+                    *libc::__errno_location()
+                };
+                let err = io::Error::last_os_error();
+                match raw_err {
+                    libc::EAGAIN => (),
+                    libc::EINTR => continue,
+                    _ => {
+                        eprintln!("futex_wait returned error: {}", err);
+                        std::process::abort()
+                    },
+                }
             }
-            thread::yield_now();
+            break;
         }
         let _child_tid = unsafe { Box::from_raw(self.child_tid) };
         let _stack_ptr = unsafe { Box::from_raw(self.stack_ptr) };
