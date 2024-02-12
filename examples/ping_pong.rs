@@ -11,9 +11,16 @@ use {
 
 
 // This example creates two network-isolated threads and gives each a network interface with which
-// they can send messages back-and-forth.
+// they send messages back-and-forth.
 #[tokio::main]
 async fn main() {
+
+    // First create two machines.
+    let machine_0 = Machine::new().unwrap();
+    let machine_1 = Machine::new().unwrap();
+
+
+    // Then give each machine a network interface.
     let ipv4_addr_0 = ipv4!("10.1.2.3");
     let port_0 = 45666;
     let addr_0 = SocketAddr::from((ipv4_addr_0, port_0));
@@ -22,12 +29,6 @@ async fn main() {
     let port_1 = 5555;
     let addr_1 = SocketAddr::from((ipv4_addr_1, port_1));
 
-    // Create two machines. A machine initially has no network interfaces and has its own tokio
-    // runtime on which we can spawn tasks.
-    let machine_0 = Machine::new().unwrap();
-    let machine_1 = Machine::new().unwrap();
-
-    // Give each machine a network interface.
     let iface_0 = {
         machine_0
         .add_ip_iface()
@@ -43,10 +44,13 @@ async fn main() {
         .unwrap()
     };
 
+
     // Connect the network interfaces directly to each other.
     netsim::connect(iface_0, iface_1);
 
-    // Machine 0 receives a UDP packet then replies with a UDP packet.
+
+    // Execute a task on machine 0. This task waits to receive a UDP packet, then replies to the
+    // packet.
     let join_handle_0 = machine_0.spawn(async move {
         let socket = UdpSocket::bind(addr_0).await.unwrap();
 
@@ -62,7 +66,7 @@ async fn main() {
         println!("sent reply: '{send_msg}'");
     });
 
-    // Machine 1 sends a UDP packet then waits for the reply.
+    // Execute a task on machine 1. This task sends a UDP packet then waits for the reply.
     let join_handle_1 = machine_1.spawn(async move {
         let socket = UdpSocket::bind(addr_1).await.unwrap();
 
@@ -79,7 +83,8 @@ async fn main() {
     });
 
     // Wait for both machines to run their tasks to completion.
-    let (task_result_0, task_result_1) = join!(join_handle_0.join(), join_handle_1.join());
+    let task_result_0 = join_handle_0.await;
+    let task_result_1 = join_handle_1.await;
     let () = task_result_0.unwrap().unwrap();
     let () = task_result_1.unwrap().unwrap();
 }
