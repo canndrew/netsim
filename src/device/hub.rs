@@ -1,6 +1,8 @@
 use crate::priv_prelude::*;
 
-/// A simple IP network hub. You can insert any number of interfaces into the hub and any packet
+/// A simple IP network hub.
+///
+/// Insert any number of interfaces into the hub and any packet
 /// received on one will be forwarded to all other interfaces.
 pub struct IpHub {
     iface_sender: mpsc::UnboundedSender<Pin<Box<dyn IpSinkStream>>>,

@@ -23,10 +23,10 @@ pub(crate) use {
         channel::mpsc,
     },
     ioctl_sys::ioctl,
-    net_literals::{ipv4, ipv6},
     pin_project::pin_project,
     rand::Rng,
     log::{log_enabled, debug, Level},
+    netsim_macros::{ipv4_network, ipv6_network},
     crate::{
         namespace, ioctl, iface, adapter, sys,
         device::IpChannel,
@@ -44,7 +44,7 @@ pub(crate) use {
 
 #[cfg(test)]
 pub(crate) use {
-    net_literals::addrv4,
+    net_literals::{ipv4, addrv4},
     tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         net::{TcpStream, TcpListener},

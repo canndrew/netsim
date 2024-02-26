@@ -4,6 +4,7 @@ version = "2.0.0-alpha0"
 authors = ["Andrew Cann <shum@canndrew.org>"]
 description = "Run tests in network-isolated threads. Intercept and meddle with their packets."
 repository = "https://github.com/canndrew/netsim-ng"
+documentation = "https://docs.rs/netsim"
 license = "MIT OR BSD-3-Clause"
 keywords = ["network", "ip", "testing"]
 categories = ["asynchronous", "development-tools::testing", "network-programming", "simulation", "virtualization"]
@@ -22,4 +23,5 @@ rand = "0.8.5"
 pin-project = "1.1.3"
 bytes = "1.4.0"
 log = "0.4.19"
+netsim-macros = { path = "netsim-macros", version = "2.0.0-alpha0" }
 

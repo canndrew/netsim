@@ -21,8 +21,8 @@ pub trait SinkStreamExt<T>: Stream + Sink<T> {
 
     /// Randomly drops items sent through this `Sink`/`Stream`.
     ///
-    /// * `loss_rate` is what proportion of the items to drop. Setting to `1` will drop everything,
-    /// setting to `0` will drop nothing.
+    /// * `loss_rate` is what proportion of the items to drop. Setting to `1.0` will drop
+    /// everything, setting to `0.0` will drop nothing.
     /// * `jitter_period` controls the average rate of switching between dropping and not dropping
     /// items. Setting this to zero disables jitter so that each item has an independent
     /// probability of getting dropped.

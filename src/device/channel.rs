@@ -1,7 +1,7 @@
 use crate::priv_prelude::*;
 pub use futures::channel::mpsc::SendError;
 
-/// A bi directional channel for both sending and receiving items.
+/// A bi-directional channel where both ends can both send and receive items.
 pub struct BiChannel<T> {
     sender: mpsc::Sender<T>,
     receiver: mpsc::Receiver<T>,
@@ -57,7 +57,7 @@ impl<T> Sink<T> for BiChannel<T> {
     }
 }
 
-/// A two-way channel for sending/receiving IP packets.
+/// A bi-directional channel for sending/receiving IP packets.
 pub struct IpChannel {
     packet_channel: BiChannel<Box<IpPacket>>,
 }

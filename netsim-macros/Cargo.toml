@@ -1,0 +1,20 @@
+[package]
+name = "netsim-macros"
+version = "2.0.0-alpha0"
+authors = ["Andrew Cann <shum@canndrew.org>"]
+description = "Macros for netsim."
+repository = "https://github.com/canndrew/netsim-ng"
+documentation = "https://docs.rs/netsim"
+license = "MIT OR BSD-3-Clause"
+keywords = ["network", "ip", "testing"]
+categories = ["asynchronous", "development-tools::testing", "network-programming", "simulation", "virtualization"]
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "2.0.28"
+quote = "1.0.32"
+proc-macro2 = "1.0.66"
+

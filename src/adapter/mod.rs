@@ -1,4 +1,6 @@
 //! `Sink`/`Stream` adapters.
+//!
+//! Intended for use with `Sink`s and `Stream`s transporting packets.
 
 use crate::priv_prelude::*;
 

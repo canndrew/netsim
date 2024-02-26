@@ -694,7 +694,7 @@ impl Udpv4Packet {
             debug_assert_eq!(i + 1, self.data.len());
             hasher.write_u16((self.data[i] as u16) << 8);
         }
-        *slice_mut!(&mut self.data[ipv4_header_len..], 16..18) = hasher.finish().to_be_bytes();
+        *slice_mut!(&mut self.data[ipv4_header_len..], 6..8) = hasher.finish().to_be_bytes();
     }
 }
 

@@ -1,2 +1,4 @@
 /target
 /Cargo.lock
+/netsim-macros/Cargo.lock
+/netsim-macros/target

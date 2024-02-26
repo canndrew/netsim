@@ -8,8 +8,9 @@ use {
 mod port_map;
 mod restrictions;
 
-/// A simple NAT (network address translation) implementation. Allows for testing network code
-/// across NATs.
+/// A simple NAT (network address translation) implementation.
+///
+/// For testing network code across NATs.
 pub struct Nat {
     iface_sender: mpsc::UnboundedSender<Pin<Box<dyn IpSinkStream>>>,
 }

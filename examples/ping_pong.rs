@@ -1,12 +1,12 @@
 use {
     std::{
+        time::Duration,
         net::SocketAddr,
         str,
     },
     tokio::net::UdpSocket,
     netsim::Machine,
     net_literals::ipv4,
-    futures::join,
 };
 
 
@@ -33,6 +33,7 @@ async fn main() {
         machine_0
         .add_ip_iface()
         .ipv4_addr(ipv4_addr_0)
+        .ipv4_default_route()
         .await
         .unwrap()
     };
@@ -40,6 +41,7 @@ async fn main() {
         machine_1
         .add_ip_iface()
         .ipv4_addr(ipv4_addr_1)
+        .ipv4_default_route()
         .await
         .unwrap()
     };
@@ -49,8 +51,7 @@ async fn main() {
     netsim::connect(iface_0, iface_1);
 
 
-    // Execute a task on machine 0. This task waits to receive a UDP packet, then replies to the
-    // packet.
+    // Execute a task on machine 0. This task waits to receive a UDP packet then sends a reply.
     let join_handle_0 = machine_0.spawn(async move {
         let socket = UdpSocket::bind(addr_0).await.unwrap();
 
@@ -65,26 +66,29 @@ async fn main() {
         assert_eq!(send_len, send_msg.len());
         println!("sent reply: '{send_msg}'");
     });
-
-    // Execute a task on machine 1. This task sends a UDP packet then waits for the reply.
+    // Execute a task on machine 1. This task sends UDP packets until it receives a reply.
     let join_handle_1 = machine_1.spawn(async move {
         let socket = UdpSocket::bind(addr_1).await.unwrap();
-
-        let send_msg = "ping";
-        let send_len = socket.send_to(send_msg.as_bytes(), addr_0).await.unwrap();
-        assert_eq!(send_len, send_msg.len());
-        println!("sent msg: '{send_msg}'");
-
         let mut recv_bytes = [0u8; 100];
-        let (recv_len, peer_addr) = socket.recv_from(&mut recv_bytes).await.unwrap();
+
+        let (recv_len, peer_addr) = loop {
+            let send_msg = "ping";
+            let send_len = socket.send_to(send_msg.as_bytes(), addr_0).await.unwrap();
+            assert_eq!(send_len, send_msg.len());
+            println!("sent msg: '{send_msg}'");
+
+            tokio::select! {
+                recv_result = socket.recv_from(&mut recv_bytes) => break recv_result.unwrap(),
+                () = tokio::time::sleep(Duration::from_secs(1)) => (),
+            }
+        };
         assert_eq!(peer_addr, addr_0);
         let recv_msg = str::from_utf8(&recv_bytes[..recv_len]).unwrap();
         println!("received reply: '{recv_msg}'");
     });
 
+
     // Wait for both machines to run their tasks to completion.
-    let task_result_0 = join_handle_0.await;
-    let task_result_1 = join_handle_1.await;
-    let () = task_result_0.unwrap().unwrap();
-    let () = task_result_1.unwrap().unwrap();
+    let () = join_handle_0.await.unwrap().unwrap();
+    let () = join_handle_1.await.unwrap().unwrap();
 }

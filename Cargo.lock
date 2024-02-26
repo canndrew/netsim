@@ -288,10 +288,20 @@ dependencies = [
  "libc",
  "log",
  "net-literals",
+ "netsim-macros",
  "oneshot",
  "pin-project",
  "rand",
  "tokio",
+]
+
+[[package]]
+name = "netsim-macros"
+version = "2.0.0-alpha0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.28",
 ]
 
 [[package]]
