@@ -369,38 +369,110 @@ impl std::error::Error for NetworkParseError {
 
 /// An iterator over the IPv4 addresses in an [`Ipv4Network`](crate::Ipv4Network).
 pub struct Ipv4NetworkIter {
-    network: Ipv4Network,
-    next_addr_opt: Option<Ipv4Addr>,
+    start_addr_opt: Option<Ipv4Addr>,
+    end_addr_opt: Option<Ipv4Addr>,
 }
 
 impl Iterator for Ipv4NetworkIter {
     type Item = Ipv4Addr;
 
     fn next(&mut self) -> Option<Ipv4Addr> {
-        let next_addr = self.next_addr_opt.take()?;
-        if !self.network.contains(next_addr) {
+        let next_addr = self.start_addr_opt?;
+        if self.end_addr_opt == Some(next_addr) {
             return None;
         }
-        self.next_addr_opt = u32::from(next_addr).checked_add(1).map(Ipv4Addr::from);
+        self.start_addr_opt = u32::from(next_addr).checked_add(1).map(Ipv4Addr::from);
+        Some(next_addr)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let start_addr = match self.start_addr_opt {
+            Some(start_addr) => start_addr,
+            None => return (0, Some(0)),
+        };
+        let end_addr = match self.end_addr_opt {
+            Some(end_addr) => end_addr,
+            None => {
+                let diff_m1 = u32::MAX - u32::from(start_addr);
+                return match usize::try_from(diff_m1) {
+                    Ok(diff_m1) => (diff_m1.saturating_add(1), diff_m1.checked_add(1)),
+                    Err(_) => (usize::MAX, None),
+                };
+            },
+        };
+        let diff = u32::from(end_addr) - u32::from(start_addr);
+        match usize::try_from(diff) {
+            Ok(diff) => (diff, Some(diff)),
+            Err(_) => (usize::MAX, None),
+        }
+    }
+}
+
+impl DoubleEndedIterator for Ipv4NetworkIter {
+    fn next_back(&mut self) -> Option<Ipv4Addr> {
+        if self.start_addr_opt == self.end_addr_opt {
+            return None;
+        }
+        let next_addr = match self.end_addr_opt {
+            Some(end_addr) => Ipv4Addr::from(u32::from(end_addr) - 1),
+            None => Ipv4Addr::from(u32::MAX),
+        };
+        self.end_addr_opt = Some(next_addr);
         Some(next_addr)
     }
 }
 
 /// An iterator over the IPv6 addresses in an [`Ipv6Network`](crate::Ipv6Network).
 pub struct Ipv6NetworkIter {
-    network: Ipv6Network,
-    next_addr_opt: Option<Ipv6Addr>,
+    start_addr_opt: Option<Ipv6Addr>,
+    end_addr_opt: Option<Ipv6Addr>,
 }
 
 impl Iterator for Ipv6NetworkIter {
     type Item = Ipv6Addr;
 
     fn next(&mut self) -> Option<Ipv6Addr> {
-        let next_addr = self.next_addr_opt.take()?;
-        if !self.network.contains(next_addr) {
+        let next_addr = self.start_addr_opt?;
+        if self.end_addr_opt == Some(next_addr) {
             return None;
         }
-        self.next_addr_opt = u128::from(next_addr).checked_add(1).map(Ipv6Addr::from);
+        self.start_addr_opt = u128::from(next_addr).checked_add(1).map(Ipv6Addr::from);
+        Some(next_addr)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let start_addr = match self.start_addr_opt {
+            Some(start_addr) => start_addr,
+            None => return (0, Some(0)),
+        };
+        let end_addr = match self.end_addr_opt {
+            Some(end_addr) => end_addr,
+            None => {
+                let diff_m1 = u128::MAX - u128::from(start_addr);
+                return match usize::try_from(diff_m1) {
+                    Ok(diff_m1) => (diff_m1.saturating_add(1), diff_m1.checked_add(1)),
+                    Err(_) => (usize::MAX, None),
+                };
+            },
+        };
+        let diff = u128::from(end_addr) - u128::from(start_addr);
+        match usize::try_from(diff) {
+            Ok(diff) => (diff, Some(diff)),
+            Err(_) => (usize::MAX, None),
+        }
+    }
+}
+
+impl DoubleEndedIterator for Ipv6NetworkIter {
+    fn next_back(&mut self) -> Option<Ipv6Addr> {
+        if self.start_addr_opt == self.end_addr_opt {
+            return None;
+        }
+        let next_addr = match self.end_addr_opt {
+            Some(end_addr) => Ipv6Addr::from(u128::from(end_addr) - 1),
+            None => Ipv6Addr::from(u128::MAX),
+        };
+        self.end_addr_opt = Some(next_addr);
         Some(next_addr)
     }
 }
@@ -411,8 +483,12 @@ impl IntoIterator for Ipv4Network {
 
     fn into_iter(self) -> Ipv4NetworkIter {
         Ipv4NetworkIter {
-            network: self,
-            next_addr_opt: Some(self.base_addr()),
+            start_addr_opt: Some(self.base_addr),
+            end_addr_opt: {
+                (u32::from(self.base_addr) | (!0u32 >> self.subnet_mask_bits))
+                .checked_add(1)
+                .map(Ipv4Addr::from)
+            },
         }
     }
 }
@@ -423,8 +499,12 @@ impl IntoIterator for Ipv6Network {
 
     fn into_iter(self) -> Ipv6NetworkIter {
         Ipv6NetworkIter {
-            network: self,
-            next_addr_opt: Some(self.base_addr()),
+            start_addr_opt: Some(self.base_addr),
+            end_addr_opt: {
+                (u128::from(self.base_addr) | (!0u128 >> self.subnet_mask_bits))
+                .checked_add(1)
+                .map(Ipv6Addr::from)
+            },
         }
     }
 }
