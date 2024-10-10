@@ -31,8 +31,8 @@ impl NatBuilder {
     ///
     /// * `external_ipv4` is the IPv4 address that the NAT uses on its external side.
     /// * `internal_ipv4_network` is the IPv4 network (eg. 192.168.0.0/16) on the internal side of
-    /// the NAT. The NAT won't forward any packets on its internal side that don't originate from
-    /// this network.
+    ///   the NAT. The NAT won't forward any packets on its internal side that don't originate from
+    ///   this network.
     pub fn new(external_ipv4: Ipv4Addr, internal_ipv4_network: Ipv4Network) -> NatBuilder {
         NatBuilder {
             external_ipv4,

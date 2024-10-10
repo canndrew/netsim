@@ -139,14 +139,14 @@ fn create_tun_interface(build_config: BuildConfig) -> io::Result<OwnedFd> {
         },
     };
 
-    #[cfg_attr(feature="cargo-clippy", allow(clippy::unnecessary_cast))]
+    #[allow(clippy::unnecessary_cast)]
     if name_cstr.as_bytes_with_nul().len() > libc::IF_NAMESIZE as usize {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "name too long"));
     }
 
     let fd = {
         let raw_fd = unsafe {
-            libc::open(b"/dev/net/tun\0".as_ptr() as *const _, libc::O_RDWR)
+            libc::open(c"/dev/net/tun".as_ptr() as *const _, libc::O_RDWR)
         };
         if raw_fd < 0 {
             let err = io::Error::last_os_error();

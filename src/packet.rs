@@ -102,8 +102,9 @@ macro_rules! packet_type(
             }
         }
 
+        #[allow(clippy::missing_transmute_annotations)]
         impl $name {
-            #[cfg_attr(feature="cargo-clippy", allow(clippy::len_without_is_empty))]
+            #[allow(clippy::len_without_is_empty)]
             pub fn len(&self) -> usize {
                 self.data.len()
             }
@@ -240,6 +241,7 @@ impl IpPacket {
         unsafe { transmute(data) }
     }
 
+    #[allow(clippy::missing_transmute_annotations)]
     pub fn version_box(self: Box<IpPacket>) -> IpPacketVersion<Box<IpPacket>> {
         match self.data[0] >> 4 {
             4 => IpPacketVersion::V4(unsafe { transmute(self) }),
@@ -248,6 +250,7 @@ impl IpPacket {
         }
     }
 
+    #[allow(clippy::missing_transmute_annotations)]
     pub fn version_arc(self: Arc<IpPacket>) -> IpPacketVersion<Arc<IpPacket>> {
         match self.data[0] >> 4 {
             4 => IpPacketVersion::V4(unsafe { transmute(self) }),
@@ -256,6 +259,7 @@ impl IpPacket {
         }
     }
 
+    #[allow(clippy::missing_transmute_annotations)]
     pub fn version_ref(&self) -> IpPacketVersion<&IpPacket> {
         match self.data[0] >> 4 {
             4 => IpPacketVersion::V4(unsafe { transmute(self) }),
@@ -264,6 +268,7 @@ impl IpPacket {
         }
     }
 
+    #[allow(clippy::missing_transmute_annotations)]
     pub fn version_mut(&mut self) -> IpPacketVersion<&mut IpPacket> {
         match self.data[0] >> 4 {
             4 => IpPacketVersion::V4(unsafe { transmute(self) }),
@@ -300,6 +305,7 @@ where
 }
 
 impl Ipv4Packet {
+    #[allow(clippy::missing_transmute_annotations)]
     pub fn protocol_box(self: Box<Ipv4Packet>) -> Ipv4PacketProtocol<Box<Ipv4Packet>> {
         match self.data[9] {
             protocol_numbers::TCP => Ipv4PacketProtocol::Tcp(unsafe { transmute(self) }),
@@ -309,6 +315,7 @@ impl Ipv4Packet {
         }
     }
 
+    #[allow(clippy::missing_transmute_annotations)]
     pub fn protocol_arc(self: Arc<Ipv4Packet>) -> Ipv4PacketProtocol<Arc<Ipv4Packet>> {
         match self.data[9] {
             protocol_numbers::TCP => Ipv4PacketProtocol::Tcp(unsafe { transmute(self) }),
@@ -318,6 +325,7 @@ impl Ipv4Packet {
         }
     }
 
+    #[allow(clippy::missing_transmute_annotations)]
     pub fn protocol_ref(&self) -> Ipv4PacketProtocol<&Ipv4Packet> {
         match self.data[9] {
             protocol_numbers::TCP => Ipv4PacketProtocol::Tcp(unsafe { transmute(self) }),
@@ -327,6 +335,7 @@ impl Ipv4Packet {
         }
     }
 
+    #[allow(clippy::missing_transmute_annotations)]
     pub fn protocol_mut(&mut self) -> Ipv4PacketProtocol<&mut Ipv4Packet> {
         match self.data[9] {
             protocol_numbers::TCP => Ipv4PacketProtocol::Tcp(unsafe { transmute(self) }),
@@ -385,6 +394,7 @@ where
 }
 
 impl Ipv6Packet {
+    #[allow(clippy::missing_transmute_annotations)]
     pub fn protocol_box(self: Box<Ipv6Packet>) -> Ipv6PacketProtocol<Box<Ipv6Packet>> {
         match self.protocol_number() {
             protocol_numbers::ICMP_V6 => Ipv6PacketProtocol::Icmp(unsafe { transmute(self) }),
@@ -392,6 +402,7 @@ impl Ipv6Packet {
         }
     }
 
+    #[allow(clippy::missing_transmute_annotations)]
     pub fn protocol_arc(self: Arc<Ipv6Packet>) -> Ipv6PacketProtocol<Arc<Ipv6Packet>> {
         match self.protocol_number() {
             protocol_numbers::ICMP_V6 => Ipv6PacketProtocol::Icmp(unsafe { transmute(self) }),
@@ -399,6 +410,7 @@ impl Ipv6Packet {
         }
     }
 
+    #[allow(clippy::missing_transmute_annotations)]
     pub fn protocol_ref(&self) -> Ipv6PacketProtocol<&Ipv6Packet> {
         match self.protocol_number() {
             protocol_numbers::ICMP_V6 => Ipv6PacketProtocol::Icmp(unsafe { transmute(self) }),
@@ -406,6 +418,7 @@ impl Ipv6Packet {
         }
     }
 
+    #[allow(clippy::missing_transmute_annotations)]
     pub fn protocol_mut(&mut self) -> Ipv6PacketProtocol<&mut Ipv6Packet> {
         match self.protocol_number() {
             protocol_numbers::ICMP_V6 => Ipv6PacketProtocol::Icmp(unsafe { transmute(self) }),

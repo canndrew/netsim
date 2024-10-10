@@ -5,9 +5,9 @@ pub trait SinkStreamExt<T>: Stream + Sink<T> {
     /// Delays items sent/received through this `Sink`/`Stream`.
     /// 
     /// * `min_delay` is the minimum delay which is applied to all items.
-    /// * `mean_additional_delay` is the average randomized delay applied to all items in addition to
-    /// `min_delay`. Setting this to zero disables delay randomization and guarantees that
-    /// items are recieved in the order they're sent.
+    /// * `mean_additional_delay` is the average randomized delay applied to all items in addition
+    ///   to `min_delay`. Setting this to zero disables delay randomization and guarantees that
+    ///   items are recieved in the order they're sent.
     fn with_delay(
         self,
         min_delay: Duration,
@@ -22,10 +22,10 @@ pub trait SinkStreamExt<T>: Stream + Sink<T> {
     /// Randomly drops items sent through this `Sink`/`Stream`.
     ///
     /// * `loss_rate` is what proportion of the items to drop. Setting to `1.0` will drop
-    /// everything, setting to `0.0` will drop nothing.
+    ///   everything, setting to `0.0` will drop nothing.
     /// * `jitter_period` controls the average rate of switching between dropping and not dropping
-    /// items. Setting this to zero disables jitter so that each item has an independent
-    /// probability of getting dropped.
+    ///   items. Setting this to zero disables jitter so that each item has an independent
+    ///   probability of getting dropped.
     fn with_loss(
         self,
         loss_rate: f64,

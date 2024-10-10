@@ -133,7 +133,7 @@ impl Ipv4Network {
         .copied()
         .filter(|network| network.contains(addr))
         .max_by_key(|network| network.subnet_mask_bits)
-        .unwrap_or_else(|| Ipv4Network::GLOBAL)
+        .unwrap_or(Ipv4Network::GLOBAL)
     }
 
     /// Generate a random address in this range and not in any reserved IPv4 range strictly
@@ -229,7 +229,7 @@ impl Ipv6Network {
         .copied()
         .filter(|network| network.contains(addr))
         .max_by_key(|network| network.subnet_mask_bits)
-        .unwrap_or_else(|| Ipv6Network::GLOBAL)
+        .unwrap_or(Ipv6Network::GLOBAL)
     }
 
     /// Generate a random address in this range and not in any reserved IPv6 range strictly

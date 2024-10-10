@@ -15,7 +15,7 @@ struct IpHubTask {
 
 impl IpHub {
     /// Create a new `IpHub`. Must be called within a `tokio` context.
-    #[cfg_attr(feature="cargo-clippy", allow(clippy::new_without_default))]
+    #[allow(clippy::new_without_default)]
     pub fn new() -> IpHub {
         let (iface_sender, iface_receiver) = mpsc::unbounded();
         let task = IpHubTask {

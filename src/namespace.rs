@@ -125,7 +125,7 @@ where
 
             let setup = move || {
                 let res = unsafe {
-                    #[cfg_attr(feature="cargo-clippy", allow(clippy::unnecessary_cast))]
+                    #[allow(clippy::unnecessary_cast)]
                     libc::prctl(libc::PR_SET_PDEATHSIG as i32, libc::SIGTERM, 0, 0, 0)
                 };
                 if res == -1 {
