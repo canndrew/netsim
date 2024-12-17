@@ -1,5 +1,11 @@
 //! Types for representing IP packets.
-
+//!
+//! ### Note
+//!
+//! This module and the types within are still very incomplete. A complete IP implementation is a
+//! lot of work so I've just been adding things as I've needed them. PRs here are welcome. However
+//! in a future version I'll probably just rip out this whole module and replace it with one of the
+//! several third-party crates that do the same thing.
 use crate::priv_prelude::*;
 use std::{
     rc::Rc,
@@ -689,6 +695,13 @@ impl Udpv4Packet {
         self.set_destination_port(addr.port());
     }
 
+    pub fn data(&self) -> &[u8] {
+        let header_len = self.ipv4_packet_ref().ipv4_header_len();
+        let udp_header_len = 8;
+        let full_header_len = header_len + udp_header_len;
+        &self.data[full_header_len..]
+    }
+
     fn fix_checksum(&mut self) {
         let ipv4_header_len = self.ipv4_packet_ref().ipv4_header_len();
         let mut hasher = Ipv4Hasher::new();
@@ -780,6 +793,8 @@ impl fmt::Debug for Tcpv4Packet {
         .debug_struct("Tcpv4Packet")
         .field("source_addr", &self.source_addr())
         .field("destination_addr", &self.destination_addr())
+        .field("seq_number", &self.seq_number())
+        .field("ack_number", &self.ack_number())
         .field("flags", &self.flags())
         .finish()
     }
