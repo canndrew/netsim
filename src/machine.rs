@@ -99,6 +99,22 @@ impl<R> JoinHandle<R> {
             Err(_recv_err) => Ok(None),
         }
     }
+
+    /// Block the current thread, wait for the future executing on the machine the complete and get
+    /// its result.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Some(value))` if the future completed normally and returned `value`.
+    /// * `Ok(None)` if the [`Machine`](crate::Machine) was dropped before the future completed.
+    /// * `Err(panic_error)` if the future panicked.
+    pub fn join_blocking(self) -> thread::Result<Option<R>> {
+        match self.ret_rx.recv() {
+            Ok(Ok(val)) => Ok(Some(val)),
+            Ok(Err(err)) => Err(err),
+            Err(_recv_err) => Ok(None),
+        }
+    }
 }
 
 impl<R> IntoFuture for JoinHandle<R>

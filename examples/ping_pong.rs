@@ -34,7 +34,7 @@ async fn main() {
         .add_ip_iface()
         .ipv4_addr(ipv4_addr_0)
         .ipv4_default_route()
-        .await
+        .build()
         .unwrap()
     };
     let iface_1 = {
@@ -42,7 +42,7 @@ async fn main() {
         .add_ip_iface()
         .ipv4_addr(ipv4_addr_1)
         .ipv4_default_route()
-        .await
+        .build()
         .unwrap()
     };
 

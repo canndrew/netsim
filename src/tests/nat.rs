@@ -14,7 +14,7 @@ async fn connect_to_outside_world() {
         .add_ip_iface()
         .ipv4_addr(*internal_addr.ip())
         .ipv4_default_route()
-        .await
+        .build()
         .unwrap()
     };
     let iface_1 = {
@@ -22,7 +22,7 @@ async fn connect_to_outside_world() {
         .add_ip_iface()
         .ipv4_addr(*addr_1.ip())
         .ipv4_default_route()
-        .await
+        .build()
         .unwrap()
     };
 
@@ -79,7 +79,7 @@ async fn nat_tcp_reset() {
         .add_ip_iface()
         .ipv4_addr(*machine_addr.ip())
         .ipv4_default_route()
-        .await
+        .build()
         .unwrap()
     };
     let (_nat, nat_iface) = {

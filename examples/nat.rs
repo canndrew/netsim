@@ -27,7 +27,7 @@ async fn main() {
         .add_ip_iface()
         .ipv4_addr(ipv4_addr_0)
         .ipv4_default_route()
-        .await
+        .build()
         .unwrap()
     };
     let global_ipv4_addr_0 = Ipv4Network::GLOBAL.random_addr(&mut rng);
@@ -41,7 +41,7 @@ async fn main() {
         .add_ip_iface()
         .ipv4_addr(ipv4_addr_1)
         .ipv4_default_route()
-        .await
+        .build()
         .unwrap()
     };
     let global_ipv4_addr_1 = Ipv4Network::GLOBAL.random_addr(&mut rng);
@@ -57,7 +57,7 @@ async fn main() {
         .add_ip_iface()
         .ipv4_addr(ipv4_addr_rendezvous)
         .ipv4_default_route()
-        .await
+        .build()
         .unwrap()
     };
 

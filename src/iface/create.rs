@@ -96,30 +96,29 @@ impl IpIfaceBuilder<'_> {
         self
     }
 
-    /// Builds the interface. The returned [`IpIface`](crate::IpIface) can be used to send packets
-    /// to or receive packets from this interface.
-    pub async fn build(self) -> io::Result<IpIface> {
-        self.into_future().await
+    /// Builds the interface. The returned [`IpIface`](crate::IpIface) can be used to send/receive packets
+    /// to/from this interface.
+    ///
+    /// # Panics
+    ///
+    /// If there is no tokio runtime present.
+    pub fn build(self) -> io::Result<IpIface> {
+        let fd = self.build_raw()?;
+        IpIface::new(fd)
     }
-}
 
-impl<'m> IntoFuture for IpIfaceBuilder<'m> {
-    type Output = io::Result<IpIface>;
-    type IntoFuture = Pin<Box<dyn Future<Output = io::Result<IpIface>> + Send + 'm>>;
-
-    fn into_future(self) -> Pin<Box<dyn Future<Output = io::Result<IpIface>> + Send + 'm>> {
+    /// Builds the interface, returning a raw file descriptor to the interface's TUN device. Unlike
+    /// [`build`](Self::build) this can be called in non-async contexts.
+    pub fn build_raw(self) -> io::Result<OwnedFd> {
         let IpIfaceBuilder { machine, build_config } = self;
-        Box::pin(async move {
-            let task = async move {
-                create_tun_interface(build_config)
-            };
-            let res = machine.spawn(task).await;
-            let fd = match res {
-                Ok(res_opt) => res_opt.unwrap()?,
-                Err(err) => panic::resume_unwind(err),
-            };
-            IpIface::new(fd)
-        })
+        let task = async move {
+            create_tun_interface(build_config)
+        };
+        let res = machine.spawn(task).join_blocking();
+        match res {
+            Ok(res_opt) => res_opt.unwrap(),
+            Err(err) => panic::resume_unwind(err),
+        }
     }
 }
 
