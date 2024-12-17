@@ -7,6 +7,8 @@
 * Capture and inspect packets produced by your code.
 * Inject and meddle with network packets.
 
+[Documentation](https://docs.rs/netsim/)
+
 ## Examples
 
 See the examples directory in this repo.
