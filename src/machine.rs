@@ -29,6 +29,13 @@ impl Machine {
         let (task_tx, mut task_rx) = mpsc::unbounded::<Pin<Box<dyn Future<Output = ()> + Send + 'static>>>();
         let (startup_tx, startup_rx) = oneshot::channel();
         let join_handle_res = namespace::spawn(move || {
+            match iface::configure::put_up("lo") {
+                Ok(()) => (),
+                Err(err) => {
+                    let _ = startup_tx.send(Err(err));
+                    return;
+                },
+            };
             let runtime_res = tokio::runtime::Runtime::new();
             let runtime = match runtime_res {
                 Ok(runtime) => {
@@ -72,7 +79,7 @@ impl Machine {
     }
 
     /// Adds a network interface to the machine. See the [`IpIfaceBuilder`](crate::IpIfaceBuilder)
-    /// details.
+    /// docs for details.
     pub fn add_ip_iface(&self) -> IpIfaceBuilder<'_> {
         IpIfaceBuilder::new(self)
     }
