@@ -4,6 +4,7 @@ use {
         str::FromStr,
     },
     proc_macro::TokenStream,
+    syn::spanned::Spanned,
     quote::quote_spanned,
 };
 
@@ -102,5 +103,36 @@ fn parse_ipv6_network(s: &str) -> Result<(Ipv6Addr, u8), String> {
         return Err(String::from("subnet mask bits cannot be greater than 128"));
     }
     Ok((addr, subnet_mask_bits))
+}
+
+/// Makes a function run in an isolated network environment.
+#[proc_macro_attribute]
+pub fn isolate(_attr: TokenStream, input: TokenStream) -> TokenStream {
+    let item_fn = syn::parse_macro_input!(input as syn::ItemFn);
+    let span = item_fn.span();
+    let syn::ItemFn { attrs, vis, sig, block } = item_fn;
+    let is_async = sig.asyncness.is_some();
+    let output = if is_async {
+        quote_spanned! {span=>
+            #(#attrs)*
+            #vis #sig {
+                let machine = netsim::Machine::new().expect("error creating machine");
+                let join_handle = machine.spawn(async move #block);
+                join_handle.await.unwrap().unwrap()
+            }
+        }
+    } else {
+        quote_spanned! {span=>
+            #(#attrs)*
+            #vis #sig {
+                let machine = netsim::Machine::new().expect("error creating machine");
+                let join_handle = machine.spawn(async move {
+                    ::netsim::tokio::task::spawn_blocking(move || #block).await.unwrap()
+                });
+                join_handle.join_blocking().unwrap().unwrap()
+            }
+        }
+    };
+    output.into()
 }
 
