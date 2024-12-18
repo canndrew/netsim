@@ -1,6 +1,6 @@
 [package]
 name = "netsim-macros"
-version = "2.0.0-alpha0"
+version = "0.3.0"
 authors = ["Andrew Cann <shum@canndrew.org>"]
 description = "Macros for netsim."
 repository = "https://github.com/canndrew/netsim-ng"
